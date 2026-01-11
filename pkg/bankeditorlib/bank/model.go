@@ -7,8 +7,12 @@ type BankInfo struct {
 	BankPath     string
 	Name         string
 	DateModified time.Time
-	PlayerNumber string
-	AuthorNumber string
+	PlayerID     string
+	AuthorID     string
+}
+
+func (bi *BankInfo) String() string {
+	return bi.Name
 }
 
 // Key represents a key-value pair within a section
@@ -19,10 +23,18 @@ type Key struct {
 	Section *Section // back-reference to parent section
 }
 
+func (k *Key) String() string {
+	return k.Name
+}
+
 // Section represents a named group of keys
 type Section struct {
 	Name string
 	Keys []*Key
+}
+
+func (s *Section) String() string {
+	return s.Name
 }
 
 // Bank represents a complete SC2Bank file structure
@@ -97,12 +109,4 @@ func (s *Section) FindKey(name string) *Key {
 		}
 	}
 	return nil
-}
-
-func (s *Section) GetName() string {
-	return s.Name
-}
-
-func (k *Key) GetName() string {
-	return k.Name
 }

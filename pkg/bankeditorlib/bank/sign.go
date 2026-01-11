@@ -15,8 +15,8 @@ func UpdateSignature(bank *Bank) error {
 
 	var data strings.Builder
 
-	data.WriteString(bank.BankInfo.AuthorNumber)
-	data.WriteString(bank.BankInfo.PlayerNumber)
+	data.WriteString(bank.BankInfo.AuthorID)
+	data.WriteString(bank.BankInfo.PlayerID)
 	data.WriteString(bank.BankInfo.Name)
 
 	for _, section := range util.OrderedByNameAscii(bank.Sections) {

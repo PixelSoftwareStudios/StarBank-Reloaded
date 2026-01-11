@@ -2,17 +2,15 @@ package util
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
 )
 
-type hasName interface {
-	GetName() string
-}
-
-func OrderedByNameAscii[T hasName](in []T) []T {
+// Matches OrderBy(o => o.Name, StringComparer.Ordinal), with stable sort, ascending by default
+func OrderedByNameAscii[T fmt.Stringer](in []T) []T {
 	out := slices.Clone(in)
 	slices.SortStableFunc(out, func(a, b T) int {
-		return cmp.Compare(a.GetName(), b.GetName())
+		return cmp.Compare(a.String(), b.String())
 	})
 	return out
 }
