@@ -14,10 +14,7 @@ import (
 // This is a simple string manipulation function with no locale awareness
 // or float parsing. It only removes commas and spaces.
 func NormalizeNumber(input string) string {
-	// Remove commas
 	result := strings.ReplaceAll(input, ",", "")
-
-	// Remove spaces
 	result = strings.ReplaceAll(result, " ", "")
 
 	return result

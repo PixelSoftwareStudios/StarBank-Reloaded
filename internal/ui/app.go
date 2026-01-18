@@ -40,7 +40,7 @@ func NewApp() *App {
 
 // Run starts the application
 func (a *App) Run() {
-	a.window = a.fyneApp.NewWindow("StarBank Reloaded")
+	a.window = a.fyneApp.NewWindow("StarBank Reloaded v1.0 - The StarCraft II Bank Editor")
 	a.window.Resize(fyne.NewSize(850, 500))
 
 	a.status = widget.NewLabel("Ready")

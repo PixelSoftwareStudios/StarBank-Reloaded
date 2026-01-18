@@ -1,6 +1,10 @@
 # Build
 /dist
 /tmp
+*.app
+*.exe
+*.tar.xz
+fyne_metadata_init.go
 
 # Environment
 .env

@@ -1,0 +1,9 @@
+[Details]
+Icon = "../../assets/logo.png"
+Name = "StarBank Reloaded"
+ID = "net.stuffbydante.starbank"
+Version = "1.0.0"
+Build = 8
+
+[Source]
+Repo = "https://github.com/PixelSoftwareStudios/StarBank-Reloaded"
