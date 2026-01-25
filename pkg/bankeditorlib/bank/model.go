@@ -2,6 +2,16 @@ package bank
 
 import "time"
 
+const (
+	KeyTypeFixed   = "fixed"
+	KeyTypeFlag    = "flag"
+	KeyTypeInt     = "int"
+	KeyTypeString  = "string"
+	KeyTypePoint   = "point"
+	KeyTypeText    = "text"
+	KeyTypeComplex = ""
+)
+
 // BankInfo contains metadata about a bank file
 type BankInfo struct {
 	BankPath     string

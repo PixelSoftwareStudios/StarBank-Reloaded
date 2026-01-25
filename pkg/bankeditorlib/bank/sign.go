@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Updates bank signature in place
 func UpdateSignature(bank *Bank) error {
 	if bank == nil {
 		return errors.New("Invalid bank")
@@ -26,7 +27,10 @@ func UpdateSignature(bank *Bank) error {
 			data.WriteString(key.Name)
 			data.WriteString("Value")
 			data.WriteString(key.Type)
-			data.WriteString(key.Value)
+			// See: https://github.com/BlueRaja/Starbank/pull/15
+			if key.Type != KeyTypeText {
+				data.WriteString(key.Value)
+			}
 		}
 	}
 
