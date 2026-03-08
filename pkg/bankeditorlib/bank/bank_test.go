@@ -5,160 +5,154 @@ import (
 	"testing"
 )
 
-func TestParseAndWriteRoundTrip(t *testing.T) {
-	// Sample SC2Bank XML
-	xmlInput := `<?xml version="1.0" encoding="utf-8"?>
+// realBankXML is a minimal SC2Bank file in the real on-disk format.
+// Keys use <Value type="val"/> child elements, not attributes on <Key>.
+// The signature uses <Signature value="..."/>.
+const realBankXML = `<?xml version="1.0" encoding="utf-8"?>
 <Bank version="1">
 	<Section name="xp">
-		<Key name="xp" type="int">10000000943</Key>
+		<Key name="xp">
+			<Value int="10000000943"/>
+		</Key>
 	</Section>
 	<Section name="stats">
-		<Key name="level" type="int">50</Key>
-		<Key name="gold" type="string">1000000</Key>
+		<Key name="level">
+			<Value int="50"/>
+		</Key>
+		<Key name="gold">
+			<Value string="1000000"/>
+		</Key>
 	</Section>
 </Bank>`
 
-	// Parse the XML
-	bank, err := ParseBank([]byte(xmlInput))
+func TestParseAndWriteRoundTrip(t *testing.T) {
+	b, err := ParseBank([]byte(realBankXML))
 	if err != nil {
-		t.Fatalf("Failed to parse bank: %v", err)
+		t.Fatalf("ParseBank: %v", err)
 	}
 
-	// Verify parsing
-	if bank.Version != "1" {
-		t.Errorf("Expected version '1', got '%s'", bank.Version)
+	if b.Version != "1" {
+		t.Errorf("version: got %q, want %q", b.Version, "1")
+	}
+	if len(b.Sections) != 2 {
+		t.Fatalf("sections: got %d, want 2", len(b.Sections))
 	}
 
-	if len(bank.Sections) != 2 {
-		t.Fatalf("Expected 2 sections, got %d", len(bank.Sections))
+	xpSec := b.FindSection("xp")
+	if xpSec == nil {
+		t.Fatal("section 'xp' not found")
 	}
-
-	// Verify first section
-	xpSection := bank.FindSection("xp")
-	if xpSection == nil {
-		t.Fatal("Section 'xp' not found")
-	}
-	if len(xpSection.Keys) != 1 {
-		t.Errorf("Expected 1 key in xp section, got %d", len(xpSection.Keys))
-	}
-
-	xpKey := xpSection.FindKey("xp")
+	xpKey := xpSec.FindKey("xp")
 	if xpKey == nil {
-		t.Fatal("Key 'xp' not found")
+		t.Fatal("key 'xp' not found")
 	}
-	if xpKey.Type != "int" {
-		t.Errorf("Expected type 'int', got '%s'", xpKey.Type)
+	if xpKey.Type != KeyTypeInt {
+		t.Errorf("key type: got %q, want %q", xpKey.Type, KeyTypeInt)
 	}
 	if xpKey.Value != "10000000943" {
-		t.Errorf("Expected value '10000000943', got '%s'", xpKey.Value)
+		t.Errorf("key value: got %q, want %q", xpKey.Value, "10000000943")
+	}
+	if xpKey.Section != xpSec {
+		t.Error("key back-reference to section is incorrect")
 	}
 
-	// Verify back-reference
-	if xpKey.Section != xpSection {
-		t.Error("Key back-reference to section is incorrect")
-	}
-
-	// Write back to XML
-	xmlOutput, err := WriteBank(bank)
+	// Write back and verify the output contains expected SC2Bank elements.
+	out, err := WriteBank(b)
 	if err != nil {
-		t.Fatalf("Failed to write bank: %v", err)
+		t.Fatalf("WriteBank: %v", err)
 	}
+	outStr := string(out)
 
-	// Verify output contains expected elements
-	outputStr := string(xmlOutput)
-	if !strings.Contains(outputStr, `<?xml version="1.0" encoding="utf-8"?>`) {
-		t.Error("Output missing XML declaration")
+	mustContain := []string{
+		`<?xml version="1.0" encoding="utf-8"?>`,
+		`<Bank version="1">`,
+		`<Section name="xp">`,
+		`<Key name="xp">`,
+		`<Value int="10000000943">`,
+		`<Key name="level">`,
+		`<Value int="50">`,
+		`<Key name="gold">`,
+		`<Value string="1000000">`,
 	}
-	if !strings.Contains(outputStr, `<Bank version="1">`) {
-		t.Error("Output missing Bank element with version")
-	}
-	if !strings.Contains(outputStr, `<Section name="xp">`) {
-		t.Error("Output missing xp section")
-	}
-	if !strings.Contains(outputStr, `<Key name="xp" type="int">10000000943</Key>`) {
-		t.Error("Output missing xp key")
-	}
-}
-
-func TestAddSectionAndKey(t *testing.T) {
-	bank := NewBank()
-
-	// Add section
-	section := bank.AddSection("inventory")
-	if section == nil {
-		t.Fatal("Failed to add section")
-	}
-
-	// Add key
-	key := section.AddKey("sword", "int", "5")
-	if key == nil {
-		t.Fatal("Failed to add key")
-	}
-
-	// Verify key properties
-	if key.Name != "sword" {
-		t.Errorf("Expected key name 'sword', got '%s'", key.Name)
-	}
-	if key.Type != "int" {
-		t.Errorf("Expected key type 'int', got '%s'", key.Type)
-	}
-	if key.Value != "5" {
-		t.Errorf("Expected key value '5', got '%s'", key.Value)
-	}
-	if key.Section != section {
-		t.Error("Key back-reference to section is incorrect")
-	}
-
-	// Verify section contains key
-	foundKey := section.FindKey("sword")
-	if foundKey != key {
-		t.Error("FindKey did not return the same key instance")
-	}
-
-	// Test adding duplicate section (should return existing)
-	section2 := bank.AddSection("inventory")
-	if section2 != section {
-		t.Error("AddSection should return existing section for duplicate name")
-	}
-
-	// Test updating existing key
-	key2 := section.AddKey("sword", "string", "10")
-	if key2 != key {
-		t.Error("AddKey should return existing key for duplicate name")
-	}
-	if key.Value != "10" {
-		t.Errorf("Expected updated value '10', got '%s'", key.Value)
-	}
-	if key.Type != "string" {
-		t.Errorf("Expected updated type 'string', got '%s'", key.Type)
+	for _, want := range mustContain {
+		if !strings.Contains(outStr, want) {
+			t.Errorf("output missing: %s\nfull output:\n%s", want, outStr)
+		}
 	}
 }
 
 func TestParseWithSignature(t *testing.T) {
-	xmlInput := `<?xml version="1.0" encoding="utf-8"?>
+	const xml = `<?xml version="1.0" encoding="utf-8"?>
 <Bank version="1">
 	<Section name="test">
-		<Key name="value" type="int">123</Key>
+		<Key name="value">
+			<Value int="123"/>
+		</Key>
 	</Section>
-	<Signature>ABC123DEF456</Signature>
+	<Signature value="ABC123DEF456"/>
 </Bank>`
 
-	bank, err := ParseBank([]byte(xmlInput))
+	b, err := ParseBank([]byte(xml))
 	if err != nil {
-		t.Fatalf("Failed to parse bank with signature: %v", err)
+		t.Fatalf("ParseBank: %v", err)
+	}
+	if b.Signature != "ABC123DEF456" {
+		t.Errorf("signature: got %q, want %q", b.Signature, "ABC123DEF456")
 	}
 
-	if bank.Signature != "ABC123DEF456" {
-		t.Errorf("Expected signature 'ABC123DEF456', got '%s'", bank.Signature)
-	}
-
-	// Write back and verify signature is preserved
-	xmlOutput, err := WriteBank(bank)
+	out, err := WriteBank(b)
 	if err != nil {
-		t.Fatalf("Failed to write bank: %v", err)
+		t.Fatalf("WriteBank: %v", err)
+	}
+	if !strings.Contains(string(out), `<Signature value="ABC123DEF456">`) {
+		t.Errorf("signature not preserved in output:\n%s", string(out))
+	}
+}
+
+func TestAddSectionAndKey(t *testing.T) {
+	b := NewBank()
+
+	sec := b.AddSection("inventory")
+	if sec == nil {
+		t.Fatal("AddSection returned nil")
 	}
 
-	if !strings.Contains(string(xmlOutput), "<Signature>ABC123DEF456</Signature>") {
-		t.Error("Signature not preserved in output")
+	key := sec.AddKey("sword", KeyTypeInt, "5")
+	if key == nil {
+		t.Fatal("AddKey returned nil")
+	}
+	if key.Name != "sword" || key.Type != KeyTypeInt || key.Value != "5" {
+		t.Errorf("key fields: got {%q %q %q}, want {%q %q %q}",
+			key.Name, key.Type, key.Value, "sword", KeyTypeInt, "5")
+	}
+	if key.Section != sec {
+		t.Error("key back-reference to section is incorrect")
+	}
+	if sec.FindKey("sword") != key {
+		t.Error("FindKey did not return the same key instance")
+	}
+
+	// Duplicate section returns the existing one.
+	if b.AddSection("inventory") != sec {
+		t.Error("AddSection should return existing section for duplicate name")
+	}
+
+	// Duplicate key updates type and value, returns same pointer.
+	updated := sec.AddKey("sword", KeyTypeString, "10")
+	if updated != key {
+		t.Error("AddKey should return existing key for duplicate name")
+	}
+	if key.Value != "10" || key.Type != KeyTypeString {
+		t.Errorf("AddKey did not update existing key: got {%q %q}", key.Type, key.Value)
+	}
+}
+
+func TestParseMissingSection(t *testing.T) {
+	b, err := ParseBank([]byte(realBankXML))
+	if err != nil {
+		t.Fatalf("ParseBank: %v", err)
+	}
+	if b.FindSection("nonexistent") != nil {
+		t.Error("FindSection should return nil for unknown section")
 	}
 }

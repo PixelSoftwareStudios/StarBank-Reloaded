@@ -2,57 +2,30 @@ package ui
 
 import (
 	"starbank/internal/editor"
+	"starbank/internal/maps"
+	"starbank/internal/settings"
 )
 
-// MapItem represents a StarCraft II map with bank files
-type MapItem struct {
-	Name          string
-	HasBankFiles  bool
-	IsBlizzardMap bool
-}
-
-// AppState holds the application state and editor
+// AppState holds runtime application state — the current open bank, discovered
+// maps, and a reference to the loaded settings.
 type AppState struct {
-	Editor *editor.Editor
+	Editor      *editor.Editor
+	SC2Root     string
+	BankFolders []string
+	AllMaps     []maps.MapItem
+	CurrentMap  *maps.MapItem
 
-	// UI preferences
-	HideBlizzardMaps     bool
-	HideMapsWithoutBanks bool
-	AutoResignOnSave     bool
+	// PathLoadError is non-nil when SC2 path detection failed entirely (as
+	// opposed to succeeding but finding zero bank files).
+	PathLoadError error
 
-	// Map discovery
-	AllMaps      []MapItem
-	FilteredMaps []MapItem
-
-	// Current selection
-	CurrentMapName  string
-	CurrentBankName string
+	Settings *settings.Settings
 }
 
-// NewAppState creates a new application state with default values
+// NewAppState creates a fresh AppState, loading persisted settings from disk.
 func NewAppState() *AppState {
 	return &AppState{
-		Editor:               editor.NewEditor(),
-		HideBlizzardMaps:     true,
-		HideMapsWithoutBanks: true,
-		AutoResignOnSave:     true,
-		AllMaps:              getDefaultMaps(),
-		FilteredMaps:         []MapItem{},
-	}
-}
-
-// getDefaultMaps returns the default mock map list
-// TODO: Replace with real map discovery from SC2 directory
-func getDefaultMaps() []MapItem {
-	return []MapItem{
-		{"?????? ?????? ???????", true, false},
-		{"Custom Hero Defense", true, false},
-		{"Entropy TD", true, false},
-		{"Lottery Defence", true, false},
-		{"Mafia", true, false},
-		{"MineralZ and the Thing", false, false},
-		{"Penguin Warz", true, false},
-		{"Squadron TD Veteran Test", false, false},
-		{"Blizzard Example Map", true, true},
+		Editor:   editor.NewEditor(),
+		Settings: settings.Load(),
 	}
 }

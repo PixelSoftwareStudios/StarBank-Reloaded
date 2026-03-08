@@ -6,21 +6,20 @@ import (
 	"path/filepath"
 
 	"starbank/pkg/bankeditorlib/bank"
+	"starbank/pkg/bankeditorlib/util"
 )
 
-// SaveMode defines how a bank file should be saved
+// SaveMode controls how a bank is persisted to disk.
 type SaveMode int
 
 const (
-	// SaveModeOverwrite replaces the existing file
+	// SaveModeOverwrite replaces the existing file in-place using an atomic rename.
 	SaveModeOverwrite SaveMode = iota
-	// SaveModeBackup creates a .bak file before saving
+	// SaveModeBackup writes a .bak copy of the current file before overwriting.
 	SaveModeBackup
-	// SaveModeAs saves to a new location (path provided separately)
-	SaveModeAs
 )
 
-// Editor manages the lifecycle of a bank document
+// Editor manages the lifecycle of a single open bank document.
 type Editor struct {
 	filePath    string
 	originalXML []byte
@@ -28,171 +27,241 @@ type Editor struct {
 	dirty       bool
 }
 
-// NewEditor creates a new empty editor
+// NewEditor returns an empty editor with no bank loaded.
 func NewEditor() *Editor {
-	return &Editor{
-		bank:  bank.NewBank(),
-		dirty: false,
-	}
+	return &Editor{bank: bank.NewBank()}
 }
 
-// Open loads a bank file from disk and parses it
+// Open reads and parses a .SC2Bank file, then populates BankInfo metadata
+// derived from the file path and filesystem stats.
 func (e *Editor) Open(path string) error {
-	// Read file
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read bank file: %w", err)
+		return fmt.Errorf("reading bank file: %w", err)
 	}
 
-	// Parse bank
-	parsedBank, err := bank.ParseBank(data)
+	b, err := bank.ParseBank(data)
 	if err != nil {
-		return fmt.Errorf("failed to parse bank file: %w", err)
+		return fmt.Errorf("parsing bank: %w", err)
 	}
 
-	// Update BankInfo metadata
-	fileInfo, err := os.Stat(path)
-	if err == nil {
-		parsedBank.BankInfo.DateModified = fileInfo.ModTime()
-		parsedBank.BankInfo.BankPath = path
-		parsedBank.BankInfo.Name = filepath.Base(path)
+	if info, statErr := os.Stat(path); statErr == nil {
+		b.BankInfo.DateModified = info.ModTime()
 	}
+	b.BankInfo.BankPath = path
+	b.BankInfo.Name = bankNameFromPath(path)
+	b.BankInfo.AuthorID = authorIDFromPath(path)
+	b.BankInfo.PlayerID = playerIDFromPath(path)
 
-	// Store state
 	e.filePath = path
 	e.originalXML = data
-	e.bank = parsedBank
+	e.bank = b
 	e.dirty = false
-
 	return nil
 }
 
-// GetBank returns the current bank model for UI to read/edit
+// GetBank returns the current bank model for reads and edits.
+// Call MarkDirty after making changes.
 func (e *Editor) GetBank() *bank.Bank {
 	return e.bank
 }
 
-// MarkDirty sets the dirty flag to indicate unsaved changes
+// MarkDirty records that the bank has unsaved changes.
 func (e *Editor) MarkDirty() {
 	e.dirty = true
 }
 
-// IsDirty returns whether there are unsaved changes
+// IsDirty reports whether there are unsaved changes.
 func (e *Editor) IsDirty() bool {
 	return e.dirty
 }
 
-// Reset reverts the bank to the original XML state
+// GetFilePath returns the current file path, or empty string if no file is open.
+func (e *Editor) GetFilePath() string {
+	return e.filePath
+}
+
+// Reset re-parses the original source XML, discarding all unsaved edits.
 func (e *Editor) Reset() error {
 	if len(e.originalXML) == 0 {
 		return fmt.Errorf("no original data to reset to")
 	}
-
-	// Re-parse original XML
-	parsedBank, err := bank.ParseBank(e.originalXML)
+	b, err := bank.ParseBank(e.originalXML)
 	if err != nil {
-		return fmt.Errorf("failed to reset bank: %w", err)
+		return fmt.Errorf("resetting bank: %w", err)
 	}
+	b.BankInfo.BankPath = e.filePath
+	b.BankInfo.Name = bankNameFromPath(e.filePath)
+	b.BankInfo.AuthorID = authorIDFromPath(e.filePath)
+	b.BankInfo.PlayerID = playerIDFromPath(e.filePath)
 
-	// Restore metadata
-	if e.filePath != "" {
-		parsedBank.BankInfo.BankPath = e.filePath
-		parsedBank.BankInfo.Name = filepath.Base(e.filePath)
-	}
-
-	e.bank = parsedBank
+	e.bank = b
 	e.dirty = false
-
 	return nil
 }
 
-// Save writes the current bank to disk according to the specified mode
-// autoResign indicates whether to re-sign after saving (not implemented yet)
+// Save serializes the bank and writes it to the current file path.
+// If autoResign is true the bank signature is recalculated before writing.
+// SaveModeBackup writes a .bak copy of the original before overwriting.
 func (e *Editor) Save(mode SaveMode, autoResign bool) error {
-	// Generate XML from current bank
+	if e.filePath == "" {
+		return fmt.Errorf("no file path set; use SaveAs for a new file")
+	}
+
+	if autoResign {
+		if err := bank.UpdateSignature(e.bank); err != nil {
+			return fmt.Errorf("re-signing bank: %w", err)
+		}
+	}
+
 	xmlData, err := bank.WriteBank(e.bank)
 	if err != nil {
-		return fmt.Errorf("failed to generate XML: %w", err)
+		return fmt.Errorf("serializing bank: %w", err)
 	}
 
-	// Future: if autoResign is true, sign the data here
-	// For now, this is a placeholder for future signing implementation
-
-	targetPath := e.filePath
-
-	switch mode {
-	case SaveModeBackup:
-		// Create backup of original file
-		if e.filePath != "" {
-			backupPath := e.filePath + ".bak"
-			if err := os.WriteFile(backupPath, e.originalXML, 0644); err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
-			}
+	if mode == SaveModeBackup {
+		if writeErr := os.WriteFile(e.filePath+".bak", e.originalXML, 0644); writeErr != nil {
+			return fmt.Errorf("writing backup: %w", writeErr)
 		}
-		fallthrough
-
-	case SaveModeOverwrite:
-		if targetPath == "" {
-			return fmt.Errorf("no file path set for save")
-		}
-		if err := os.WriteFile(targetPath, xmlData, 0644); err != nil {
-			return fmt.Errorf("failed to write bank file: %w", err)
-		}
-
-	case SaveModeAs:
-		// SaveModeAs requires the path to be set externally before calling
-		// This is handled by SaveAs method
-		return fmt.Errorf("use SaveAs method for SaveModeAs mode")
 	}
 
-	// Update state on successful save
+	if err := writeFileAtomic(e.filePath, xmlData); err != nil {
+		return fmt.Errorf("writing bank file: %w", err)
+	}
+
 	e.originalXML = xmlData
 	e.dirty = false
-
 	return nil
 }
 
-// SaveAs saves the bank to a new file path
+// SaveAs serializes the bank to a new path and updates the editor to track
+// the new file. If autoResign is true the signature is recalculated first.
 func (e *Editor) SaveAs(newPath string, autoResign bool) error {
 	if newPath == "" {
-		return fmt.Errorf("new path cannot be empty")
+		return fmt.Errorf("path cannot be empty")
 	}
 
-	// Generate XML from current bank
+	if autoResign {
+		if err := bank.UpdateSignature(e.bank); err != nil {
+			return fmt.Errorf("re-signing bank: %w", err)
+		}
+	}
+
 	xmlData, err := bank.WriteBank(e.bank)
 	if err != nil {
-		return fmt.Errorf("failed to generate XML: %w", err)
+		return fmt.Errorf("serializing bank: %w", err)
 	}
 
-	// Future: if autoResign is true, sign the data here
-
-	// Write to new path
-	if err := os.WriteFile(newPath, xmlData, 0644); err != nil {
-		return fmt.Errorf("failed to write bank file: %w", err)
+	if err := writeFileAtomic(newPath, xmlData); err != nil {
+		return fmt.Errorf("writing bank file: %w", err)
 	}
 
-	// Update editor state to new path
 	e.filePath = newPath
 	e.originalXML = xmlData
 	e.dirty = false
-
-	// Update bank info
 	e.bank.BankInfo.BankPath = newPath
-	e.bank.BankInfo.Name = filepath.Base(newPath)
-
+	e.bank.BankInfo.Name = bankNameFromPath(newPath)
+	e.bank.BankInfo.AuthorID = authorIDFromPath(newPath)
+	e.bank.BankInfo.PlayerID = playerIDFromPath(newPath)
 	return nil
 }
 
-// CopyXML returns the current bank as an XML string for clipboard
-func (e *Editor) CopyXML() (string, error) {
-	xmlData, err := bank.WriteBank(e.bank)
+// LoadXML parses raw SC2Bank XML and replaces the current bank model,
+// preserving BankInfo metadata (path, IDs, name). This is used by the Raw
+// View to apply hand-edited XML without going through the file system.
+func (e *Editor) LoadXML(data []byte) error {
+	b, err := bank.ParseBank(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate XML: %w", err)
+		return fmt.Errorf("parsing XML: %w", err)
 	}
-	return string(xmlData), nil
+	// Preserve existing BankInfo so path and IDs are not lost.
+	*b.BankInfo = *e.bank.BankInfo
+	e.bank = b
+	e.dirty = true
+	return nil
 }
 
-// GetFilePath returns the current file path
-func (e *Editor) GetFilePath() string {
-	return e.filePath
+// CopyXML returns the current bank serialized as XML without modifying the
+// bank or its dirty state.
+func (e *Editor) CopyXML() (string, error) {
+	data, err := bank.WriteBank(e.bank)
+	if err != nil {
+		return "", fmt.Errorf("serializing bank: %w", err)
+	}
+	return string(data), nil
+}
+
+// writeFileAtomic writes data to path via a temp file + rename so the target
+// file is never partially written.
+func writeFileAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, ".sc2bank-*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	ok := false
+	defer func() {
+		if !ok {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("writing temp file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("syncing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+
+	// Preserve original file permissions when overwriting an existing file.
+	if info, statErr := os.Stat(path); statErr == nil {
+		_ = os.Chmod(tmpPath, info.Mode())
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("replacing file: %w", err)
+	}
+
+	ok = true
+	return nil
+}
+
+// bankNameFromPath returns the filename without its extension.
+func bankNameFromPath(path string) string {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	return base[:len(base)-len(ext)]
+}
+
+// authorIDFromPath extracts the author ID from a standard SC2Bank path:
+//
+//	.../Banks/<authorID>/bankfile.SC2Bank
+func authorIDFromPath(path string) string {
+	candidate := filepath.Base(filepath.Dir(path))
+	if util.IsValidAccountID(candidate) {
+		return candidate
+	}
+	return ""
+}
+
+// playerIDFromPath extracts the player ID from a standard SC2Bank path:
+//
+//	.../Accounts/<accountNum>/<playerID>/Banks/<authorID>/bankfile.SC2Bank
+func playerIDFromPath(path string) string {
+	dir := filepath.Dir(path) // .../Banks/<authorID>
+	dir = filepath.Dir(dir)   // .../Banks
+	dir = filepath.Dir(dir)   // .../<playerID>
+	candidate := filepath.Base(dir)
+	if util.IsValidAccountID(candidate) {
+		return candidate
+	}
+	return ""
 }

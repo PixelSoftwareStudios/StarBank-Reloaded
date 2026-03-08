@@ -2,17 +2,19 @@ package bank
 
 import "time"
 
+// Key type constants as used in SC2Bank <Value type="..."/> attributes.
 const (
-	KeyTypeFixed   = "fixed"
-	KeyTypeFlag    = "flag"
-	KeyTypeInt     = "int"
-	KeyTypeString  = "string"
-	KeyTypePoint   = "point"
-	KeyTypeText    = "text"
-	KeyTypeComplex = ""
+	KeyTypeFixed  = "fixed"
+	KeyTypeFlag   = "flag"
+	KeyTypeInt    = "int"
+	KeyTypePoint  = "point"
+	KeyTypeString = "string"
+	KeyTypeText   = "text"
+	KeyTypeUnit   = "unit"
 )
 
-// BankInfo contains metadata about a bank file
+// BankInfo holds metadata about a bank file path and ownership.
+// It does not contain data from inside the bank file itself.
 type BankInfo struct {
 	BankPath     string
 	Name         string
@@ -25,19 +27,19 @@ func (bi *BankInfo) String() string {
 	return bi.Name
 }
 
-// Key represents a key-value pair within a section
+// Key represents a single key-value pair within a Section.
 type Key struct {
 	Name    string
 	Type    string
 	Value   string
-	Section *Section // back-reference to parent section
+	Section *Section // back-reference to parent
 }
 
 func (k *Key) String() string {
 	return k.Name
 }
 
-// Section represents a named group of keys
+// Section represents a named group of Keys within a Bank.
 type Section struct {
 	Name string
 	Keys []*Key
@@ -47,7 +49,7 @@ func (s *Section) String() string {
 	return s.Name
 }
 
-// Bank represents a complete SC2Bank file structure
+// Bank represents a complete parsed .SC2Bank file.
 type Bank struct {
 	BankInfo  *BankInfo
 	Sections  []*Section
@@ -55,7 +57,7 @@ type Bank struct {
 	Version   string
 }
 
-// NewBank creates a new empty Bank with initialized fields
+// NewBank returns an empty Bank with sensible defaults.
 func NewBank() *Bank {
 	return &Bank{
 		BankInfo: &BankInfo{},
@@ -64,58 +66,45 @@ func NewBank() *Bank {
 	}
 }
 
-// AddSection adds a new section or returns existing one with the given name
+// AddSection returns the existing Section with the given name, or creates and
+// appends a new one.
 func (b *Bank) AddSection(name string) *Section {
-	// Check if section already exists
 	if existing := b.FindSection(name); existing != nil {
 		return existing
 	}
-
-	// Create new section
-	section := &Section{
-		Name: name,
-		Keys: []*Key{},
-	}
+	section := &Section{Name: name, Keys: []*Key{}}
 	b.Sections = append(b.Sections, section)
 	return section
 }
 
-// FindSection returns the section with the given name, or nil if not found
+// FindSection returns the Section with the given name, or nil.
 func (b *Bank) FindSection(name string) *Section {
-	for _, section := range b.Sections {
-		if section.Name == name {
-			return section
+	for _, s := range b.Sections {
+		if s.Name == name {
+			return s
 		}
 	}
 	return nil
 }
 
-// AddKey adds a new key or updates existing one with the given name
-// Sets the back-reference to the parent section
+// AddKey returns the existing Key with the given name (updating its type and
+// value), or creates and appends a new one with a back-reference to s.
 func (s *Section) AddKey(name, keyType, value string) *Key {
-	// Check if key already exists
 	if existing := s.FindKey(name); existing != nil {
 		existing.Type = keyType
 		existing.Value = value
 		return existing
 	}
-
-	// Create new key with back-reference
-	key := &Key{
-		Name:    name,
-		Type:    keyType,
-		Value:   value,
-		Section: s,
-	}
+	key := &Key{Name: name, Type: keyType, Value: value, Section: s}
 	s.Keys = append(s.Keys, key)
 	return key
 }
 
-// FindKey returns the key with the given name, or nil if not found
+// FindKey returns the Key with the given name, or nil.
 func (s *Section) FindKey(name string) *Key {
-	for _, key := range s.Keys {
-		if key.Name == name {
-			return key
+	for _, k := range s.Keys {
+		if k.Name == name {
+			return k
 		}
 	}
 	return nil

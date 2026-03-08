@@ -3,57 +3,44 @@ package bank
 import (
 	"encoding/xml"
 	"fmt"
-	"strings"
 )
 
-// WriteBank writes a Bank model to XML format
-// Preserves section and key order from the model
-func WriteBank(bank *Bank) ([]byte, error) {
-	if bank == nil {
+// WriteBank serializes a Bank model to SC2Bank XML bytes.
+// The caller is responsible for writing the result to disk.
+// Section and key order from the model is preserved exactly.
+func WriteBank(b *Bank) ([]byte, error) {
+	if b == nil {
 		return nil, fmt.Errorf("bank cannot be nil")
 	}
 
-	// Build XML structure
-	xmlBankData := xmlBank{
-		Version:   bank.Version,
-		Sections:  make([]xmlSection, 0, len(bank.Sections)),
-		Signature: bank.Signature,
+	xb := xmlBank{
+		Version:  b.Version,
+		Sections: make([]xmlSection, 0, len(b.Sections)),
 	}
 
-	// Convert sections
-	for _, section := range bank.Sections {
-		xmlSec := xmlSection{
-			Name: section.Name,
-			Keys: make([]xmlKey, 0, len(section.Keys)),
-		}
+	if b.Signature != "" {
+		xb.Signature = &xmlSignature{Value: b.Signature}
+	}
 
-		// Convert keys
-		for _, key := range section.Keys {
-			xmlSec.Keys = append(xmlSec.Keys, xmlKey{
-				Name:  key.Name,
-				Type:  key.Type,
-				Value: key.Value,
+	for _, sec := range b.Sections {
+		xs := xmlSection{
+			Name: sec.Name,
+			Keys: make([]xmlKey, 0, len(sec.Keys)),
+		}
+		for _, k := range sec.Keys {
+			xs.Keys = append(xs.Keys, xmlKey{
+				Name:  k.Name,
+				Value: xmlValue{Type: k.Type, Value: k.Value},
 			})
 		}
-
-		xmlBankData.Sections = append(xmlBankData.Sections, xmlSec)
+		xb.Sections = append(xb.Sections, xs)
 	}
 
-	// Marshal to XML with indentation
-	output, err := xml.MarshalIndent(xmlBankData, "", "\t")
+	out, err := xml.MarshalIndent(xb, "", "\t")
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal bank to XML: %w", err)
+		return nil, fmt.Errorf("marshaling bank XML: %w", err)
 	}
 
-	// Add XML declaration
-	xmlDeclaration := `<?xml version="1.0" encoding="utf-8"?>` + "\n"
-	result := xmlDeclaration + string(output)
-
-	// Clean up empty signature elements
-	if bank.Signature == "" {
-		result = strings.Replace(result, "\n\t<Signature></Signature>", "", 1)
-		result = strings.Replace(result, "<Signature></Signature>\n", "", 1)
-	}
-
-	return []byte(result), nil
+	const header = `<?xml version="1.0" encoding="utf-8"?>` + "\n"
+	return append([]byte(header), out...), nil
 }
