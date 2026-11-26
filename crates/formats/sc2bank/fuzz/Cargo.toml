@@ -24,5 +24,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "structural"
+path = "fuzz_targets/structural.rs"
+required-features = ["fuzzing"]
+test = false
+doc = false
+bench = false
+
 [lints]
 workspace = true
