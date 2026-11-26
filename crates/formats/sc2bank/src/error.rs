@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-use crate::{LimitKind, ValueId};
+use crate::{LimitKind, ValueId, encoding::UTF8_BOM};
 
 /// Position of a diagnostic. Byte offsets are zero-based, lines and columns are one-based.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,7 +19,9 @@ impl Location {
 		let mut line: u32 = 1;
 		let mut column: u32 = 1;
 		let mut previous_cr = false;
-		for character in source[..end].chars() {
+		let prefix = &source[..end];
+		let text = prefix.strip_prefix(UTF8_BOM).unwrap_or(prefix);
+		for character in text.chars() {
 			match character {
 				'\r' => {
 					line = line.saturating_add(1);
@@ -52,6 +54,8 @@ pub enum ParseErrorKind {
 	UnsupportedXmlVersion,
 	/// Malformed XML, including malformed encoding declarations.
 	InvalidXml,
+	/// Namespace syntax cannot be interpreted faithfully by the XML projection.
+	UnsupportedNamespace,
 	/// Document type declarations are prohibited.
 	Doctype,
 	/// The XML root is not an unqualified Bank.
@@ -106,6 +110,9 @@ impl fmt::Display for ParseError {
 			ParseErrorKind::UnsupportedEncoding => write!(output, "expected UTF-8 bank XML")?,
 			ParseErrorKind::UnsupportedXmlVersion => write!(output, "expected XML version 1.0")?,
 			ParseErrorKind::InvalidXml => write!(output, "invalid XML")?,
+			ParseErrorKind::UnsupportedNamespace => {
+				write!(output, "unsupported XML namespace syntax")?
+			}
 			ParseErrorKind::Doctype => {
 				write!(output, "XML document type declarations are unsupported")?
 			}

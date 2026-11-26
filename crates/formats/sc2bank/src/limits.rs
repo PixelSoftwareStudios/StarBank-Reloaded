@@ -5,6 +5,11 @@ const MAX_ATTRIBUTES_PER_ELEMENT: usize = 64;
 const MAX_SCALAR_BYTES: usize = 1024 * 1024;
 const MAX_MARKUP_MARKERS: usize = 400_000;
 
+// The validator deduplicates declarations globally, and may copy inherited bindings
+// on a nested declaration. Bound both dimensions independently of general node size.
+pub(crate) const MAX_NAMESPACE_DECLARATIONS: usize = 1024;
+pub(crate) const MAX_NAMESPACE_SCOPE: usize = 128;
+
 /// Resource bounds shared by the XML reader and writer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -51,6 +56,10 @@ pub enum LimitKind {
 	AttributesPerElement,
 	/// Text or attribute length.
 	ScalarBytes,
+	/// Namespace declarations across the document.
+	NamespaceDeclarations,
+	/// Namespace declarations active along one ancestor chain.
+	NamespaceScope,
 	/// Markup-marker count used to bound validator allocations.
 	MarkupMarkers,
 }

@@ -1,11 +1,11 @@
-use std::{iter, ops::Range, str};
+use std::{iter, ops::Range};
 
 use roxmltree::{Attribute, Document, Node, ParsingOptions, TextPos};
 
 use crate::{
 	BankDocument, Key, KeyId, LimitKind, Limits, Location, OpaqueReason, ParseError,
 	ParseErrorKind, Section, SectionId, StoredSignature, TypedAttribute, ValueId, ValueKind,
-	ValueNode, preflight,
+	ValueNode, encoding, preflight,
 };
 
 pub(crate) const BANK: &str = "Bank";
@@ -31,9 +31,7 @@ pub fn parse(bytes: &[u8], limits: Limits) -> Result<BankDocument, ParseError> {
 	if bytes.len() > limits.document_bytes {
 		return Err(preflight::limit_error(LimitKind::DocumentBytes));
 	}
-	let source = str::from_utf8(bytes).map_err(|error| {
-		ParseError::new(ParseErrorKind::UnsupportedEncoding).with_detail(error.to_string())
-	})?;
+	let source = encoding::utf8_source(bytes)?;
 	let inspection = preflight::inspect(source, limits)?;
 	let options = ParsingOptions {
 		allow_dtd: false,
@@ -241,7 +239,7 @@ fn project_value(
 	element: Node<'_, '_>,
 	namespace_declarations: &[usize],
 ) -> ValueNode {
-	let namespace = element.tag_name().namespace();
+	let namespace = namespace_uri(element);
 	let range = element.range();
 	let declares_namespace = namespace_declarations.binary_search(&range.start).is_ok();
 	ValueNode {
@@ -325,7 +323,11 @@ fn unqualified_attribute<'node, 'source>(
 }
 
 fn is_unqualified(node: Node<'_, '_>, name: &str) -> bool {
-	node.is_element() && node.tag_name().namespace().is_none() && node.tag_name().name() == name
+	node.is_element() && namespace_uri(node).is_none() && node.tag_name().name() == name
+}
+
+fn namespace_uri<'document>(node: Node<'document, '_>) -> Option<&'document str> {
+	node.tag_name().namespace().filter(|uri| !uri.is_empty())
 }
 
 fn is_significant(node: Node<'_, '_>) -> bool {

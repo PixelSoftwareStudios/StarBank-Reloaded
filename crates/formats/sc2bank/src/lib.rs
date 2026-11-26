@@ -1,6 +1,7 @@
 //! Reads StarCraft II bank XML and writes targeted edits without reformatting the document.
 #![forbid(unsafe_code)]
 
+mod encoding;
 mod error;
 mod limits;
 mod model;
