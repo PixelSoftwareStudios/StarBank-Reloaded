@@ -3,19 +3,18 @@ use std::sync::{
 	atomic::{AtomicBool, Ordering},
 };
 
-use sc2bank::Limits;
 use serde::{Deserialize, Serialize};
-use starbank_editor::{Engine, MAX_CONTROL_BYTES};
+use starbank_editor::MAX_CONTROL_BYTES;
 use tauri::{
 	Manager as _, State, WebviewWindow,
 	ipc::{InvokeBody, Request, Response},
 };
 
-use crate::{frame, selection};
+use crate::{frame, save::DesktopSession, selection};
 
 #[derive(Default)]
 pub(crate) struct DesktopEngine {
-	pub(crate) engine: Mutex<Engine>,
+	pub(crate) engine: Mutex<DesktopSession>,
 	dialog_open: AtomicBool,
 }
 
@@ -29,13 +28,18 @@ pub(crate) enum CommandError {
 	Unavailable,
 	WriteRejected(String),
 	WriteUncertain,
+	ActiveWriteRejected(String),
+	ActiveWriteUncertain,
+	NewFileUncertain,
+	SavedNeedsReopen,
 	File(selection::OpenError),
 }
 
 #[derive(Serialize)]
 pub(crate) struct OpenedBank {
-	name: String,
-	control: String,
+	pub(crate) name: String,
+	pub(crate) control: String,
+	pub(crate) can_overwrite: bool,
 }
 
 #[derive(Deserialize)]
@@ -76,23 +80,23 @@ pub(crate) async fn open_bank(
 	}
 	let _dialog = state.dialog()?;
 	let Some(selection) = selection::pick_bank(&window).await else {
+		state
+			.engine
+			.lock()
+			.map_err(|_| CommandError::Unavailable)?
+			.clear_discard();
 		return Ok(None);
 	};
 	let path = selection.path().to_path_buf();
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
-		let (name, bytes) =
-			selection::read_bank(&path, Limits::default()).map_err(CommandError::File)?;
 		let state = app.state::<DesktopEngine>();
-		let reply = state
+		state
 			.engine
 			.lock()
 			.map_err(|_| CommandError::Unavailable)?
-			.dispatch(&control, Some(&bytes));
-		Ok(Some(OpenedBank {
-			name,
-			control: reply.json,
-		}))
+			.open_path(&control, &path)
+			.map(Some)
 	})
 	.await
 	.map_err(|_| CommandError::Unavailable)?
@@ -128,7 +132,7 @@ pub(crate) async fn dispatch_bank(
 	.map_err(|_| CommandError::Unavailable)?
 }
 
-const OPEN_REQUEST: &str = "open";
+pub(crate) const OPEN_REQUEST: &str = "open";
 
 pub(crate) fn is_request(control: &str, kind: &str) -> Result<bool, CommandError> {
 	if control.len() > MAX_CONTROL_BYTES {

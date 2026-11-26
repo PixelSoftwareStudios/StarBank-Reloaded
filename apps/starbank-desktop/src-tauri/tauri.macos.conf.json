@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": ["SC2Bank"],
+        "contentTypes": ["org.starbank-reloaded.sc2bank"],
+        "name": "StarCraft II bank",
+        "role": "Editor",
+        "rank": "Alternate"
+      }
+    ]
+  }
+}

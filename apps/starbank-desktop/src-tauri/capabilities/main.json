@@ -7,6 +7,27 @@
     "allow-open-bank",
     "allow-dispatch-bank",
     "allow-export-bank-copy",
-    "allow-can-export-bank"
+    "allow-can-export-bank",
+    "allow-list-open-requests",
+    "allow-dismiss-open-request",
+    "allow-open-requested-bank",
+    "allow-resign-active-bank",
+    "allow-can-reveal-bank",
+    "allow-reveal-active-bank",
+    "allow-confirm-discard-bank",
+    "allow-save-active-bank",
+    "allow-save-bank-as",
+    "allow-list-active-backups",
+    "allow-restore-active-bank",
+    "allow-refresh-inventory",
+    "allow-select-inventory-folder",
+    "allow-use-automatic-inventory",
+    "allow-cancel-inventory",
+    "allow-open-bank-id",
+    "allow-read-settings",
+    "allow-change-setting",
+    "allow-recover-settings",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

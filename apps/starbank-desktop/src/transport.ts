@@ -11,6 +11,7 @@ const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 interface FileDialogReply {
   name: string;
   control: string;
+  can_overwrite?: boolean;
 }
 
 interface NativeReply {
@@ -22,8 +23,20 @@ export function pickBank(control: string): Promise<FileDialogReply | null> {
   return invoke<FileDialogReply | null>("open_bank", { control });
 }
 
+export function resignActiveBank(target: ActiveBankTarget) {
+  return invoke<FileDialogReply>("resign_active_bank", { target });
+}
+
 export function canExportBank(): Promise<boolean> {
   return invoke<boolean>("can_export_bank");
+}
+
+export function canRevealBank(): Promise<boolean> {
+  return invoke<boolean>("can_reveal_bank");
+}
+
+export function revealActiveBank(target: ActiveBankTarget): Promise<void> {
+  return invoke<void>("reveal_active_bank", { target });
 }
 
 export function exportBankCopy(
@@ -85,4 +98,59 @@ export function encodeBankXml(xml: string): Uint8Array {
     throw new Error("The bank XML contains invalid Unicode text.");
   }
   return encoder.encode(xml);
+}
+
+export interface ActiveBankTarget {
+  requestId: string;
+  documentId: string;
+  revision: string;
+}
+
+export interface BackupChoice {
+  id: number;
+  name: string;
+  timestamp: string;
+  placement: "adjacent" | "managed";
+  health: "verified" | "missing" | "unverified";
+}
+
+export interface BackupChoices {
+  records: readonly BackupChoice[];
+  rejectedMetadata: number;
+}
+
+export function confirmDiscardBank(target: ActiveBankTarget): Promise<boolean> {
+  return invoke<boolean>("confirm_discard_bank", { target });
+}
+
+export function saveActiveBank(
+  target: ActiveBankTarget,
+  withBackup: boolean,
+): Promise<FileDialogReply | null> {
+  return invoke<FileDialogReply | null>("save_active_bank", {
+    target,
+    withBackup,
+  });
+}
+
+export function saveBankAs(
+  target: ActiveBankTarget,
+): Promise<FileDialogReply | null> {
+  return invoke<FileDialogReply | null>("save_bank_as", { target });
+}
+
+export function listActiveBackups(
+  target: ActiveBankTarget,
+): Promise<BackupChoices> {
+  return invoke<BackupChoices>("list_active_backups", { target });
+}
+
+export function restoreActiveBank(
+  target: ActiveBankTarget,
+  backupId: number,
+): Promise<FileDialogReply | null> {
+  return invoke<FileDialogReply | null>("restore_active_bank", {
+    target,
+    backupId,
+  });
 }

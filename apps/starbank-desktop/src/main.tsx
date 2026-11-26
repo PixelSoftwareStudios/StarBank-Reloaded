@@ -1,11 +1,14 @@
 import type {
   EngineCommand,
+  EngineDiff,
+  EngineProfile,
   EngineReply,
   EngineSnapshot,
 } from "@starbank/engine-client/protocol";
 import {
   decodeEngineReply,
   engineRequest,
+  profileLoadForFile,
 } from "@starbank/engine-client/protocol";
 import type {
   BankEditorController,
@@ -17,14 +20,27 @@ import type {
 import { AppShell } from "@starbank/ui";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { BackupPicker } from "./backup-picker";
+import { OpenRequests, openRequestedBank } from "./open-requests";
+import type { ActiveBankTarget, BackupChoices } from "./transport";
 import {
   canExportBank,
+  canRevealBank,
+  confirmDiscardBank,
   decodeBankXml,
   dispatchBank,
   encodeBankXml,
   exportBankCopy,
+  listActiveBackups,
   pickBank,
+  resignActiveBank,
+  restoreActiveBank,
+  revealActiveBank,
+  saveActiveBank,
+  saveBankAs,
 } from "./transport";
+import { useDesktopSettings } from "./use-desktop-settings";
+import { openInventoryBank, useInventory } from "./use-inventory";
 import "@starbank/ui/styles.css";
 
 const APP_NAME = "StarBank Reloaded";
@@ -35,15 +51,37 @@ interface DesktopDocument {
   canRedo: boolean;
 }
 
+type OpenBankSource = (
+  control: string,
+) => Promise<{ name: string; control: string; can_overwrite?: boolean } | null>;
+
 function DesktopApp() {
   const [document, setDocument] = useState<DesktopDocument>();
+  const [profile, setProfile] = useState<EngineProfile>();
+  const [hasDraft, setHasDraft] = useState(false);
+  const [nativeNotice, setNativeNotice] = useState<string>();
+  const [selectedBankId, setSelectedBankId] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [exportAvailable, setExportAvailable] = useState(false);
+  const [revealAvailable, setRevealAvailable] = useState(false);
+  const [overwriteAvailable, setOverwriteAvailable] = useState(false);
+  const [backupPrompt, setBackupPrompt] = useState<{
+    choices: BackupChoices;
+    select: (id?: number) => void;
+  }>();
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
+  const preferences = useDesktopSettings();
+  const { theme, textSize } = preferences.settings;
+
+  useEffect(() => {
+    window.document.documentElement.dataset.starbankTheme = theme;
+    window.document.documentElement.dataset.starbankTextSize = textSize;
+  }, [theme, textSize]);
 
   useEffect(() => {
     void canExportBank().then(setExportAvailable, () => {});
+    void canRevealBank().then(setRevealAvailable, () => {});
   }, []);
 
   function requestId() {
@@ -58,10 +96,17 @@ function DesktopApp() {
       return { ok: false, message: "A bank operation is already in progress." };
     }
     inProgress.current = true;
+    setNativeNotice(undefined);
     setBusy(true);
     try {
       return await run();
     } catch (error) {
+      if (
+        error === "active_write_uncertain" ||
+        error === "saved_needs_reopen"
+      ) {
+        setOverwriteAvailable(false);
+      }
       return { ok: false, message: messageFor(error) };
     } finally {
       inProgress.current = false;
@@ -116,6 +161,36 @@ function DesktopApp() {
       canUndo: snapshot.can_undo,
       canRedo: snapshot.can_redo,
     });
+    if (document?.projection.id !== target.id) {
+      setProfile(undefined);
+    } else if (profile && profile.status !== "unloaded") {
+      try {
+        await updateProfile(target, { kind: "profile_snapshot" });
+      } catch {
+        setProfile(undefined);
+      }
+    }
+  }
+
+  async function updateProfile(
+    target: EditorTarget,
+    command: Extract<
+      EngineCommand,
+      {
+        kind: "profile_snapshot" | "profile_load" | "profile_clear";
+      }
+    >,
+    bytes?: Uint8Array,
+  ) {
+    const { reply } = await dispatch(target, command, bytes);
+    if (
+      reply.result.kind !== "profile" ||
+      reply.document_id !== target.id ||
+      reply.revision !== target.revision
+    ) {
+      throw new Error("The bank changed before its profile could be loaded.");
+    }
+    setProfile(reply.result.payload);
   }
 
   function update(
@@ -133,20 +208,180 @@ function DesktopApp() {
     });
   }
 
+  function activeTarget(target: EditorTarget): ActiveBankTarget {
+    return {
+      documentId: target.id,
+      revision: target.revision,
+      requestId: requestId(),
+    };
+  }
+
+  async function confirmNativeReplacement(): Promise<boolean> {
+    const current = document?.projection;
+    return !current?.dirty || confirmDiscardBank(activeTarget(current));
+  }
+
+  function openFrom(source: OpenBankSource, bankId?: string) {
+    return action(async () => {
+      if (hasDraft) {
+        return {
+          ok: false,
+          message: "Apply or discard the current draft first.",
+        };
+      }
+      if (!(await confirmNativeReplacement())) return { ok: true };
+      const id = requestId();
+      const control = engineRequest(
+        id,
+        document?.projection.dirty
+          ? { kind: "open", payload: { discard_current: true } }
+          : { kind: "open" },
+      );
+      const opened = await source(JSON.stringify(control));
+      if (!opened) return { ok: true };
+      await adopt(opened.name, decodeEngineReply(opened.control, id));
+      setOverwriteAvailable(opened.can_overwrite === true);
+      setSelectedBankId(bankId);
+      return { ok: true, message: `Opened ${opened.name}.` };
+    });
+  }
+
+  const inventory = useInventory({
+    selectedBankId,
+    disabled: busy || hasDraft,
+    onOpenBank: (id) => {
+      void openFrom((control) => openInventoryBank(id, control), id).then(
+        (result) => setNativeNotice(result.message),
+      );
+    },
+  });
+
+  function save(target: EditorTarget, mode: "overwrite" | "backup" | "new") {
+    return action(async () => {
+      const nativeTarget = activeTarget(target);
+      const saved =
+        mode === "new"
+          ? await saveBankAs(nativeTarget)
+          : await saveActiveBank(nativeTarget, mode === "backup");
+      if (!saved) return { ok: true };
+      await adopt(
+        saved.name,
+        decodeEngineReply(saved.control, nativeTarget.requestId),
+      );
+      setOverwriteAvailable(saved.can_overwrite === true);
+      if (mode === "new") setSelectedBankId(undefined);
+      return {
+        ok: true,
+        message:
+          mode === "backup"
+            ? `Saved ${saved.name} with a backup.`
+            : `Saved ${saved.name}.`,
+      };
+    });
+  }
+
+  function restore(target: EditorTarget) {
+    return action(async () => {
+      const choices = await listActiveBackups(activeTarget(target));
+      const backupId = await new Promise<number | undefined>((resolve) => {
+        setBackupPrompt({
+          choices,
+          select(id) {
+            setBackupPrompt(undefined);
+            resolve(id);
+          },
+        });
+      });
+      if (backupId === undefined) return { ok: true };
+      const nativeTarget = activeTarget(target);
+      const restored = await restoreActiveBank(nativeTarget, backupId);
+      if (!restored) return { ok: true };
+      await adopt(
+        restored.name,
+        decodeEngineReply(restored.control, nativeTarget.requestId),
+      );
+      setOverwriteAvailable(restored.can_overwrite === true);
+      return {
+        ok: true,
+        message: `Restored ${restored.name} and saved a reversal backup.`,
+      };
+    });
+  }
+
   const controller: BankEditorController = {
     document: document?.projection,
     busy,
-    onOpen: () =>
-      action(async () => {
-        const id = requestId();
-        const control = engineRequest(id, { kind: "open" });
-        const selected = await pickBank(JSON.stringify(control));
-        if (selected) {
-          await adopt(selected.name, decodeEngineReply(selected.control, id));
-          return { ok: true, message: `Opened ${selected.name}.` };
+    status: nativeNotice,
+    onOpen: () => openFrom(pickBank),
+    onDraftChange: setHasDraft,
+    profile: {
+      current: profile ?? { status: "unloaded" },
+      requireAuthor: profile?.status === "missing_context",
+      onLoad: (target, file, author) =>
+        action(async () => {
+          if (!document || document.projection.id !== target.id) {
+            throw new Error("Open a bank before loading a profile.");
+          }
+          const payload = profileLoadForFile(
+            file,
+            document.projection.name,
+            author,
+          );
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          await updateProfile(target, { kind: "profile_load", payload }, bytes);
+          return { ok: true };
+        }),
+      onClear: (target) =>
+        action(async () => {
+          await updateProfile(target, { kind: "profile_clear" });
+          return { ok: true };
+        }),
+      onPreview: async (target, payload) => {
+        const { reply } = await dispatch(target, {
+          kind: "profile_preview",
+          payload,
+        });
+        if (
+          reply.result.kind !== "profile_preview" ||
+          reply.document_id !== target.id ||
+          reply.revision !== target.revision
+        ) {
+          throw new Error(
+            "The bank changed before the profile preview could be read.",
+          );
         }
+        return reply.result.payload;
+      },
+      onApply: (target, preview_id) =>
+        update(target, { kind: "profile_apply", payload: { preview_id } }),
+    },
+    onStructure: (target, change) =>
+      update(target, { kind: "structure", payload: change }),
+    onRevert: (target, selection) =>
+      update(target, { kind: "revert", payload: selection }),
+    onDiff: async (target) => {
+      let diff: EngineDiff | undefined;
+      const outcome = await action(async () => {
+        const { reply } = await dispatch(target, { kind: "diff" });
+        if (
+          reply.result.kind !== "diff" ||
+          reply.document_id !== target.id ||
+          reply.revision !== target.revision
+        ) {
+          return {
+            ok: false,
+            message: "The bank changed before its diff could be read.",
+          };
+        }
+        diff = reply.result.payload;
         return { ok: true };
-      }),
+      });
+      if (diff) return { ok: true, diff };
+      return {
+        ok: false,
+        message: outcome.message ?? "The bank diff could not be read.",
+      };
+    },
     onEditValues: (target, edits) =>
       update(target, { kind: "set_values", payload: { edits } }),
     onReplaceXml: (target, xml) =>
@@ -158,6 +393,31 @@ function DesktopApp() {
     onRedo: document?.canRedo
       ? (target) => update(target, { kind: "redo" })
       : undefined,
+    onSave: overwriteAvailable
+      ? (target) => save(target, "overwrite")
+      : undefined,
+    onSaveAs: exportAvailable ? (target) => save(target, "new") : undefined,
+    onSaveWithBackup: overwriteAvailable
+      ? (target) => save(target, "backup")
+      : undefined,
+    onRestore: overwriteAvailable ? restore : undefined,
+    onReveal: revealAvailable
+      ? (target) =>
+          action(async () => {
+            await revealActiveBank(activeTarget(target));
+            return { ok: true };
+          })
+      : undefined,
+    onResign: (target) =>
+      action(async () => {
+        const native = activeTarget(target);
+        const result = await resignActiveBank(native);
+        await adopt(
+          result.name,
+          decodeEngineReply(result.control, native.requestId),
+        );
+        return { ok: true, message: "Re-signed the bank in the editor." };
+      }),
     onExport: exportAvailable
       ? (target) =>
           action(async () => {
@@ -211,20 +471,58 @@ function DesktopApp() {
           })
       : undefined,
   };
-  return <AppShell name={APP_NAME} editor={controller} />;
+  return (
+    <>
+      <AppShell
+        name={APP_NAME}
+        editor={controller}
+        inventory={inventory}
+        preferences={preferences}
+        workspaceAccessory={
+          <OpenRequests
+            busy={busy}
+            hasDraft={hasDraft}
+            onOpen={(id) =>
+              openFrom((control) => openRequestedBank(id, control))
+            }
+          />
+        }
+      />
+      {backupPrompt ? (
+        <BackupPicker
+          choices={backupPrompt.choices}
+          select={backupPrompt.select}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function displaySections(snapshot: EngineSnapshot) {
   return snapshot.sections.map((section) => ({
     id: section.id,
     name: section.name ?? "Unnamed section",
+    keys: section.keys.map((key) => ({
+      id: key.id,
+      name: key.name ?? "Unnamed key",
+    })),
     rows: section.keys.flatMap((key): EditorRow[] => {
       const name = key.name ?? "Unnamed key";
       if (key.values.length === 0) {
-        return [{ id: key.id, name, type: "", value: "", editable: false }];
+        return [
+          {
+            id: key.id,
+            keyId: key.id,
+            name,
+            type: "",
+            value: "",
+            editable: false,
+          },
+        ];
       }
       return key.values.map((value) => ({
         id: value.id,
+        keyId: key.id,
         name,
         childName: value.name === "Value" ? undefined : value.name,
         type: value.kind ?? "",
@@ -236,9 +534,40 @@ function displaySections(snapshot: EngineSnapshot) {
 }
 
 function messageFor(error: unknown): string {
+  switch (error) {
+    case "reveal_unavailable":
+      return "Open in Folder is unavailable on this platform.";
+    case "reveal_invalid_target":
+    case "reveal_target_changed":
+      return "The selected bank changed. Try Open in Folder again.";
+    case "reveal_file_changed":
+      return "The bank file changed on disk. Reopen it to use Open in Folder.";
+    case "reveal_failed":
+      return "The file manager could not open the bank folder.";
+  }
   if (error instanceof Error) return error.message;
   if (typeof error === "string" && error === "dialog_busy") {
     return "A file dialog is already open.";
+  }
+  if (error === "stale_bank" || error === "unknown_bank") {
+    return "The selected bank changed. Refresh the inventory and select it again.";
+  }
+  if (error === "active_write_uncertain") {
+    return "The bank write could not be verified. Inspect the file and recovery copies before reopening it.";
+  }
+  if (error === "new_file_uncertain") {
+    return "The new file could not be verified. Inspect the destination and its recovery copies.";
+  }
+  if (error === "saved_needs_reopen") {
+    return "The write was verified on disk. Reopen the bank to refresh the editor.";
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "active_write_rejected" in error &&
+    typeof error.active_write_rejected === "string"
+  ) {
+    return `The bank operation was refused. ${error.active_write_rejected}`;
   }
   if (error === "write_uncertain") {
     return "The export outcome is uncertain. Inspect the destination before retrying.";

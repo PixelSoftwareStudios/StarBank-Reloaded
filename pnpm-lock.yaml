@@ -212,6 +212,9 @@ importers:
       '@starbank/engine-client':
         specifier: workspace:*
         version: link:../../packages/engine-client
+      '@starbank/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@starbank/ui':
         specifier: workspace:*
         version: link:../../packages/ui
