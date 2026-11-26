@@ -8,12 +8,12 @@ This register maps one minimum acceptance case per requirement. Completed entrie
 | AT-MIG-02 | REQ-MIG-02 | Inventory and license/notice audit recorded; owner approves release license before publication. | Pending |
 | AT-ENG-01 | REQ-ENG-01 | CI gates formatting, lints, module-root and size checks; no unsupported APIs or invented results. | Local gates passed. Hosted matrix pending. [Evidence](BOOTSTRAP.md) |
 | AT-ENG-02 | REQ-ENG-02 | Dependency spikes verify real source, license and targets; no Zod/shadcn default or empty crates. | Initial dependencies and shell verified. Production target qualification pending. [Evidence](BOOTSTRAP.md) |
-| AT-FMT-01 | REQ-FMT-01 | Read ordinary real/synthetic XML and reparse exported bank; no MPQ dependency. | Pending |
-| AT-FMT-02 | REQ-FMT-02 | Round-trip multi-value, empty and repeated-name fixtures without coalescing; child labels visible. | Pending |
-| AT-FMT-03 | REQ-FMT-03 | Unchanged export byte identical; edited round-trip preserves semantics/unknowns or rejects. | Pending |
-| AT-FMT-04 | REQ-FMT-04 | Malformed/truncated/oversize/DTD inputs safely reject; fuzz corpus and limits tested. | Pending |
-| AT-SIG-01 | REQ-SIG-01 | Known-good SC2 fixtures and pinned upstream differential vectors, including multi-value/Unicode, pass. | Pending |
-| AT-SIG-02 | REQ-SIG-02 | External, nested and ambiguous paths require context; no false valid state. | Pending |
+| AT-FMT-01 | REQ-FMT-01 | Read ordinary real/synthetic XML and reparse exported bank; no MPQ dependency. | Synthetic UTF-8 tests passed. Real SC2 corpus pending. [Evidence](IMPLEMENTATION.md) |
+| AT-FMT-02 | REQ-FMT-02 | Round-trip multi-value, empty and repeated-name fixtures without coalescing; child labels visible. | Format tests passed. Editor projection pending. [Evidence](IMPLEMENTATION.md) |
+| AT-FMT-03 | REQ-FMT-03 | Unchanged export byte identical; edited round-trip preserves semantics/unknowns or rejects. | Unchanged and targeted attribute edits passed. Other encodings and structural edits pending. [Evidence](IMPLEMENTATION.md) |
+| AT-FMT-04 | REQ-FMT-04 | Malformed/truncated/oversize/DTD inputs safely reject; fuzz corpus and limits tested. | Bounded rejection tests passed. Sustained fuzzing pending. [Evidence](IMPLEMENTATION.md) |
+| AT-SIG-01 | REQ-SIG-01 | Known-good SC2 fixtures and pinned upstream differential vectors, including multi-value/Unicode, pass. | Four synthetic vectors matched pinned v2.0. SC2 fixtures pending. [Evidence](IMPLEMENTATION.md) |
+| AT-SIG-02 | REQ-SIG-02 | External, nested and ambiguous paths require context; no false valid state. | Library validation and status tests passed. Context UI pending. [Evidence](IMPLEMENTATION.md) |
 | AT-SIG-03 | REQ-SIG-03 | Prepared export verifies after reparse; context changes and opt-out diagnosed. | Pending |
 | AT-EDIT-01 | REQ-EDIT-01 | Switch views without losing edits or writing wrong recycled row; stale commands rejected. | Pending |
 | AT-EDIT-02 | REQ-EDIT-02 | 1,000,000 -> 1000000; string commas untouched; >2^53 exact; malformed/group/range invalid blocks save. | Pending |
@@ -28,15 +28,15 @@ This register maps one minimum acceptance case per requirement. Completed entrie
 | AT-SAVE-02 | REQ-SAVE-02 | Failure/crash/lock/conflict/ACL tests on actual Windows/macOS; no blind retry or data loss. | Pending |
 | AT-BACKUP-01 | REQ-BACKUP-01 | Unique bankname_timestamp.sc2bank.bak; existing bytes preserved, backup failure aborts. | Pending |
 | AT-BACKUP-02 | REQ-BACKUP-02 | Batch report, restore verifies and backs up current target, prior backup never overwritten. | Pending |
-| AT-PATH-01 | REQ-PATH-01 | Priority tests incl redirected docs, permission failure, empty folder, explicit NotImplemented. | Pending |
-| AT-PATH-02 | REQ-PATH-02 | Manual root/Accounts/Banks/arbitrary collection; no guessed signature context; exact fallback text. | Pending |
-| AT-MAP-01 | REQ-MAP-01 | No discarded collisions; account picker filters only selected scope; unknown metadata visible. | Pending |
+| AT-PATH-01 | REQ-PATH-01 | Priority tests incl redirected docs, permission failure, empty folder, explicit NotImplemented. | Synthetic candidates passed on macOS. Windows runtime pending. [Evidence](IMPLEMENTATION.md) |
+| AT-PATH-02 | REQ-PATH-02 | Manual root/Accounts/Banks/arbitrary collection; no guessed signature context; exact fallback text. | Local selection and context tests passed. UI fallback integration pending. [Evidence](IMPLEMENTATION.md) |
+| AT-MAP-01 | REQ-MAP-01 | No discarded collisions; account picker filters only selected scope; unknown metadata visible. | Inventory keeps collisions and hidden banks. Account UI and metadata pending. [Evidence](IMPLEMENTATION.md) |
 | AT-MPQ-01 | REQ-MPQ-01 | Differential read, compression/Unicode/error bounds vs StormLib; no MPQ for bank parser. | Pending |
 | AT-MPQ-02 | REQ-MPQ-02 | Backend read/write spike and verified copy output; source untouched; no unsupported success claim. | Pending |
 | AT-MAP-02 | REQ-MAP-02 | Map grouping, known Blizzard filter, ambiguity resolution and multiple bank selector. | Pending |
 | AT-MAP-03 | REQ-MAP-03 | Unchanged map not re-opened, changed re-index, corrupt cache rebuild; 4-worker cap and no freeze. | Pending |
-| AT-UI-01 | REQ-UI-01 | Visual snapshots and keyboard tests at 850×500 and narrow/wide; options pinned, list grows. | Pending |
-| AT-UI-02 | REQ-UI-02 | Filter and setting behavior, layout and copy snapshots; More and gear same settings page. | Pending |
+| AT-UI-01 | REQ-UI-01 | Visual snapshots and keyboard tests at 850×500 and narrow/wide; options pinned, list grows. | Browser tests passed at 850×500 and 390×640. Native and wider views pending. [Evidence](IMPLEMENTATION.md) |
+| AT-UI-02 | REQ-UI-02 | Filter and setting behavior, layout and copy snapshots; More and gear same settings page. | Synthetic filters and callbacks passed. Settings integration pending. [Evidence](IMPLEMENTATION.md) |
 | AT-UI-03 | REQ-UI-03 | Long path/resize/manual scroll, filename visible; icons do not shrink, other scrollbars unaffected. | Pending |
 | AT-UI-04 | REQ-UI-04 | Match reference and show unknown/no bank/multi-bank states correctly. | Pending |
 | AT-UI-05 | REQ-UI-05 | Actual bank projections, selectable profile, virtualized editing and settings toggle, no mock data. | Pending |

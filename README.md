@@ -13,6 +13,6 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The shell currently shows the empty workspace. Bank editing awaits the engine and file adapter.
+The format library reads and patches UTF-8 bank XML. The native discovery library inventories selected banks. The web shell currently shows the empty workspace while the editor and file adapters are in development.
 
 New code licensing remains pending provenance review. The archived Go prototype retains its original [license notice](original/LICENSE).

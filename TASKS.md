@@ -23,16 +23,16 @@ Depends on: 01.
 
 Depends on: 02.
 
-- [ ] Parser and writer, real fixture corpus, unknown handling, bounds and fuzz harness.
-- [ ] Implement and verify: REQ-FMT-01, REQ-FMT-02, REQ-FMT-03, REQ-FMT-04.
+- [x] Implement bounded UTF-8 parsing, lossless unchanged export and targeted existing-value edits. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Qualify real SC2 inputs and other encodings, complete fuzz coverage and verify the remaining acceptance cases for REQ-FMT-01, REQ-FMT-02, REQ-FMT-03 and REQ-FMT-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-04 — Signature and context
 
 Depends on: 03.
 
-- [ ] Canonical vectors and differential oracle; verify before export.
-- [ ] Implement and verify: REQ-SIG-01, REQ-SIG-02, REQ-SIG-03.
+- [x] Implement signature computation and read-only verification. Compare synthetic vectors with the pinned v2.0 signer. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Verify game-generated digests and complete context UI and prepared re-sign/export for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-05 — Editor transactions and validation
@@ -63,8 +63,8 @@ Depends on: 04,05.
 
 Depends on: 02.
 
-- [ ] First valid root, all banks, Linux stub/manual, scopes and resolver fixtures.
-- [ ] Implement and verify: REQ-PATH-01, REQ-PATH-02, REQ-MAP-01.
+- [x] Implement prioritized candidates, Linux manual mode, scoped inventory and signing hints. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Verify real platform paths, player display names and UI integration for REQ-PATH-01, REQ-PATH-02 and REQ-MAP-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-09 — MPQ feasibility and adapter
@@ -87,8 +87,8 @@ Depends on: 08,09.
 
 Depends on: 02,08.
 
-- [ ] React/HeroUI design at 850×500; pinned scroll, menus, metadata and quick options; synthetic fixtures only.
-- [ ] Implement and verify: REQ-UI-01, REQ-UI-02, REQ-UI-03, REQ-UI-04.
+- [x] Implement and browser-check the resizable map list, search, filters, selection and Quick Options using synthetic inventory. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Wire discovery and settings. Complete breadcrumbs, menus, map metadata and bank choice for REQ-UI-01, REQ-UI-02, REQ-UI-03 and REQ-UI-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-12 — Live editor UI
