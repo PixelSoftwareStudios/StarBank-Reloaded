@@ -19,6 +19,8 @@
     "allow-save-bank-as",
     "allow-list-active-backups",
     "allow-restore-active-bank",
+    "allow-create-batch-backup",
+    "allow-cancel-batch-backup",
     "allow-refresh-inventory",
     "allow-select-inventory-folder",
     "allow-use-automatic-inventory",

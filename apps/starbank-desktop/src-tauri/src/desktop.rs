@@ -4,6 +4,7 @@ use tauri::{
 };
 
 use crate::{
+	batch_backup::BatchBackupService,
 	commands::DesktopEngine,
 	inventory::InventoryService,
 	open_requests::{self, OpenRequests},
@@ -20,6 +21,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 	let current_dir = std::env::current_dir().ok();
 	tauri::Builder::default()
 		.manage(DesktopEngine::default())
+		.manage(BatchBackupService::default())
 		.manage(OpenRequests::from_args(
 			current_dir.as_deref(),
 			std::env::args_os().skip(1),
@@ -83,6 +85,8 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::save::save_bank_as,
 			crate::backup::list_active_backups,
 			crate::backup::restore_active_bank,
+			crate::batch_backup::create_batch_backup,
+			crate::batch_backup::cancel_batch_backup,
 			crate::inventory::refresh_inventory,
 			crate::inventory::select_inventory_folder,
 			crate::inventory::use_automatic_inventory,

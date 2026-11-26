@@ -7,12 +7,17 @@ use tauri::{Manager as _, State, WebviewWindow};
 use crate::commands::{self, CommandError, DesktopEngine, OpenedBank};
 
 mod authority;
+mod batch;
 mod projection;
 mod root_record;
 mod scan;
 
 pub(crate) use authority::BankAuthority;
 use authority::is_native_disk_path;
+use batch::MapMembers;
+#[cfg(test)]
+pub(crate) use batch::scan_batch_fixture;
+pub(crate) use batch::{InventoryBatch, InventoryBatchMember};
 use projection::OpaqueIds;
 pub(crate) use projection::{InventoryReason, InventorySnapshot, InventoryStatus};
 use root_record::{ManualRoot, RootRecordStore};
@@ -36,6 +41,7 @@ struct InventoryState {
 	active: Option<Cancellation>,
 	generation: u64,
 	banks: BTreeMap<String, BankAuthority>,
+	map_members: MapMembers,
 	ids: OpaqueIds,
 }
 
@@ -52,6 +58,7 @@ pub(crate) enum InventoryError {
 	Cancelled,
 	Unavailable,
 	UnknownBank,
+	UnknownMap,
 	StaleBank,
 }
 
@@ -167,6 +174,7 @@ impl InventoryService {
 			state.manual_root = accepted_root;
 		}
 		state.banks = banks;
+		state.map_members = snapshot.map_members();
 		if state.root_record_unavailable {
 			snapshot.incomplete = true;
 			snapshot
@@ -187,6 +195,7 @@ impl InventoryService {
 			ScanMode::Manual(path) => {
 				if state.manual_root.as_ref().map(|root| &root.path) != Some(&path) {
 					state.banks.clear();
+					state.map_members.clear();
 				}
 				state.manual_root = Some(ManualRoot {
 					path,
@@ -197,6 +206,7 @@ impl InventoryService {
 			ScanMode::Automatic => {
 				if state.manual_root.take().is_some() {
 					state.banks.clear();
+					state.map_members.clear();
 				}
 				RootChange::Automatic
 			}

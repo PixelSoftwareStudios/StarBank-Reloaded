@@ -11,7 +11,7 @@ use starbank_map_index::IndexReport;
 use starbank_paths::BankInventory;
 use starbank_paths::PlayerScope;
 
-use super::{BankAuthority, authority::AuthorizedRoot};
+use super::{BankAuthority, authority::AuthorizedRoot, batch::MapMembers};
 
 const MAX_BANK_TARGETS: usize = 4_096;
 const MAX_MAP_MATCHES: usize = 49_152;
@@ -80,6 +80,22 @@ pub(super) struct BankItem {
 }
 
 impl InventorySnapshot {
+	pub(super) fn map_members(&self) -> MapMembers {
+		let mut members: MapMembers = self
+			.maps
+			.iter()
+			.map(|map| (map.id.clone(), Vec::new()))
+			.collect();
+		for bank in &self.banks {
+			for id in &bank.map_ids {
+				if let Some(map_banks) = members.get_mut(id) {
+					map_banks.push(bank.id.clone());
+				}
+			}
+		}
+		members
+	}
+
 	pub(super) fn empty(status: InventoryStatus, reason: Option<InventoryReason>) -> Self {
 		Self {
 			status,
@@ -120,6 +136,12 @@ impl OpaqueIds {
 
 	fn id(&self, prefix: &str, path: &Path) -> String {
 		format!("{prefix}{:016x}", self.0.hash_one((prefix, path)))
+	}
+
+	pub(super) fn accepts_map_id(id: &str) -> bool {
+		id.strip_prefix(MAP_PREFIX).is_some_and(|hex| {
+			hex.len() == HEX_ID_CHARS && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+		})
 	}
 
 	pub(super) fn accepts_bank_id(id: &str) -> bool {

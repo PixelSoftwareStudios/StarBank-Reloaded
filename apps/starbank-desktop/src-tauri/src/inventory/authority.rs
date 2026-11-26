@@ -61,16 +61,57 @@ impl BankAuthority {
 	}
 
 	pub(crate) fn validate(&self) -> Result<(), InventoryError> {
+		self.validated_metadata().map(drop)
+	}
+
+	pub(super) fn freeze(self) -> FrozenBankAuthority {
+		let identity = self
+			.validated_metadata()
+			.ok()
+			.and_then(|metadata| DirectoryIdentity::from_metadata(&metadata));
+		FrozenBankAuthority {
+			authority: self,
+			identity,
+		}
+	}
+
+	fn validated_metadata(&self) -> Result<fs::Metadata, InventoryError> {
 		let Some(parent) = self.path.parent() else {
 			return Err(InventoryError::StaleBank);
 		};
 		if !ordinary_directories(parent)
 			|| DirectoryIdentity::read(self.root.path()) != Some(self.root.identity)
-			|| checked_metadata(&self.path).is_none_or(|metadata| !metadata.is_file())
 		{
 			return Err(InventoryError::StaleBank);
 		}
-		Ok(())
+		checked_metadata(&self.path)
+			.filter(fs::Metadata::is_file)
+			.ok_or(InventoryError::StaleBank)
+	}
+}
+
+#[derive(Debug)]
+pub(crate) struct FrozenBankAuthority {
+	authority: BankAuthority,
+	identity: Option<DirectoryIdentity>,
+}
+
+impl FrozenBankAuthority {
+	pub(crate) fn path(&self) -> &Path {
+		self.authority.path()
+	}
+
+	pub(crate) fn validate(&self) -> Result<(), InventoryError> {
+		self.identity
+			.filter(|identity| {
+				self.authority
+					.validated_metadata()
+					.ok()
+					.and_then(|metadata| DirectoryIdentity::from_metadata(&metadata))
+					== Some(*identity)
+			})
+			.map(|_| ())
+			.ok_or(InventoryError::StaleBank)
 	}
 }
 
@@ -90,6 +131,10 @@ impl DirectoryIdentity {
 		if !metadata.is_dir() {
 			return None;
 		}
+		Self::from_metadata(&metadata)
+	}
+
+	fn from_metadata(metadata: &fs::Metadata) -> Option<Self> {
 		#[cfg(unix)]
 		{
 			use std::os::unix::fs::MetadataExt;

@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod backup;
+mod batch_backup;
 mod commands;
 mod desktop;
 mod export;

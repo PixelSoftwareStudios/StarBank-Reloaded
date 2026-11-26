@@ -17,6 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"save_bank_as",
 			"list_active_backups",
 			"restore_active_bank",
+			"create_batch_backup",
+			"cancel_batch_backup",
 			"refresh_inventory",
 			"select_inventory_folder",
 			"use_automatic_inventory",
