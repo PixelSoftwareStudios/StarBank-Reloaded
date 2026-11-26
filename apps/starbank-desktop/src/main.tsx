@@ -23,6 +23,7 @@ import type {
 import { AppShell } from "starbank-ui";
 import { BackupPicker } from "./backup-picker";
 import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
+import { resignExternalBank } from "./external-sign";
 import {
   type ManualSigningPrompt,
   ManualSigningSheet,
@@ -538,6 +539,23 @@ function DesktopApp() {
         breadcrumbAvailable
         tools={
           <BatchBackupTools
+            onResignExternal={
+              exportAvailable && !busy && !closeGuard.pending
+                ? () => {
+                    void action(() =>
+                      resignExternalBank({
+                        setPrompt: setSigningPrompt,
+                        errorMessage: messageFor,
+                      }),
+                    ).then((result) => setNativeNotice(result.message));
+                  }
+                : undefined
+            }
+            externalSigningUnavailable={
+              exportAvailable
+                ? undefined
+                : "Signed copy export is unavailable on this platform."
+            }
             availability={
               !exportAvailable
                 ? {

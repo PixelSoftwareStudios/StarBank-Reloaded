@@ -27,6 +27,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 		.manage(DesktopEngine::default())
 		.manage(DesktopCloseGuard::default())
 		.manage(BatchBackupService::default())
+		.manage(crate::external_sign::ExternalSignService::default())
 		.manage(OpenRequests::from_args(
 			current_dir.as_deref(),
 			std::env::args_os().skip(1),
@@ -85,6 +86,10 @@ pub(crate) fn run() -> tauri::Result<()> {
 			open_requests::dismiss_open_request,
 			open_requests::open_requested_bank,
 			crate::resign::resign_active_bank,
+			crate::external_sign::pick_external_bank_to_resign,
+			crate::external_sign::check_external_bank_signature,
+			crate::external_sign::export_external_signed_bank,
+			crate::external_sign::discard_external_signing_source,
 			crate::reveal::can_reveal_bank,
 			crate::reveal::reveal_active_bank,
 			crate::save::confirm_discard_bank,

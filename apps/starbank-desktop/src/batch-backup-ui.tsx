@@ -37,6 +37,8 @@ export type BackupAvailability =
 interface BatchBackupToolsProps {
   availability: BackupAvailability;
   initialPlacement?: BackupPlacement;
+  onResignExternal?: () => void;
+  externalSigningUnavailable?: string;
   onStart: (request: BatchBackupRequest) => Promise<BatchBackupReport | null>;
   onCancel: () => Promise<void>;
 }
@@ -150,6 +152,8 @@ function Report({ report }: { report: BatchBackupReport }) {
 export function BatchBackupTools({
   availability,
   initialPlacement = "managed",
+  onResignExternal,
+  externalSigningUnavailable,
   onStart,
   onCancel,
 }: BatchBackupToolsProps) {
@@ -275,10 +279,13 @@ export function BatchBackupTools({
             )}
             <Dropdown.Menu
               aria-label="Bank tools"
-              disabledKeys={
-                ready ? (selectedMap ? [] : ["map"]) : ["all", "map"]
-              }
+              disabledKeys={[
+                ...(!onResignExternal ? ["resign"] : []),
+                ...(!ready ? ["all"] : []),
+                ...(!selectedMap ? ["map"] : []),
+              ]}
               onAction={(key) => {
+                if (key === "resign") onResignExternal?.();
                 if (key === "all")
                   choose({ kind: "all" }, "Back up all bank files");
                 if (key === "map" && selectedMap)
@@ -288,9 +295,15 @@ export function BatchBackupTools({
                   );
               }}
             >
+              <Dropdown.Item id="resign">Re-sign external bank…</Dropdown.Item>
               <Dropdown.Item id="all">Back up all bank files</Dropdown.Item>
               <Dropdown.Item id="map">Back up selected map</Dropdown.Item>
             </Dropdown.Menu>
+            {externalSigningUnavailable && (
+              <p className="batch-backup-unavailable">
+                {externalSigningUnavailable}
+              </p>
+            )}
             {ready && !selectedMap && (
               <p className="batch-backup-unavailable">
                 Select a map to back up its bank files.

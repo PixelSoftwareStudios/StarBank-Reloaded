@@ -30,7 +30,7 @@ pub(crate) struct ManualContext {
 }
 
 impl ManualContext {
-	fn validate(self) -> Result<SigningContext, CommandError> {
+	pub(crate) fn validate(self) -> Result<SigningContext, CommandError> {
 		if self
 			.author
 			.len()
@@ -57,6 +57,7 @@ pub(crate) enum ResignReply {
 pub(crate) enum CheckedSignature {
 	Unsigned,
 	Malformed,
+	MissingContext,
 	Unsupported,
 	Valid,
 	Invalid,
@@ -67,6 +68,7 @@ impl From<SignatureStatus> for CheckedSignature {
 		match status {
 			SignatureStatus::Unsigned => Self::Unsigned,
 			SignatureStatus::Malformed(_) => Self::Malformed,
+			SignatureStatus::MissingContext => Self::MissingContext,
 			SignatureStatus::Valid => Self::Valid,
 			SignatureStatus::Invalid => Self::Invalid,
 			_ => Self::Unsupported,

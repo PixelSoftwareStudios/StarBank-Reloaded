@@ -9,6 +9,7 @@ type CheckedSignature = Exclude<EngineSignatureStatus, "missing_context">;
 export interface ManualSigningPrompt {
   name: string;
   sourceStatus?: string;
+  purpose?: "editor" | "signed_copy";
   check: (context: EngineSigningContext) => Promise<CheckedSignature>;
   apply: (context: EngineSigningContext) => Promise<void>;
   dismiss: () => void;
@@ -35,6 +36,7 @@ const sourceMessage: Record<string, string> = {
 export function ManualSigningSheet({
   name,
   sourceStatus,
+  purpose = "editor",
   check,
   apply,
   dismiss,
@@ -80,6 +82,9 @@ export function ManualSigningSheet({
     }
   }
 
+  const actionLabel =
+    purpose === "signed_copy" ? "Save signed copy…" : "Re-sign in editor";
+
   return (
     <dialog
       ref={dialog}
@@ -102,8 +107,10 @@ export function ManualSigningSheet({
             : ""}
         </p>
         <p>
-          Supply the context this bank uses in StarCraft II. Re-signing updates
-          the editor and can be undone.
+          Supply the context this bank uses in StarCraft II.{" "}
+          {purpose === "signed_copy"
+            ? "The signed copy is saved to a new file."
+            : "Re-signing updates the editor and can be undone."}
         </p>
       </div>
       <form
@@ -179,7 +186,7 @@ export function ManualSigningSheet({
             type="submit"
             disabled={working}
           >
-            {working ? "Working…" : "Re-sign in editor"}
+            {working ? "Working…" : actionLabel}
           </button>
         </div>
       </form>

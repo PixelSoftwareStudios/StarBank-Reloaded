@@ -7,6 +7,7 @@ mod close_guard;
 mod commands;
 mod desktop;
 mod export;
+mod external_sign;
 mod frame;
 mod inventory;
 mod open_requests;
