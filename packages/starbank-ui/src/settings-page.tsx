@@ -337,7 +337,7 @@ function InventoryDiscoveryFields({ inventory }: { inventory: MapInventory }) {
           : "Bank inventory ready.");
       break;
     case "cancelled":
-      status = "Bank scan canceled.";
+      status = inventory.message ?? "Bank scan canceled.";
       break;
     case "failed":
       status = inventory.message;
@@ -360,9 +360,12 @@ function InventoryDiscoveryFields({ inventory }: { inventory: MapInventory }) {
           controls={controls}
           rootName={rootName}
           scanning={scanning}
+          onRebuildMapIndex={controls.onRebuildMapIndex}
         />
       )}
-      <p className="settings-page-note">{status}</p>
+      <p className="settings-page-note" role="status">
+        {status}
+      </p>
       {scanning && (
         <progress
           aria-label="Bank discovery progress"

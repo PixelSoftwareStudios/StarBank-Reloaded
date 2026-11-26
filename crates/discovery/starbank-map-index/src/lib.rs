@@ -11,10 +11,10 @@ mod scan;
 mod script;
 
 pub use association::{MapAssociations, MapIndex, MapRecord};
-pub use cache::CacheState;
+pub use cache::{CacheState, PreparedCacheUpdate};
 pub use metadata::{MapMetadata, MapTitleSource, MetadataError, parse_metadata};
 pub use paths::known_cache_roots;
 pub use scan::{
 	Cancellation, IndexIssue, IndexIssueKind, IndexLimit, IndexLimits, IndexReport, IndexRequest,
-	Progress, ScanError, scan_maps,
+	Progress, ScanError, prepare_map_cache_rebuild, scan_maps,
 };

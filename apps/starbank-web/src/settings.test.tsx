@@ -233,6 +233,26 @@ test("settings render manual folder and backup controls only when available", ()
   expect(desktop).toContain("without an automatic backup");
 });
 
+test("settings offer map index rebuild alongside refresh when supported", () => {
+  const noChange = () => undefined;
+  const settings = renderToStaticMarkup(
+    <SettingsPage
+      settings={defaultSettings()}
+      onBack={noChange}
+      onChange={noChange}
+      inventory={{
+        status: "ready",
+        maps: [],
+        selectedMapId: null,
+        onSelectMap: noChange,
+        controls: { onRefresh: noChange, onRebuildMapIndex: noChange },
+      }}
+    />,
+  );
+  expect(settings).toContain('<button type="button">Refresh</button>');
+  expect(settings).toContain("Rebuild map index</button>");
+});
+
 test("settings present archive progress with cancellation when preferences are read-only", () => {
   const noChange = () => undefined;
   const settings = renderToStaticMarkup(
@@ -247,7 +267,7 @@ test("settings present archive progress with cancellation when preferences are r
         scanned: 2,
         total: 5,
         rootName: "Banks",
-        controls: { onCancel: noChange },
+        controls: { onCancel: noChange, onRebuildMapIndex: noChange },
       }}
     />,
   );
@@ -256,6 +276,7 @@ test("settings present archive progress with cancellation when preferences are r
   expect(settings).toContain('max="5" value="2"');
   expect(settings).toContain("2 of 5 map archives inspected");
   expect(settings).toContain('<button type="button">Cancel scan</button>');
+  expect(settings).not.toContain("Rebuild map index</button>");
 });
 
 test.each([

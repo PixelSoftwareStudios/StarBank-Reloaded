@@ -28,12 +28,9 @@ export interface MapFilters {
 
 type InventoryStatus =
   | {
-      status:
-        | "unavailable"
-        | "root-not-found"
-        | "manual-required"
-        | "cancelled";
+      status: "unavailable" | "root-not-found" | "manual-required";
     }
+  | { status: "cancelled"; message?: string }
   | { status: "failed"; message: string }
   | { status: "scanning"; message?: string; scanned?: number; total?: number }
   | {
@@ -143,7 +140,7 @@ export function MapSidebar({
       case "scanning":
         return inventory.message ?? "Scanning for banks…";
       case "cancelled":
-        return "Scan canceled.";
+        return inventory.message ?? "Scan canceled.";
       case "failed":
         return inventory.message;
       case "ready":

@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"create_batch_backup",
 			"cancel_batch_backup",
 			"refresh_inventory",
+			"rebuild_map_index",
 			"select_inventory_folder",
 			"use_automatic_inventory",
 			"cancel_inventory",

@@ -325,3 +325,48 @@ fn map_index_activity_emits_actual_archive_counts_and_honors_cancel_boundary() -
 	assert!(service.start_scan(ScanMode::Refresh).is_ok());
 	Ok(())
 }
+
+#[test]
+fn explicit_map_index_rebuild_uses_the_same_bank_authority_and_cancel_boundary() -> io::Result<()> {
+	let temp = tempfile::tempdir()?;
+	let root = temp.path().canonicalize()?;
+	let bank_root = root.join("Selected banks");
+	let bank = write(&bank_root, "Shared.sc2bank", b"<Bank/>")?;
+	let map_root = root.join("Archives");
+	let archive = write(&map_root, "map.s2ma", ALPHA)?;
+	let roots = [map_root];
+	let cache = root.join("map-metadata.json");
+	let service = InventoryService::with_cache_path(Some(cache.clone()));
+	let initial = manual_snapshot(&service, &bank_root, &roots)?;
+	assert_eq!(initial["canRebuildMapIndex"], true);
+	let bank_id = initial["banks"][0]["id"].as_str().expect("bank id");
+	let previous_cache = fs::read(&cache)?;
+	fs::write(&archive, RIVAL)?;
+
+	let cancelled = service.scan_with_progress(ScanMode::RebuildMapIndex, &roots, |event| {
+		let message = serde_json::to_value(event).expect("progress JSON");
+		if message["stage"] == "inspecting_archives" {
+			assert_eq!(message["generation"], "2");
+			assert_eq!(message["completed"], 1);
+			service.cancel(2).expect("cancel rebuild");
+		}
+	});
+	assert!(matches!(cancelled, Err(InventoryError::Cancelled)));
+	assert_eq!(fs::read(&cache)?, previous_cache);
+	assert_eq!(
+		service
+			.authorize_bank(bank_id)
+			.expect("existing bank")
+			.path(),
+		bank
+	);
+
+	let rebuilt = service
+		.scan_with_roots(ScanMode::RebuildMapIndex, &roots)
+		.expect("rebuild after cancellation");
+	let rebuilt = serialize_snapshot(rebuilt)?;
+	assert_eq!(rebuilt["maps"][0]["name"], "A Different Map");
+	assert_eq!(rebuilt["banks"], initial["banks"]);
+	assert_ne!(fs::read(&cache)?, previous_cache);
+	Ok(())
+}

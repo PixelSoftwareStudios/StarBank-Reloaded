@@ -15,7 +15,8 @@ use starbank_mpq::{MetadataArchive, MetadataEntry, MpqError};
 
 use crate::{
 	CacheState, MapIndex, MapMetadata, MapRecord, MapTitleSource, MetadataError,
-	cache::{self, Cache, Fingerprint},
+	PreparedCacheUpdate,
+	cache::{Cache, CachePolicy, Fingerprint, load_cache},
 	parse_metadata,
 	paths::{ArchiveWork, enumerate},
 };
@@ -215,37 +216,59 @@ pub struct IndexReport {
 pub fn scan_maps(
 	request: IndexRequest<'_>,
 	cancellation: &Cancellation,
-	mut on_progress: impl FnMut(Progress<'_>),
+	on_progress: impl FnMut(Progress<'_>),
 ) -> Result<IndexReport, ScanError> {
+	let (mut report, update) =
+		inspect_maps(request, cancellation, CachePolicy::Reuse, on_progress)?;
+	if let Some(update) = update {
+		let path = update.path.clone();
+		if let Err(source) = update.publish() {
+			report.issues.push(IndexIssue {
+				path,
+				kind: IndexIssueKind::CacheWrite(source),
+			});
+			sort_issues(&mut report.issues);
+		}
+	}
+	Ok(report)
+}
+
+/// Inspects the same authorized map roots without reading the old cache.
+///
+/// Returns a prepared replacement only if the scan completed without warnings
+/// and the new cache could be staged. The caller controls publication.
+///
+/// # Errors
+///
+/// Cancellation, a limit crossing or a worker startup failure aborts the scan
+/// and leaves the previous persisted cache alone.
+pub fn prepare_map_cache_rebuild(
+	request: IndexRequest<'_>,
+	cancellation: &Cancellation,
+	on_progress: impl FnMut(Progress<'_>),
+) -> Result<(IndexReport, Option<PreparedCacheUpdate>), ScanError> {
+	let result = inspect_maps(request, cancellation, CachePolicy::Rebuild, on_progress)?;
+	cancellation.check()?;
+	Ok(result)
+}
+
+fn inspect_maps(
+	request: IndexRequest<'_>,
+	cancellation: &Cancellation,
+	policy: CachePolicy,
+	mut on_progress: impl FnMut(Progress<'_>),
+) -> Result<(IndexReport, Option<PreparedCacheUpdate>), ScanError> {
 	cancellation.check()?;
 	let limits = request.limits.capped();
 	let enumeration = enumerate(request.roots, limits, cancellation)?;
 	let total = enumeration.work.len();
 	let mut issues = enumeration.issues;
-	let (cache, cache_state, cache_path) = match request.cache_path {
-		Some(requested) => {
-			let (cache, state, path, error) =
-				match cache::locate(requested, &enumeration.input_roots) {
-					Ok(normalized) => {
-						let (cache, state, error) = Cache::load(&normalized);
-						(cache, state, Some(normalized), error)
-					}
-					Err(error) => (Cache::default(), CacheState::Unavailable, None, Some(error)),
-				};
-			if let Some(source) = error {
-				issues.push(IndexIssue {
-					path: requested.to_owned(),
-					kind: IndexIssueKind::CacheRead(source),
-				});
-			}
-			(
-				cache,
-				state,
-				path.filter(|_| state != CacheState::Unavailable),
-			)
-		}
-		None => (Cache::default(), CacheState::Disabled, None),
-	};
+	let (cache, cache_state, cache_path) = load_cache(
+		request.cache_path,
+		&enumeration.input_roots,
+		policy,
+		&mut issues,
+	);
 	let mut updated_cache = Cache::default();
 	let mut maps = Vec::new();
 	let mut retained = 0_usize;
@@ -306,24 +329,35 @@ pub fn scan_maps(
 	)?;
 
 	cancellation.check()?;
-	if let Some(path) = cache_path.as_deref()
+	let mut prepared = None;
+	if let Some(path) = cache_path
 		&& enumeration.complete
+		&& (matches!(policy, CachePolicy::Reuse) || issues.is_empty())
 		&& (cache_state != CacheState::Loaded || updated_cache != cache)
-		&& let Err(source) = updated_cache.save(path)
 	{
-		issues.push(IndexIssue {
-			path: path.to_owned(),
-			kind: IndexIssueKind::CacheWrite(source),
-		});
+		match updated_cache.prepare(path.clone()) {
+			Ok(update) => prepared = Some(update),
+			Err(source) => issues.push(IndexIssue {
+				path,
+				kind: IndexIssueKind::CacheWrite(source),
+			}),
+		}
 	}
+	sort_issues(&mut issues);
+	Ok((
+		IndexReport {
+			index: MapIndex::from_records(maps),
+			cache_hits,
+			cache_state,
+			incomplete: !enumeration.complete,
+			issues,
+		},
+		prepared,
+	))
+}
+
+fn sort_issues(issues: &mut [IndexIssue]) {
 	issues.sort_by(|left, right| left.path.cmp(&right.path));
-	Ok(IndexReport {
-		index: MapIndex::from_records(maps),
-		cache_hits,
-		cache_state,
-		incomplete: !enumeration.complete,
-		issues,
-	})
 }
 
 fn process_work(

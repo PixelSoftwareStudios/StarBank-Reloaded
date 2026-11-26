@@ -24,7 +24,7 @@ use progress::InventoryProgressPublisher;
 use projection::OpaqueIds;
 pub(crate) use projection::{InventoryReason, InventorySnapshot, InventoryStatus};
 use root_record::{ManualRoot, RootRecordStore};
-use scan::{check_cancelled, collect_inventory};
+use scan::{MapCache, check_cancelled, collect_inventory};
 
 const PICK_FOLDER_TITLE: &str = "Select SC2 Bank Folder";
 const OPEN_REQUEST: &str = "open";
@@ -51,6 +51,7 @@ struct InventoryState {
 
 enum ScanMode {
 	Refresh,
+	RebuildMapIndex,
 	Manual(PathBuf),
 	Automatic,
 }
@@ -64,6 +65,7 @@ pub(crate) enum InventoryError {
 	UnknownBank,
 	UnknownMap,
 	StaleBank,
+	MapIndexRebuildFailed,
 }
 
 #[derive(Debug, Serialize)]
@@ -166,12 +168,19 @@ impl InventoryService {
 		map_roots: &[PathBuf],
 		notify: impl FnMut(InventoryProgress),
 	) -> Result<InventorySnapshot, InventoryError> {
+		let rebuilding = matches!(mode, ScanMode::RebuildMapIndex);
+		let cache_path = self.cache_path.as_deref();
+		let cache = if rebuilding {
+			MapCache::Rebuild(cache_path.ok_or(InventoryError::MapIndexRebuildFailed)?)
+		} else {
+			MapCache::Reuse(cache_path)
+		};
 		let lease = self.start_scan(mode)?;
 		let mut progress = InventoryProgressPublisher::new(lease.generation, notify);
-		let ((mut snapshot, banks), accepted_root) = collect_inventory(
+		let ((mut snapshot, banks), accepted_root, rebuilt_cache) = collect_inventory(
 			lease.root.as_ref(),
 			map_roots,
-			self.cache_path.as_deref(),
+			cache,
 			&lease.ids,
 			lease.generation,
 			&lease.cancellation,
@@ -179,6 +188,14 @@ impl InventoryService {
 		)?;
 		let mut state = self.state.lock().map_err(|_| InventoryError::Unavailable)?;
 		check_cancelled(&lease.cancellation)?;
+		if rebuilding && snapshot.status == InventoryStatus::Ready {
+			// The lease serializes cancellation with the final replacement.
+			rebuilt_cache
+				.filter(|_| !snapshot.incomplete)
+				.ok_or(InventoryError::MapIndexRebuildFailed)?
+				.publish()
+				.map_err(|_| InventoryError::MapIndexRebuildFailed)?;
+		}
 		let record_value = match lease.change {
 			RootChange::Keep => None,
 			RootChange::Manual => accepted_root.as_ref().map(Some),
@@ -208,7 +225,7 @@ impl InventoryService {
 			return Err(InventoryError::Busy);
 		}
 		let change = match mode {
-			ScanMode::Refresh => RootChange::Keep,
+			ScanMode::Refresh | ScanMode::RebuildMapIndex => RootChange::Keep,
 			ScanMode::Manual(path) => {
 				if state.manual_root.as_ref().map(|root| &root.path) != Some(&path) {
 					state.banks.clear();
@@ -277,6 +294,20 @@ pub(crate) async fn refresh_inventory(
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
 			.scan(ScanMode::Refresh, progress)
+	})
+	.await
+	.map_err(|_| InventoryError::Unavailable)?
+}
+
+#[tauri::command]
+pub(crate) async fn rebuild_map_index(
+	window: WebviewWindow,
+	progress: Channel<InventoryProgress>,
+) -> Result<InventorySnapshot, InventoryError> {
+	let app = window.app_handle().clone();
+	tauri::async_runtime::spawn_blocking(move || {
+		app.state::<InventoryService>()
+			.scan(ScanMode::RebuildMapIndex, progress)
 	})
 	.await
 	.map_err(|_| InventoryError::Unavailable)?

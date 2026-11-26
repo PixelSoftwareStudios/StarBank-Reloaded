@@ -28,6 +28,7 @@ export type BankFilter =
 export interface InventoryControls {
   onSelectDirectory?: () => void;
   onRefresh?: () => void;
+  onRebuildMapIndex?: () => void;
   onUseAutomatic?: () => void;
   onCancel?: () => void;
 }
@@ -156,10 +157,12 @@ export function InventoryActions({
   controls,
   scanning,
   rootName,
+  onRebuildMapIndex,
 }: {
   controls: InventoryControls;
   scanning: boolean;
   rootName?: string | null;
+  onRebuildMapIndex?: () => void;
 }) {
   const { onSelectDirectory, onRefresh, onUseAutomatic, onCancel } = controls;
   return (
@@ -178,6 +181,15 @@ export function InventoryActions({
       {onRefresh && !scanning && (
         <button type="button" onClick={onRefresh}>
           Refresh
+        </button>
+      )}
+      {onRebuildMapIndex && !scanning && (
+        <button
+          type="button"
+          onClick={onRebuildMapIndex}
+          title="Re-read all cached map archives"
+        >
+          Rebuild map index
         </button>
       )}
       {onUseAutomatic && !scanning && (

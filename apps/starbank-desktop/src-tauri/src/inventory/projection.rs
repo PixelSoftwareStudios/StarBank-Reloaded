@@ -55,6 +55,7 @@ pub(crate) struct InventorySnapshot {
 	pub(super) root_name: Option<String>,
 	pub(super) manual: bool,
 	pub(super) incomplete: bool,
+	pub(super) can_rebuild_map_index: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -105,6 +106,7 @@ impl InventorySnapshot {
 			root_name: None,
 			manual: false,
 			incomplete: false,
+			can_rebuild_map_index: false,
 		}
 	}
 }

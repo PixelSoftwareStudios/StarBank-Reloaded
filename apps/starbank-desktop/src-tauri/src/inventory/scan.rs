@@ -4,7 +4,10 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use starbank_map_index::{Cancellation, IndexLimits, IndexRequest, ScanError, scan_maps};
+use starbank_map_index::{
+	Cancellation, IndexLimits, IndexRequest, PreparedCacheUpdate, ScanError,
+	prepare_map_cache_rebuild, scan_maps,
+};
 use starbank_paths::{
 	PathError, PathSelection, ScanLimits, get_sc2_root_path, inventory_banks, is_valid_bank_path,
 };
@@ -23,15 +26,23 @@ const BANK_SCAN_LIMITS: ScanLimits = ScanLimits::new(BANK_SCAN_DEPTH, BANK_SCAN_
 const MAP_SCAN_ENTRIES: usize = 65_536;
 const MAP_SCAN_ARCHIVES: usize = 2_048;
 
+#[derive(Clone, Copy)]
+pub(super) enum MapCache<'a> {
+	Reuse(Option<&'a Path>),
+	Rebuild(&'a Path),
+}
+
+type CollectedInventory = (Projection, Option<ManualRoot>, Option<PreparedCacheUpdate>);
+
 pub(super) fn collect_inventory(
 	manual: Option<&ManualRoot>,
 	map_roots: &[PathBuf],
-	cache_path: Option<&Path>,
+	cache: MapCache<'_>,
 	ids: &OpaqueIds,
 	generation: u64,
 	cancellation: &Cancellation,
 	progress: &mut InventoryProgressPublisher<impl FnMut(InventoryProgress)>,
-) -> Result<(Projection, Option<ManualRoot>), InventoryError> {
+) -> Result<CollectedInventory, InventoryError> {
 	check_cancelled(cancellation)?;
 	progress.locating_folder();
 	let manual_path = manual.map(|root| root.path.as_path());
@@ -46,6 +57,7 @@ pub(super) fn collect_inventory(
 				InventoryStatus::Failed,
 				Some(InventoryReason::InvalidFolder),
 			),
+			None,
 			None,
 		));
 	}
@@ -64,15 +76,17 @@ pub(super) fn collect_inventory(
 					Some(InventoryReason::InvalidFolder),
 				),
 				None,
+				None,
 			));
 		}
-		Err(error) => return Ok((path_failure(manual_path, &error), None)),
+		Err(error) => return Ok((path_failure(manual_path, &error), None, None)),
 	};
 	let root = match AuthorizedRoot::capture(selection.path()) {
 		Ok(root) => root,
 		Err(reason) => {
 			return Ok((
 				empty_projection(manual_path, InventoryStatus::Failed, Some(reason)),
+				None,
 				None,
 			));
 		}
@@ -84,7 +98,7 @@ pub(super) fn collect_inventory(
 	progress.enumerating_banks();
 	let banks = match inventory_banks(&selection, BANK_SCAN_LIMITS) {
 		Ok(banks) => banks,
-		Err(error) => return Ok((path_failure(manual_path, &error), accepted)),
+		Err(error) => return Ok((path_failure(manual_path, &error), accepted, None)),
 	};
 	check_cancelled(cancellation)?;
 
@@ -93,6 +107,10 @@ pub(super) fn collect_inventory(
 		.filter(|root| is_native_disk_path(root))
 		.cloned()
 		.collect::<Vec<_>>();
+	let cache_path = match cache {
+		MapCache::Reuse(path) => path,
+		MapCache::Rebuild(path) => Some(path),
+	};
 	let request = IndexRequest {
 		roots: &roots,
 		cache_path,
@@ -104,19 +122,23 @@ pub(super) fn collect_inventory(
 		},
 	};
 	progress.indexing_maps();
-	let result = scan_maps(request, cancellation, |update| {
-		progress.inspected_archive(update)
-	});
-	let maps = match result {
-		Ok(report) => Some(report),
+	let notify = |update: starbank_map_index::Progress<'_>| progress.inspected_archive(update);
+	let result = match cache {
+		MapCache::Reuse(_) => scan_maps(request, cancellation, notify).map(|report| (report, None)),
+		MapCache::Rebuild(_) if roots.is_empty() => {
+			return Err(InventoryError::MapIndexRebuildFailed);
+		}
+		MapCache::Rebuild(_) => prepare_map_cache_rebuild(request, cancellation, notify),
+	};
+	let (report, rebuilt_cache) = match result {
+		Ok((report, rebuilt_cache)) => (Some(report), rebuilt_cache),
 		Err(ScanError::Cancelled) => return Err(InventoryError::Cancelled),
-		Err(_) => None,
+		Err(_) => (None, None),
 	};
 	check_cancelled(cancellation)?;
-	Ok((
-		project(root, manual.is_some(), &banks, maps.as_ref(), ids),
-		accepted,
-	))
+	let mut projection = project(root, manual.is_some(), &banks, report.as_ref(), ids);
+	projection.0.can_rebuild_map_index = cache_path.is_some() && !roots.is_empty();
+	Ok((projection, accepted, rebuilt_cache))
 }
 
 fn manual_selection(path: &Path) -> Result<PathSelection, PathError> {

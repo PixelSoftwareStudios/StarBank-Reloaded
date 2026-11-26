@@ -18,6 +18,7 @@ interface InventorySnapshot {
   rootName: string | null;
   manual: boolean;
   incomplete: boolean;
+  canRebuildMapIndex: boolean;
 }
 
 type InventoryProgress = { generation: string } & (
@@ -45,6 +46,7 @@ const INVENTORY_FAILURE = "The bank inventory could not be loaded.";
 
 type InventoryQuery =
   | "refresh_inventory"
+  | "rebuild_map_index"
   | "use_automatic_inventory"
   | "select_inventory_folder";
 
@@ -88,15 +90,30 @@ export function useInventory({
       const result = await invoke<InventorySnapshot | null>(command, {
         progress: channel,
       });
-      if (result) setSnapshot(result);
+      if (result) {
+        setSnapshot(result);
+        if (
+          command === "rebuild_map_index" &&
+          result.status === "ready" &&
+          !result.reason
+        ) {
+          setMessage("Map index rebuilt.");
+        }
+      }
     } catch (error) {
-      if (error === "cancelled") setCancelled(true);
-      else
+      if (error === "cancelled") {
+        setCancelled(true);
+        if (command === "rebuild_map_index")
+          setMessage("Map index rebuild canceled.");
+      } else {
         setMessage(
           error === "busy"
             ? "A scan or native file dialog is already open."
-            : INVENTORY_FAILURE,
+            : error === "map_index_rebuild_failed"
+              ? "The map index could not be rebuilt."
+              : INVENTORY_FAILURE,
         );
+      }
     } finally {
       receiving = false;
       active.current = false;
@@ -111,6 +128,10 @@ export function useInventory({
 
   const controls = {
     onRefresh: () => void run("refresh_inventory"),
+    onRebuildMapIndex:
+      snapshot?.status === "ready" && snapshot.canRebuildMapIndex
+        ? () => void run("rebuild_map_index")
+        : undefined,
     onSelectDirectory: () => void run("select_inventory_folder"),
     onUseAutomatic: snapshot?.manual
       ? () => void run("use_automatic_inventory")
@@ -126,23 +147,25 @@ export function useInventory({
   const rootName = snapshot?.rootName;
   const failure = snapshot?.reason ? FAILURE_TEXT[snapshot.reason] : undefined;
   if (query) {
+    const rebuilding = query === "rebuild_map_index";
+    let currentStage = "Starting inventory scan…";
+    if (rebuilding) currentStage = "Rebuilding map index…";
+    else if (query === "select_inventory_folder")
+      currentStage = "Choose a bank folder…";
+    if (progress && (!rebuilding || progress.stage !== "inspecting_archives")) {
+      currentStage = PROGRESS_LABELS[progress.stage];
+    }
     return {
       status: "scanning",
       controls,
       rootName,
-      message:
-        message ??
-        (progress
-          ? PROGRESS_LABELS[progress.stage]
-          : query === "select_inventory_folder"
-            ? "Choose a bank folder…"
-            : "Starting inventory scan…"),
+      message: message ?? currentStage,
       ...(progress?.stage === "inspecting_archives"
         ? { scanned: progress.completed, total: progress.total }
         : {}),
     };
   }
-  if (cancelled) return { status: "cancelled", controls, rootName };
+  if (cancelled) return { status: "cancelled", controls, rootName, message };
   if (snapshot?.status === "ready") {
     return {
       status: "ready",

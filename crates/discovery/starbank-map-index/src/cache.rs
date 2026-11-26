@@ -10,7 +10,7 @@ use cap_std::fs::Metadata;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use crate::MapMetadata;
+use crate::{IndexIssue, IndexIssueKind, MapMetadata};
 
 const CACHE_FORMAT: u32 = 1;
 const MAX_CACHE_BYTES: usize = 16 * 1024 * 1024;
@@ -34,6 +34,46 @@ pub(crate) fn locate(path: &Path, input_roots: &BTreeSet<PathBuf>) -> io::Result
 	Ok(candidate)
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum CachePolicy {
+	Reuse,
+	Rebuild,
+}
+
+pub(crate) fn load_cache(
+	requested: Option<&Path>,
+	input_roots: &BTreeSet<PathBuf>,
+	policy: CachePolicy,
+	issues: &mut Vec<IndexIssue>,
+) -> (Cache, CacheState, Option<PathBuf>) {
+	match requested {
+		Some(requested) => {
+			let (cache, state, path, error) = match locate(requested, input_roots) {
+				Ok(normalized) => {
+					let (cache, state, error) = match policy {
+						CachePolicy::Reuse => Cache::load(&normalized),
+						CachePolicy::Rebuild => (Cache::default(), CacheState::Rebuilding, None),
+					};
+					(cache, state, Some(normalized), error)
+				}
+				Err(error) => (Cache::default(), CacheState::Unavailable, None, Some(error)),
+			};
+			if let Some(source) = error {
+				issues.push(IndexIssue {
+					path: requested.to_owned(),
+					kind: IndexIssueKind::CacheRead(source),
+				});
+			}
+			(
+				cache,
+				state,
+				path.filter(|_| state != CacheState::Unavailable),
+			)
+		}
+		None => (Cache::default(), CacheState::Disabled, None),
+	}
+}
+
 /// The previous persisted metadata cache's state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CacheState {
@@ -43,7 +83,7 @@ pub enum CacheState {
 	Missing,
 	/// A compatible cache was loaded.
 	Loaded,
-	/// A malformed or incompatible cache will be rebuilt.
+	/// The cache was incompatible or deliberately skipped for a rebuild.
 	Rebuilding,
 	/// A filesystem error prevented reading the cache.
 	Unavailable,
@@ -149,7 +189,7 @@ impl Cache {
 		}
 	}
 
-	pub(crate) fn save(&self, path: &Path) -> io::Result<()> {
+	pub(crate) fn prepare(&self, path: PathBuf) -> io::Result<PreparedCacheUpdate> {
 		let directory = path
 			.parent()
 			.filter(|parent| !parent.as_os_str().is_empty())
@@ -166,7 +206,29 @@ impl Cache {
 		};
 		serde_json::to_writer(writer, self)?;
 		temporary.as_file().sync_all()?;
-		temporary.persist(path).map_err(|error| error.error)?;
+		Ok(PreparedCacheUpdate { temporary, path })
+	}
+}
+
+/// A fully written, synced index cache awaiting atomic publication.
+///
+/// Dropping a prepared cache leaves the previous cache intact.
+#[derive(Debug)]
+pub struct PreparedCacheUpdate {
+	temporary: NamedTempFile,
+	pub(crate) path: PathBuf,
+}
+
+impl PreparedCacheUpdate {
+	/// Atomically replaces the app-owned metadata cache with the prepared contents.
+	///
+	/// # Errors
+	///
+	/// Returns the filesystem error if replacement fails.
+	pub fn publish(self) -> io::Result<()> {
+		self.temporary
+			.persist(self.path)
+			.map_err(|error| error.error)?;
 		Ok(())
 	}
 }
