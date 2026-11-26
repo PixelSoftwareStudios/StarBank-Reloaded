@@ -1,26 +1,26 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
 import type {
   EngineCommand,
   EngineDiff,
   EngineProfile,
   EngineReply,
   EngineSnapshot,
-} from "@starbank/engine-client/protocol";
+} from "starbank-engine-client/protocol";
 import {
   decodeEngineReply,
   engineRequest,
   profileLoadForFile,
-} from "@starbank/engine-client/protocol";
+} from "starbank-engine-client/protocol";
 import type {
   BankEditorController,
   BankEditorDocument,
   EditorActionResult,
   EditorRow,
   EditorTarget,
-} from "@starbank/ui";
-import { AppShell } from "@starbank/ui";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
+} from "starbank-ui";
+import { AppShell } from "starbank-ui";
 import { BackupPicker } from "./backup-picker";
 import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
 import {
@@ -52,7 +52,7 @@ import {
 import { useDesktopSettings } from "./use-desktop-settings";
 import { openInventoryBank, useInventory } from "./use-inventory";
 import { useNativeCloseGuard } from "./use-native-close-guard";
-import "@starbank/ui/styles.css";
+import "starbank-ui/styles.css";
 
 const APP_NAME = "StarBank Reloaded";
 

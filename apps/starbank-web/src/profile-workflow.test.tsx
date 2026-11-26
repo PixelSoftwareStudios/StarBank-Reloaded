@@ -1,9 +1,9 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import {
   decodeEngineReply,
   engineRequest,
-} from "@starbank/engine-client/protocol";
-import { AppShell, type BankEditorController } from "@starbank/ui";
-import { renderToStaticMarkup } from "react-dom/server";
+} from "starbank-engine-client/protocol";
+import { AppShell, type BankEditorController } from "starbank-ui";
 import { describe, expect, it, vi } from "vitest";
 
 const target = { document_id: "document-1", expected_revision: "14" };

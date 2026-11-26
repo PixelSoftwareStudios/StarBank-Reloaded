@@ -1,4 +1,4 @@
-import { type EngineInfo, EngineWorkerClient } from "@starbank/engine-client";
+import { type EngineInfo, EngineWorkerClient } from "starbank-engine-client";
 import {
   decodeEngineReply,
   type EngineCommand,
@@ -12,9 +12,9 @@ import {
   type EngineTarget,
   engineRequest,
   profileLoadForFile,
-} from "@starbank/engine-client/protocol";
-import { readBankFile } from "@starbank/platform/browser";
-import type { BankEditorDocument, EditorTarget } from "@starbank/ui";
+} from "starbank-engine-client/protocol";
+import { readBankFile } from "starbank-platform/browser";
+import type { BankEditorDocument, EditorTarget } from "starbank-ui";
 
 const xmlEncoder = new TextEncoder();
 const xmlDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });

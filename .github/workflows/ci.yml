@@ -101,9 +101,9 @@ jobs:
       - run: pnpm build
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm --filter @starbank/web exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm --filter @starbank/web test:browser
-      - run: pnpm --filter @starbank/web exec node test/breadcrumbs.mjs chromium firefox webkit
+      - run: pnpm --filter starbank-web exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm --filter starbank-web test:browser
+      - run: pnpm --filter starbank-web exec node test/breadcrumbs.mjs chromium firefox webkit
 
   desktop:
     name: Native desktop on ${{ matrix.os }}
@@ -129,6 +129,6 @@ jobs:
             libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libx11-dev
       - run: rustup show
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @starbank/desktop exec tauri build --no-bundle --debug -- --locked
+      - run: pnpm --filter starbank-desktop exec tauri build --no-bundle --debug -- --locked
       - run: cargo clippy --locked -p starbank-desktop --features desktop --all-targets -- -D warnings
       - run: cargo test --locked -p starbank-desktop --features desktop

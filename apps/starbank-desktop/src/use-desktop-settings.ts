@@ -1,11 +1,11 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
 import {
   type AppSettings,
   decodeSettings,
   defaultSettings,
   type SettingsIssue,
-} from "@starbank/platform/settings";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+} from "starbank-platform/settings";
 
 type PreferenceKey = Exclude<keyof AppSettings, "version">;
 

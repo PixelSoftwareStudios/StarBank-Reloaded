@@ -1,8 +1,8 @@
-import { type AppSettings, defaultSettings } from "@starbank/platform/settings";
-import { AppShell, type BankEditorDocument } from "@starbank/ui";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import "@starbank/ui/styles.css";
+import { type AppSettings, defaultSettings } from "starbank-platform/settings";
+import { AppShell, type BankEditorDocument } from "starbank-ui";
+import "starbank-ui/styles.css";
 
 const ancestors = [
   "/",

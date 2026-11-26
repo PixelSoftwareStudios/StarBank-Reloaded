@@ -1,8 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
 import type {
   EngineSignatureStatus,
   EngineSigningContext,
-} from "@starbank/engine-client/protocol";
-import { invoke } from "@tauri-apps/api/core";
+} from "starbank-engine-client/protocol";
 
 const HEADER_BYTES = 5;
 const CONTROL_ONLY = 0;

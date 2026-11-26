@@ -1,12 +1,13 @@
-import { EngineTransportError } from "@starbank/engine-client";
+import { useEffect, useRef, useState } from "react";
+import { EngineTransportError } from "starbank-engine-client";
 import type {
   EngineProfile,
   EngineSigningContext,
-} from "@starbank/engine-client/protocol";
+} from "starbank-engine-client/protocol";
 import {
   prepareBankDownload,
   writeBankClipboard,
-} from "@starbank/platform/browser";
+} from "starbank-platform/browser";
 import {
   AppShell,
   type BankEditorController,
@@ -16,8 +17,7 @@ import {
   type EditorTarget,
   preloadEditorTools,
   preloadSettingsPage,
-} from "@starbank/ui";
-import { useEffect, useRef, useState } from "react";
+} from "starbank-ui";
 import {
   type BankEditCommand,
   type BrowserBankSession,

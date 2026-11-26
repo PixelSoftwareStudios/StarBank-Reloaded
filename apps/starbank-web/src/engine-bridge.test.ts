@@ -1,9 +1,9 @@
-import { EngineWorkerClient } from "@starbank/engine-client";
+import { EngineWorkerClient } from "starbank-engine-client";
 import {
   decodeEngineReply,
   engineRequest,
-} from "@starbank/engine-client/protocol";
-import { prepareBankDownload, readBankFile } from "@starbank/platform/browser";
+} from "starbank-engine-client/protocol";
+import { prepareBankDownload, readBankFile } from "starbank-platform/browser";
 import { describe, expect, test, vi } from "vitest";
 
 const BANK_LIMIT = 16;

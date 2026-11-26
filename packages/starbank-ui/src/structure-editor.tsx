@@ -1,9 +1,9 @@
+import { type FormEvent, useId, useState } from "react";
 import {
   type EngineStructureChange,
   type EngineStructuredValueKind,
   STRUCTURED_VALUE_KINDS,
-} from "@starbank/engine-client/protocol";
-import { type FormEvent, useId, useState } from "react";
+} from "starbank-engine-client/protocol";
 import { EditorDialog } from "./editor-dialog";
 import type { EditorRow, EditorSection } from "./editor-model";
 

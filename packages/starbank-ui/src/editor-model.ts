@@ -2,7 +2,7 @@ import type {
   EngineDiff,
   EngineRevertTarget,
   EngineStructureChange,
-} from "@starbank/engine-client/protocol";
+} from "starbank-engine-client/protocol";
 import type { EditorProfileController } from "./simple-profile-model";
 
 export interface EditorTarget {

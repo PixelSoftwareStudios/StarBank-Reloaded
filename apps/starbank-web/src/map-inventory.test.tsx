@@ -1,11 +1,11 @@
-import { AppShell, type MapInventory } from "@starbank/ui";
 import { renderToStaticMarkup } from "react-dom/server";
+import { AppShell, type MapInventory } from "starbank-ui";
 import { describe, expect, it } from "vitest";
 import {
   type BankListItem,
   bankScopeChoices,
   filterBanks,
-} from "../../../packages/ui/src/inventory-browser";
+} from "../../../packages/starbank-ui/src/inventory-browser";
 
 const maps = [
   { id: "alpha", name: "Alpha", isBlizzard: false, hasBankFiles: true },

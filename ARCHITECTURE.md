@@ -43,10 +43,10 @@ starbank-reloaded/
 │   ├── starbank-web/                # Vite static shell
 │   └── starbank-cli/                # Cargo workspace member
 ├── packages/
-│   ├── ui/                         # shared HeroUI components and design tokens
-│   ├── editor/                     # views, interaction, Zustand projection
-│   ├── engine-client/              # typed command client, DTOs, Valibot
-│   └── platform/                   # desktop/browser capabilities and IO adapters
+│   ├── starbank-ui/                # shared HeroUI components and design tokens
+│   ├── starbank-editor/            # editor state and presentation models
+│   ├── starbank-engine-client/     # typed command client, DTOs, Valibot
+│   └── starbank-platform/          # desktop/browser capabilities and IO adapters
 ├── crates/
 │   ├── foundation/starbank-core/   # minimal common IDs, limits, primitives, errors
 │   ├── formats/sc2bank/             # independent format reader/writer and model

@@ -1,5 +1,5 @@
-import { Dropdown } from "@starbank/ui";
 import { useEffect, useId, useRef, useState } from "react";
+import { Dropdown } from "starbank-ui";
 import "./batch-backup-ui.css";
 
 export type BackupScope = { kind: "all" } | { kind: "map"; id: string };

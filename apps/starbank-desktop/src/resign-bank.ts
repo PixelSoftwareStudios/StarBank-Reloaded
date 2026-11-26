@@ -1,12 +1,12 @@
 import {
   decodeEngineReply,
   type EngineReply,
-} from "@starbank/engine-client/protocol";
+} from "starbank-engine-client/protocol";
 import type {
   BankEditorDocument,
   EditorActionResult,
   EditorTarget,
-} from "@starbank/ui";
+} from "starbank-ui";
 import type { ManualSigningPrompt } from "./manual-signing-sheet";
 import { type ActiveBankTarget, resignActiveBank } from "./transport";
 

@@ -1,5 +1,5 @@
-import { type AppSettings, MAP_PANE_WIDTH } from "@starbank/platform/settings";
 import { type ReactNode, useEffect, useRef } from "react";
+import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 
 export type SettingsKey = Exclude<keyof AppSettings, "version">;
 export type ChangeSetting = <Key extends SettingsKey>(

@@ -1,4 +1,3 @@
-import { type AppSettings, MAP_PANE_WIDTH } from "@starbank/platform/settings";
 import {
   type CSSProperties,
   lazy,
@@ -9,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 import type { BankEditorController } from "./editor-model";
 import { EditorPane } from "./editor-pane";
 import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";

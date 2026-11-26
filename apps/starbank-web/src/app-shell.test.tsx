@@ -1,5 +1,5 @@
-import { AppShell, filterMaps, type MapListItem } from "@starbank/ui";
 import { renderToStaticMarkup } from "react-dom/server";
+import { AppShell, filterMaps, type MapListItem } from "starbank-ui";
 import { expect, it } from "vitest";
 
 const MAPS: MapListItem[] = [

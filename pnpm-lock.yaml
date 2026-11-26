@@ -209,15 +209,15 @@ importers:
 
   apps/starbank-desktop:
     dependencies:
-      '@starbank/engine-client':
+      'starbank-engine-client':
         specifier: workspace:*
-        version: link:../../packages/engine-client
-      '@starbank/platform':
+        version: link:../../packages/starbank-engine-client
+      'starbank-platform':
         specifier: workspace:*
-        version: link:../../packages/platform
-      '@starbank/ui':
+        version: link:../../packages/starbank-platform
+      'starbank-ui':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/starbank-ui
       '@tauri-apps/api':
         specifier: 2.12.5
         version: 2.12.5
@@ -258,15 +258,15 @@ importers:
 
   apps/starbank-web:
     dependencies:
-      '@starbank/engine-client':
+      'starbank-engine-client':
         specifier: workspace:*
-        version: link:../../packages/engine-client
-      '@starbank/platform':
+        version: link:../../packages/starbank-engine-client
+      'starbank-platform':
         specifier: workspace:*
-        version: link:../../packages/platform
-      '@starbank/ui':
+        version: link:../../packages/starbank-platform
+      'starbank-ui':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/starbank-ui
       react:
         specifier: 'catalog:'
         version: 19.3.1
@@ -305,7 +305,7 @@ importers:
         specifier: 5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
 
-  packages/engine-client:
+  packages/starbank-engine-client:
     dependencies:
       valibot:
         specifier: 1.5.0
@@ -315,7 +315,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
-  packages/platform:
+  packages/starbank-platform:
     dependencies:
       valibot:
         specifier: 1.5.0
@@ -325,7 +325,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
-  packages/ui:
+  packages/starbank-ui:
     dependencies:
       '@codemirror/commands':
         specifier: 6.11.2
@@ -354,12 +354,12 @@ importers:
       '@lezer/highlight':
         specifier: 1.2.5
         version: 1.2.5
-      '@starbank/engine-client':
+      'starbank-engine-client':
         specifier: workspace:*
-        version: link:../engine-client
-      '@starbank/platform':
+        version: link:../starbank-engine-client
+      'starbank-platform':
         specifier: workspace:*
-        version: link:../platform
+        version: link:../starbank-platform
       lucide-react:
         specifier: 1.80.0
         version: 1.80.0(@types/react@19.3.3)(react@19.3.1)

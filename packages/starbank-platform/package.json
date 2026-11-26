@@ -1,5 +1,5 @@
 {
-  "name": "@starbank/platform",
+  "name": "starbank-platform",
   "private": true,
   "type": "module",
   "exports": {

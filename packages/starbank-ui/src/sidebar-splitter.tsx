@@ -1,5 +1,5 @@
-import { MAP_PANE_WIDTH } from "@starbank/platform/settings";
 import { useRef } from "react";
+import { MAP_PANE_WIDTH } from "starbank-platform/settings";
 
 const KEYBOARD_STEP = 2;
 

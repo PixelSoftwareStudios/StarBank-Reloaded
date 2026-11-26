@@ -1,5 +1,5 @@
 {
-  "name": "@starbank/engine-client",
+  "name": "starbank-engine-client",
   "private": true,
   "type": "module",
   "exports": {

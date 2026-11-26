@@ -1,5 +1,5 @@
 {
-  "name": "@starbank/web",
+  "name": "starbank-web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,9 +11,9 @@
     "test:browser": "node test/browser.mjs"
   },
   "dependencies": {
-    "@starbank/engine-client": "workspace:*",
-    "@starbank/platform": "workspace:*",
-    "@starbank/ui": "workspace:*",
+    "starbank-engine-client": "workspace:*",
+    "starbank-platform": "workspace:*",
+    "starbank-ui": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"

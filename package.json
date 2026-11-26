@@ -6,11 +6,11 @@
     "node": "24.22.3"
   },
   "scripts": {
-    "build": "pnpm --filter @starbank/web build",
+    "build": "pnpm --filter starbank-web build",
     "check": "pnpm run lint && pnpm run typecheck",
-    "dev": "pnpm --filter @starbank/web dev",
+    "dev": "pnpm --filter starbank-web dev",
     "lint": "biome check package.json biome.json tsconfig.base.json apps packages",
-    "test": "pnpm --filter @starbank/web test",
+    "test": "pnpm --filter starbank-web test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

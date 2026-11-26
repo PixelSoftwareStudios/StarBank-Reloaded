@@ -175,7 +175,7 @@ export function MapSidebar({
         <h2 className="text-sm font-semibold" id={titleId}>
           Map List
         </h2>
-        <hr className="map-divider my-2.5" aria-hidden="true" />
+        <hr className="map-divider my-2.5" />
         <label className="map-search">
           <span className="sr-only">Search maps</span>
           <input
@@ -280,7 +280,7 @@ export function MapSidebar({
       </div>
 
       <div className="map-options">
-        <hr className="map-divider mb-2.5" aria-hidden="true" />
+        <hr className="map-divider mb-2.5" />
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Quick Options</legend>
           <label>

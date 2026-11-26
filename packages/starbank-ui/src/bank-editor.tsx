@@ -1,6 +1,4 @@
 import { Tabs } from "@heroui/react/tabs";
-import type { EngineDiff } from "@starbank/engine-client/protocol";
-import type { AppSettings } from "@starbank/platform/settings";
 import {
   lazy,
   type ReactNode,
@@ -8,6 +6,8 @@ import {
   useLayoutEffect,
   useState,
 } from "react";
+import type { EngineDiff } from "starbank-engine-client/protocol";
+import type { AppSettings } from "starbank-platform/settings";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
 import {

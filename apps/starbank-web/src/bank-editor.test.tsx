@@ -1,11 +1,11 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import {
   AppShell,
   type BankEditorDocument,
   type EditorRow,
   normalizeDraft,
   prepareTableDraft,
-} from "@starbank/ui";
-import { renderToStaticMarkup } from "react-dom/server";
+} from "starbank-ui";
 import { describe, expect, it } from "vitest";
 
 const gold: EditorRow = {

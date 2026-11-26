@@ -15,17 +15,17 @@ test:
     pnpm test
 
 wasm:
-    pnpm --filter @starbank/web run wasm
+    pnpm --filter starbank-web run wasm
 
 build:
     cargo build --locked --workspace
     pnpm build
 
 dev-web:
-    pnpm --filter @starbank/web run dev
+    pnpm --filter starbank-web run dev
 
 dev-desktop:
-    pnpm --filter @starbank/desktop run dev
+    pnpm --filter starbank-desktop run dev
 
 package:
-    pnpm --filter @starbank/desktop run build -- --locked
+    pnpm --filter starbank-desktop run build -- --locked

@@ -1,5 +1,5 @@
 {
-  "name": "@starbank/desktop",
+  "name": "starbank-desktop",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@starbank/engine-client": "workspace:*",
-    "@starbank/platform": "workspace:*",
-    "@starbank/ui": "workspace:*",
+    "starbank-engine-client": "workspace:*",
+    "starbank-platform": "workspace:*",
+    "starbank-ui": "workspace:*",
     "@tauri-apps/api": "2.12.5",
     "react": "catalog:",
     "react-dom": "catalog:",

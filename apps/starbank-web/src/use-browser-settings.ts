@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   type AppSettings,
   BROWSER_SETTINGS_KEY,
@@ -7,8 +8,7 @@ import {
   type SettingsIssue,
   type SettingsLoadResult,
   writeBrowserSettings,
-} from "@starbank/platform/settings";
-import { useEffect, useState } from "react";
+} from "starbank-platform/settings";
 
 type PreferenceKey = Exclude<keyof AppSettings, "version">;
 

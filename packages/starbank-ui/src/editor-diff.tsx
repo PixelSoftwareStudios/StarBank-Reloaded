@@ -1,9 +1,9 @@
+import { useState } from "react";
 import type {
   EngineDiff,
   EngineOccurrenceDiff,
   EngineRevertTarget,
-} from "@starbank/engine-client/protocol";
-import { useState } from "react";
+} from "starbank-engine-client/protocol";
 import { EditorDialog } from "./editor-dialog";
 
 const CHANGE_PAGE_SIZE = 100;

@@ -1,6 +1,6 @@
-import type { MapInventory, MapListItem } from "@starbank/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MapInventory, MapListItem } from "starbank-ui";
 import type { FileDialogReply } from "./transport";
 
 interface InventorySnapshot {

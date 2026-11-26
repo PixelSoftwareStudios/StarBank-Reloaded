@@ -1,5 +1,5 @@
-import type { EditorActionResult } from "@starbank/ui";
 import { type ChangeEvent, useRef, useState } from "react";
+import type { EditorActionResult } from "starbank-ui";
 import {
   type BankSelectionSource,
   collectLocalBanks,

@@ -1,7 +1,7 @@
-import type { EditorActionResult } from "@starbank/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import type { EditorActionResult } from "starbank-ui";
 import type { FileDialogReply } from "./transport";
 import "./open-requests.css";
 
