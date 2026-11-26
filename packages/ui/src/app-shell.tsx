@@ -44,6 +44,7 @@ export function AppShell({
   preferences,
   workspaceAccessory,
   tools,
+  breadcrumbAvailable,
 }: {
   name: string;
   inventory?: MapInventory;
@@ -52,6 +53,7 @@ export function AppShell({
   preferences?: PreferencesController;
   workspaceAccessory?: ReactNode;
   tools?: ReactNode;
+  breadcrumbAvailable?: boolean;
 }) {
   const mapPaneId = useId();
   const [mapPaneWidth, setMapPaneWidth] = useState<number>(
@@ -137,6 +139,7 @@ export function AppShell({
                 issue={preferences.issue}
                 onRecover={preferences.recover}
                 readOnly={preferences.readOnly}
+                breadcrumbAvailable={breadcrumbAvailable}
                 focusOnMount
               />
             </Suspense>

@@ -11,6 +11,7 @@
 @import "@heroui/styles/components/popover.css" layer(components);
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "./editor.css";
+@import "./bank-breadcrumbs.css";
 @import "./simple-editor.css";
 
 @import "./inventory-browser.css";

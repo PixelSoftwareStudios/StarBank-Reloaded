@@ -40,6 +40,7 @@ pub(crate) struct OpenedBank {
 	pub(crate) name: String,
 	pub(crate) control: String,
 	pub(crate) can_overwrite: bool,
+	pub(crate) breadcrumbs: Vec<String>,
 }
 
 #[derive(Deserialize)]

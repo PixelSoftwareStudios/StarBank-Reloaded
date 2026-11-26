@@ -1,7 +1,14 @@
 import { Tabs } from "@heroui/react/tabs";
 import type { EngineDiff } from "@starbank/engine-client/protocol";
 import type { AppSettings } from "@starbank/platform/settings";
-import { lazy, type ReactNode, Suspense, useLayoutEffect, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useLayoutEffect,
+  useState,
+} from "react";
+import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
 import {
   EditorActions,
@@ -30,7 +37,7 @@ type EditorView = "simple" | "table" | "raw";
 
 export type EditorSettings = Pick<
   AppSettings,
-  "sectionsLayout" | "wrapRaw" | "groupNumbers"
+  "sectionsLayout" | "wrapRaw" | "groupNumbers" | "showBreadcrumbs"
 >;
 
 let rawEditorModule: Promise<typeof import("./raw-editor")> | undefined;
@@ -219,20 +226,26 @@ export function BankEditor({
       {...fileDropHandlers(controller.onOpenFile, pending, run)}
     >
       <header className="editor-header">
-        <div className="editor-open-actions">
-          <OpenBankButton
-            controller={controller}
-            disabled={pending}
-            run={run}
-          />
-          <BankRevealButton
-            reveal={controller.onReveal}
-            target={target}
-            busy={pending}
-            run={run}
-          />
-          {tools}
-          <SettingsButton open={onOpenSettings} />
+        <div className="editor-header-bar">
+          {document.breadcrumbs?.length &&
+          settings?.showBreadcrumbs !== false ? (
+            <BankBreadcrumbs segments={document.breadcrumbs} />
+          ) : null}
+          <div className="editor-open-actions">
+            <OpenBankButton
+              controller={controller}
+              disabled={pending}
+              run={run}
+            />
+            <BankRevealButton
+              reveal={controller.onReveal}
+              target={target}
+              busy={pending}
+              run={run}
+            />
+            {tools}
+            <SettingsButton open={onOpenSettings} />
+          </div>
         </div>
         <h1 title={document.name}>{document.name}</h1>
         {profileController && (

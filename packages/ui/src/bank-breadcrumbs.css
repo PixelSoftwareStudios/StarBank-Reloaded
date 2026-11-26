@@ -1,0 +1,59 @@
+.editor-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-inline-size: 0;
+}
+
+.editor-header-bar > .editor-open-actions {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.bank-breadcrumbs {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.bank-breadcrumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.bank-breadcrumbs:focus-visible {
+  border-radius: 0.3125rem;
+  outline: 2px solid var(--map-focus);
+  outline-offset: -2px;
+}
+
+.bank-breadcrumbs__path {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  inline-size: max-content;
+  min-block-size: 1.75rem;
+  margin: 0;
+  padding-inline: 0.25rem;
+  list-style: none;
+  color: var(--shell-muted);
+  white-space: nowrap;
+  white-space-collapse: preserve-spaces;
+}
+
+.bank-breadcrumbs__path > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.bank-breadcrumbs__path svg {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+}
+
+.bank-breadcrumbs__path [aria-current="location"] bdi {
+  color: var(--shell-fg);
+  font-weight: 600;
+}

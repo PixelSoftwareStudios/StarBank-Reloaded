@@ -12,10 +12,11 @@ const UNPAIRED_SURROGATE = /[\uD800-\uDFFF]/u;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
-interface FileDialogReply {
+export interface FileDialogReply {
   name: string;
   control: string;
   can_overwrite?: boolean;
+  breadcrumbs?: readonly string[];
 }
 
 interface NativeReply {

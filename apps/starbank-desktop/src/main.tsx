@@ -29,7 +29,11 @@ import {
 } from "./manual-signing-sheet";
 import { OpenRequests, openRequestedBank } from "./open-requests";
 import { resignOpenBank } from "./resign-bank";
-import type { ActiveBankTarget, BackupChoices } from "./transport";
+import type {
+  ActiveBankTarget,
+  BackupChoices,
+  FileDialogReply,
+} from "./transport";
 import {
   canExportBank,
   canRevealBank,
@@ -58,9 +62,7 @@ interface DesktopDocument {
   canRedo: boolean;
 }
 
-type OpenBankSource = (
-  control: string,
-) => Promise<{ name: string; control: string; can_overwrite?: boolean } | null>;
+type OpenBankSource = (control: string) => Promise<FileDialogReply | null>;
 
 function DesktopApp() {
   const [document, setDocument] = useState<DesktopDocument>();
@@ -167,7 +169,11 @@ function DesktopApp() {
     return { reply, bytes: nativeReply.bytes };
   }
 
-  async function adopt(name: string, reply: EngineReply) {
+  async function adopt(
+    name: string,
+    reply: EngineReply,
+    breadcrumbs?: readonly string[],
+  ) {
     if (reply.result.kind === "error") {
       throw new Error(reply.result.payload.message);
     }
@@ -188,6 +194,11 @@ function DesktopApp() {
       projection: {
         ...target,
         name,
+        breadcrumbs:
+          breadcrumbs ??
+          (document?.projection.id === target.id
+            ? document.projection.breadcrumbs
+            : undefined),
         dirty: snapshot.dirty,
         sections: displaySections(snapshot),
         signatureStatus: snapshot.signature_status,
@@ -274,7 +285,11 @@ function DesktopApp() {
       );
       const opened = await source(JSON.stringify(control));
       if (!opened) return { ok: true };
-      await adopt(opened.name, decodeEngineReply(opened.control, id));
+      await adopt(
+        opened.name,
+        decodeEngineReply(opened.control, id),
+        opened.breadcrumbs,
+      );
       setOverwriteAvailable(opened.can_overwrite === true);
       setSelectedBankId(bankId);
       return { ok: true, message: `Opened ${opened.name}.` };
@@ -290,7 +305,6 @@ function DesktopApp() {
       );
     },
   });
-
   const selectedMap =
     inventory.status === "ready"
       ? inventory.maps.find(({ id }) => id === inventory.selectedMapId)
@@ -307,6 +321,7 @@ function DesktopApp() {
       await adopt(
         saved.name,
         decodeEngineReply(saved.control, nativeTarget.requestId),
+        saved.breadcrumbs,
       );
       setOverwriteAvailable(saved.can_overwrite === true);
       if (mode === "new") setSelectedBankId(undefined);
@@ -339,6 +354,7 @@ function DesktopApp() {
       await adopt(
         restored.name,
         decodeEngineReply(restored.control, nativeTarget.requestId),
+        restored.breadcrumbs,
       );
       setOverwriteAvailable(restored.can_overwrite === true);
       return {
@@ -519,6 +535,7 @@ function DesktopApp() {
         editor={controller}
         inventory={inventory}
         preferences={preferences}
+        breadcrumbAvailable
         tools={
           <BatchBackupTools
             availability={

@@ -83,6 +83,7 @@ impl DesktopSession {
 		Ok(OpenedBank {
 			name,
 			control: reply.json,
+			breadcrumbs: selection::display_segments(path),
 			can_overwrite: parsed.result.kind == SNAPSHOT
 				&& starbank_fs::check_replace_scope(path).is_ok(),
 		})

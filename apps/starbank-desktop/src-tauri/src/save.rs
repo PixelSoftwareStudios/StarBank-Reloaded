@@ -132,6 +132,7 @@ impl DesktopSession {
 		Ok(OpenedBank {
 			name: bank_name(path).map_err(CommandError::File)?,
 			control: reply.json,
+			breadcrumbs: crate::selection::display_segments(path),
 			can_overwrite: self
 				.selected
 				.as_ref()

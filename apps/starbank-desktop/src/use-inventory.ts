@@ -1,6 +1,7 @@
 import type { MapInventory, MapListItem } from "@starbank/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FileDialogReply } from "./transport";
 
 interface InventorySnapshot {
   status: "ready" | "root-not-found" | "manual-required" | "failed";
@@ -33,14 +34,8 @@ type InventoryQuery =
   | "use_automatic_inventory"
   | "select_inventory_folder";
 
-interface InventoryOpenedBank {
-  name: string;
-  control: string;
-  can_overwrite: boolean;
-}
-
 export function openInventoryBank(id: string, control: string) {
-  return invoke<InventoryOpenedBank>("open_bank_id", { id, control });
+  return invoke<FileDialogReply>("open_bank_id", { id, control });
 }
 
 export function useInventory({

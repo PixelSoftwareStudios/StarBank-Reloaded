@@ -34,6 +34,7 @@ export interface EditorSection {
 
 export interface BankEditorDocument extends EditorTarget {
   name: string;
+  breadcrumbs?: readonly string[];
   xml: string;
   dirty: boolean;
   sections: readonly EditorSection[];

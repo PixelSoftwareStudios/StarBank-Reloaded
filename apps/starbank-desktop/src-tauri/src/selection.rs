@@ -40,6 +40,12 @@ pub(crate) fn bank_name(path: &Path) -> Result<String, OpenError> {
 		.ok_or(OpenError::InvalidName)
 }
 
+pub(crate) fn display_segments(path: &Path) -> Vec<String> {
+	path.components()
+		.map(|part| part.as_os_str().to_string_lossy().into_owned())
+		.collect()
+}
+
 pub(crate) fn read_bank(path: &Path, limits: Limits) -> Result<(String, FileSnapshot), OpenError> {
 	let name = bank_name(path)?;
 	let snapshot = read_snapshot(path, limits.document_bytes).map_err(|error| match error {

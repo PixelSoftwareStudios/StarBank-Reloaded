@@ -2,6 +2,7 @@ import type { EditorActionResult } from "@starbank/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import type { FileDialogReply } from "./transport";
 import "./open-requests.css";
 
 const QUEUE_CHANGED = "bank-open-requests";
@@ -11,14 +12,8 @@ interface OpenRequest {
   name: string;
 }
 
-interface OpenedBank {
-  name: string;
-  control: string;
-  can_overwrite: boolean;
-}
-
 export function openRequestedBank(id: number, control: string) {
-  return invoke<OpenedBank | null>("open_requested_bank", { id, control });
+  return invoke<FileDialogReply | null>("open_requested_bank", { id, control });
 }
 
 export function OpenRequests({
