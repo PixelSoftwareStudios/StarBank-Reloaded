@@ -1,0 +1,63 @@
+@import "tailwindcss";
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+@import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/base" layer(base);
+@import "@heroui/styles/components/separator.css" layer(components);
+
+@source "./";
+
+:root {
+  color-scheme: light dark;
+  --workspace-bg: #f7f8fa;
+  --map-pane-bg: #fff;
+  --shell-fg: #202127;
+  --shell-muted: #525765;
+  --shell-divider: #d8dae0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --workspace-bg: #141518;
+    --map-pane-bg: #1a1b1f;
+    --shell-fg: #f0f0f4;
+    --shell-muted: #b2b3bd;
+    --shell-divider: #36373e;
+  }
+}
+
+.starbank-shell {
+  display: grid;
+  grid-template:
+    "workspace" minmax(12rem, 1fr)
+    "maps" auto;
+  min-height: 100dvh;
+  background: var(--workspace-bg);
+  color: var(--shell-fg);
+}
+
+.bank-workspace {
+  grid-area: workspace;
+}
+
+.map-pane {
+  grid-area: maps;
+  background: var(--map-pane-bg);
+  border-block-start: 1px solid var(--shell-divider);
+  --separator: var(--shell-divider);
+}
+
+.empty-message {
+  color: var(--shell-muted);
+}
+
+@media (min-width: 42rem) {
+  .starbank-shell {
+    grid-template: "maps workspace" 1fr / 28% minmax(0, 1fr);
+  }
+
+  .map-pane {
+    border-block-start: 0;
+    border-inline-end: 1px solid var(--shell-divider);
+  }
+}

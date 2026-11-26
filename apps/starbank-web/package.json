@@ -1,0 +1,27 @@
+{
+  "name": "@starbank/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@starbank/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@types/node": "24.19.4",
+    "@types/react": "catalog:",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "catalog:",
+    "vite": "8.3.8",
+    "vitest": "5.1.2"
+  }
+}
