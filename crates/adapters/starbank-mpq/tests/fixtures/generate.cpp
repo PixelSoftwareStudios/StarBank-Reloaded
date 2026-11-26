@@ -7,11 +7,13 @@
 #include <string>
 #include <vector>
 
+enum class Contents { Metadata, AlternateCodec, EmptyArchive, EmptyScript };
+
 struct Fixture {
     const char *filename;
     DWORD version;
     bool listfile;
-    bool bzip2_and_missing_header;
+    Contents contents;
 };
 
 static bool matches_payload(const char *path, const char *entry, const std::vector<char> &expected) {
@@ -29,23 +31,34 @@ static bool matches_payload(const char *path, const char *entry, const std::vect
     DWORD actual = 0;
     const auto size = static_cast<DWORD>(expected.size());
     bool result = SFileGetFileSize(file, nullptr) == size &&
-        SFileReadFile(file, data.data(), size, &actual, nullptr) &&
+        (expected.empty() || SFileReadFile(file, data.data(), size, &actual, nullptr)) &&
         actual == size && data == expected;
     SFileCloseFile(file);
     SFileCloseArchive(archive);
     return result;
 }
 
+static bool metadata_absent(const char *path, const char *entry) {
+    HANDLE archive = nullptr;
+    if (!SFileOpenArchive(path, 0, MPQ_OPEN_READ_ONLY, &archive)) {
+        return false;
+    }
+    const bool absent = !SFileHasFile(archive, entry);
+    return SFileCloseArchive(archive) && absent;
+}
+
 int main(int argc, char **argv) {
-    if (argc != 3) {
+    if (argc != 4) {
         return 1;
     }
 
     const std::array fixtures{
-        Fixture{"v1-no-list.s2ma", MPQ_FORMAT_VERSION_1, false, false},
-        Fixture{"v1-list.s2ma", MPQ_FORMAT_VERSION_1, true, true},
-        Fixture{"v2-list.s2ma", MPQ_FORMAT_VERSION_2, true, false},
-        Fixture{"v4-no-list.s2ma", MPQ_FORMAT_VERSION_4, false, false},
+        Fixture{"v1-no-list.s2ma", MPQ_FORMAT_VERSION_1, false, Contents::Metadata},
+        Fixture{"v1-list.s2ma", MPQ_FORMAT_VERSION_1, true, Contents::AlternateCodec},
+        Fixture{"v2-list.s2ma", MPQ_FORMAT_VERSION_2, true, Contents::Metadata},
+        Fixture{"v4-no-list.s2ma", MPQ_FORMAT_VERSION_4, false, Contents::Metadata},
+        Fixture{"empty-classic.s2ma", MPQ_FORMAT_VERSION_1, false, Contents::EmptyArchive},
+        Fixture{"empty-script.s2ma", MPQ_FORMAT_VERSION_1, false, Contents::EmptyScript},
     };
     const std::array<std::pair<const char *, DWORD>, 3> entries{{
         {"MapScript.galaxy", MPQ_FILE_COMPRESS},
@@ -59,7 +72,7 @@ int main(int argc, char **argv) {
     }
 
     for (const auto &setup : fixtures) {
-        auto path = std::string(argv[2]) + "/" + setup.filename;
+        auto path = std::string(argv[3]) + "/" + setup.filename;
         HANDLE archive = nullptr;
         SFILE_CREATE_MPQ options{};
         options.cbSize = sizeof(options);
@@ -73,13 +86,23 @@ int main(int argc, char **argv) {
             std::cerr << path << " create " << SErrGetLastError() << '\n';
             return 3;
         }
+        const auto include = [&](const std::string &name) {
+            switch (setup.contents) {
+            case Contents::Metadata: return true;
+            case Contents::AlternateCodec: return name != "DocumentHeader";
+            case Contents::EmptyArchive: return false;
+            case Contents::EmptyScript: return name == "MapScript.galaxy";
+            }
+            return false;
+        };
+        const char *source = setup.contents == Contents::EmptyScript ? argv[2] : argv[1];
         for (const auto &[name, flags] : entries) {
-            if (setup.bzip2_and_missing_header && std::string(name) == "DocumentHeader") {
+            if (!include(name)) {
                 continue;
             }
-            const DWORD codec = setup.bzip2_and_missing_header && std::string(name) == "MapScript.galaxy"
-                ? MPQ_COMPRESSION_BZIP2 : MPQ_COMPRESSION_ZLIB;
-            if (!SFileAddFileEx(archive, argv[1], name, flags, codec, codec)) {
+            const DWORD codec = setup.contents == Contents::AlternateCodec &&
+                std::string(name) == "MapScript.galaxy" ? MPQ_COMPRESSION_BZIP2 : MPQ_COMPRESSION_ZLIB;
+            if (!SFileAddFileEx(archive, source, name, flags, codec, codec)) {
                 std::cerr << path << " add " << name << ' ' << SErrGetLastError() << '\n';
                 SFileCloseArchive(archive);
                 return 4;
@@ -88,11 +111,13 @@ int main(int argc, char **argv) {
         if (!SFileCloseArchive(archive)) {
             return 5;
         }
+        const std::vector<char> empty;
+        const auto &expected_contents = setup.contents == Contents::EmptyScript ? empty : expected;
         for (const auto &[name, flags] : entries) {
-            if (setup.bzip2_and_missing_header && std::string(name) == "DocumentHeader") {
-                continue;
-            }
-            if (!matches_payload(path.c_str(), name, expected)) {
+            bool matches = include(name)
+                ? matches_payload(path.c_str(), name, expected_contents)
+                : metadata_absent(path.c_str(), name);
+            if (!matches) {
                 std::cerr << path << " read " << name << ' ' << SErrGetLastError() << '\n';
                 return 6;
             }

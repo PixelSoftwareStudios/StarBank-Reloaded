@@ -4,6 +4,8 @@ StormLib v9.40 created these archives from self-authored text. Its reader reopen
 
 | Fixture | Coverage | SHA-256 |
 | --- | --- | --- |
+| `empty-classic.s2ma` | Initialized V1 lookup table with no file records | `043fd51f7c374b76819b7311b632910abf5a931ee259dac2fb0ed43ffe24c512` |
+| `empty-script.s2ma` | Present V1 zero-length compressed script with no sector table | `102b68e3c4c233a66b71a4c06cdfcb308c63056d503e30d56584ff5f7992da87` |
 | `v1-no-list.s2ma` | Classic tables, uncompressed and single-unit/multi-sector zlib metadata, no listfile | `bbf6555dd7560c2b925c6662725dee358507a00ad9b2bf15c0c1cab30205ca14` |
 | `v1-list.s2ma` | Bzip2 script, zlib alternate script, missing document header, listfile present | `2531fff6255fb1fd4cf2bf93a2b5729613966a7fc0529a45481c8fdb479c7373` |
 | `v2-list.s2ma` | V2 header, listfile present | `314567ac7f1872a00a3a151f0d337c4d55a7e63c2bdd6c2f83db047a8b2daa8d` |
@@ -24,6 +26,7 @@ payload = "// Name: Synthetic – alpha\n// Author: Fixture only\n"
 payload += "// Content for sector coverage.\n" * 320
 Path("payload.txt").write_bytes(payload.encode("utf-8"))
 PY
+: > empty.txt
 mkdir generated
-./generate-fixtures payload.txt generated
+./generate-fixtures payload.txt empty.txt generated
 ```

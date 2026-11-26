@@ -65,6 +65,11 @@ impl MetadataEntry {
 			return Err(MpqError::InvalidEntry(self));
 		}
 
+		// Empty sector-based entries have no payload or sector-offset table.
+		if packed == 0 && expanded == 0 {
+			return Ok(Vec::new());
+		}
+
 		let sectors = expanded.div_ceil(header.sector_bytes);
 		if compressed && !single && sectors > MAX_SECTORS {
 			return Err(MpqError::LimitExceeded(Limit::EntrySectors));

@@ -7,6 +7,8 @@ use std::{
 use starbank_mpq::{Limit, MetadataArchive, MetadataEntry, MpqError};
 use stormlib_rs::{decrypt_mpq_block, derive_file_key, encrypt_mpq_block};
 
+const V1_EMPTY_ARCHIVE: &[u8] = include_bytes!("fixtures/empty-classic.s2ma");
+const V1_EMPTY_SCRIPT: &[u8] = include_bytes!("fixtures/empty-script.s2ma");
 const V1_STORED_AND_ZLIB: &[u8] = include_bytes!("fixtures/v1-no-list.s2ma");
 const V1_BZIP2_AND_MISSING: &[u8] = include_bytes!("fixtures/v1-list.s2ma");
 const V2_WITH_LISTFILE: &[u8] = include_bytes!("fixtures/v2-list.s2ma");
@@ -35,6 +37,25 @@ fn stormlib_archive_entries_match_the_original_bytes() {
 			);
 		}
 	}
+}
+
+#[test]
+fn empty_classic_archive_has_no_metadata_entries() {
+	let mut archive = MetadataArchive::open(Cursor::new(V1_EMPTY_ARCHIVE)).unwrap();
+	for entry in ENTRIES {
+		assert_eq!(archive.read(entry).unwrap(), None);
+	}
+}
+
+#[test]
+fn zero_length_sector_entry_is_present_with_empty_content() {
+	let mut archive = MetadataArchive::open(Cursor::new(V1_EMPTY_SCRIPT)).unwrap();
+	assert_eq!(
+		archive.read(MetadataEntry::MapScript).unwrap(),
+		Some(Vec::new())
+	);
+	assert_eq!(archive.read(MetadataEntry::BaseMapScript).unwrap(), None);
+	assert_eq!(archive.read(MetadataEntry::DocumentHeader).unwrap(), None);
 }
 
 #[test]
@@ -90,18 +111,32 @@ fn rejects_unknown_header_and_compressed_classic_tables() {
 
 #[test]
 fn rejects_block_table_references_outside_the_declared_count() {
-	let mut fixture = V1_STORED_AND_ZLIB.to_vec();
-	let table_offset = field(&fixture[16..20]);
-	let table_count = field(&fixture[24..28]);
-	let table = &mut fixture[table_offset..table_offset + table_count * 16];
-	let key = derive_file_key("(hash table)", 0, 0, false);
-	decrypt_mpq_block(table, key);
-	table[12..16].copy_from_slice(&(table_count as u32).to_le_bytes());
-	encrypt_mpq_block(table, key);
-	assert!(matches!(
-		MetadataArchive::open(Cursor::new(fixture)),
-		Err(MpqError::InvalidArchive(_))
-	));
+	for fixture in [V1_STORED_AND_ZLIB, V1_EMPTY_ARCHIVE] {
+		let mut damaged = fixture.to_vec();
+		let table_offset = field(&damaged[16..20]);
+		let table_count = field(&damaged[24..28]);
+		let table = &mut damaged[table_offset..table_offset + table_count * 16];
+		let key = derive_file_key("(hash table)", 0, 0, false);
+		decrypt_mpq_block(table, key);
+		table[12..16].copy_from_slice(&u32::try_from(table_count).unwrap().to_le_bytes());
+		encrypt_mpq_block(table, key);
+		assert!(matches!(
+			MetadataArchive::open(Cursor::new(damaged)),
+			Err(MpqError::InvalidArchive(_))
+		));
+	}
+}
+
+#[test]
+fn rejects_every_truncated_prefix_of_the_stormlib_archives() {
+	for fixture in [V1_STORED_AND_ZLIB, V2_WITH_LISTFILE, V4_WITHOUT_LISTFILE] {
+		for prefix_size in 0..fixture.len() {
+			assert!(matches!(
+				MetadataArchive::open(Cursor::new(&fixture[..prefix_size])),
+				Err(MpqError::InvalidArchive(_))
+			));
+		}
+	}
 }
 
 #[test]

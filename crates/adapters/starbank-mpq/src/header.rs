@@ -104,7 +104,9 @@ impl Header {
 		}
 		let hash_count = u32_at(&raw, HASH_COUNT_OFFSET);
 		let block_count = u32_at(&raw, BLOCK_COUNT_OFFSET);
-		if hash_count == 0 || block_count == 0 {
+		// Classic V1/V2 archives can contain an initialized hash table and no files.
+		// V4 may require the extended lookup when the classic block table is absent.
+		if hash_count == 0 || (version == VERSION_V4 && block_count == 0) {
 			return Err(MpqError::UnsupportedArchive("missing classic MPQ tables"));
 		}
 		if !hash_count.is_power_of_two() {
