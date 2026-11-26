@@ -1,7 +1,5 @@
 use std::{fs, io};
 
-use starbank_signature::SignatureStatus;
-
 use super::*;
 
 const MAIN: &str = "main";
@@ -70,7 +68,7 @@ fn create_only_export_keeps_source_and_consumes_the_handle() -> io::Result<()> {
 	let signed = parse(&fs::read(&destination)?, Limits::default()).expect("signed copy XML");
 	assert_eq!(
 		verify_signature(&signed, Some(&context)),
-		SignatureStatus::Valid
+		starbank_signature::SignatureStatus::Valid
 	);
 	assert_eq!(fs::read(&source)?, BANK);
 	assert!(registry.for_owner(MAIN, &selected.id).is_err());
