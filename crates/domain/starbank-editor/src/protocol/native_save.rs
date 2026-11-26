@@ -49,7 +49,27 @@ impl fmt::Debug for NativeSaveReceipt {
 	}
 }
 
+/// Current editor target for a native prompt or file operation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeActiveTarget {
+	/// The active session identifier.
+	pub document_id: String,
+	/// The current revision that the prompt or operation must verify.
+	pub revision: Revision,
+	/// Whether opening another file would discard edits.
+	pub dirty: bool,
+}
+
 impl Engine {
+	/// Captures the active editor identity, revision, and dirty state for a native operation.
+	pub fn native_active_target(&self) -> Option<NativeActiveTarget> {
+		self.active.as_ref().map(|active| NativeActiveTarget {
+			document_id: active.id.clone(),
+			revision: active.session.revision(),
+			dirty: active.session.is_dirty(),
+		})
+	}
+
 	/// Prepares exact output for a host-authorized overwrite of the active file.
 	///
 	/// The native host owns destination authorization and fingerprint checks.
