@@ -308,6 +308,7 @@ pub fn scan_maps(
 	cancellation.check()?;
 	if let Some(path) = cache_path.as_deref()
 		&& enumeration.complete
+		&& (cache_state != CacheState::Loaded || updated_cache != cache)
 		&& let Err(source) = updated_cache.save(path)
 	{
 		issues.push(IndexIssue {

@@ -83,13 +83,13 @@ fn physical_identity(_metadata: &Metadata) -> Option<(u64, u64)> {
 	None
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct Cache {
 	version: u32,
 	records: BTreeMap<String, CacheRecord>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct CacheRecord {
 	fingerprint: Fingerprint,
 	metadata: MapMetadata,

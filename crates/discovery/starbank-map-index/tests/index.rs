@@ -35,7 +35,10 @@ fn maps(directory: &Path) -> std::io::Result<[PathBuf; 3]> {
 	];
 	for (index, (path, contents)) in output.iter().zip([ALPHA, RIVAL, EMPTY]).enumerate() {
 		fs::write(path, contents)?;
-		fs::File::open(path)?.set_modified(UNIX_EPOCH + Duration::from_secs(60 + index as u64))?;
+		fs::OpenOptions::new()
+			.write(true)
+			.open(path)?
+			.set_modified(UNIX_EPOCH + Duration::from_secs(60 + index as u64))?;
 	}
 	Ok(output)
 }
@@ -250,7 +253,13 @@ fn persisted_cache_reuses_unchanged_archives_and_rebuilds_on_changes()
 		(CacheState::Missing, 0)
 	);
 	assert!(first.issues.is_empty());
+	fs::OpenOptions::new()
+		.write(true)
+		.open(&cache_path)?
+		.set_modified(UNIX_EPOCH + Duration::from_secs(60))?;
+	let cache_modified = fs::metadata(&cache_path)?.modified()?;
 	let unchanged = scan()?;
+	assert_eq!(fs::metadata(&cache_path)?.modified()?, cache_modified);
 	assert_eq!(
 		(unchanged.cache_state, unchanged.cache_hits),
 		(CacheState::Loaded, 3)
