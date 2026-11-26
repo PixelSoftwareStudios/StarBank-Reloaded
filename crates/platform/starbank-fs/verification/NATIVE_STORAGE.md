@@ -34,7 +34,7 @@ cargo check -p starbank-fs --offline --locked --target x86_64-pc-windows-msvc
 cargo check -p starbank-fs --offline --locked --target wasm32-unknown-unknown
 ```
 
-WASM cross-checks the adapter that reports unsupported. Linux implements checked snapshots and exclusive creation using `renameat2(RENAME_NOREPLACE)` through rustix. The Linux test target was checked locally with Rust 1.99.0 and `--ignore-rust-version` because the installed 1.100.0 compiler lacks the Linux standard library. Execution on Linux and verification with the pinned compiler are pending.
+WASM cross-checks the adapter that reports unsupported. Linux implements checked snapshots and exclusive creation using `renameat2(RENAME_NOREPLACE)` through rustix. The workspace suite and Linux desktop tests ran on Debian 12 arm64 with Rust 1.100.0. A separate native ext4 probe demonstrated verified exchange of visible metadata and found a gap in verifying existing attributes that Linux hides from an unprivileged caller. [Linux execution evidence](../../../../docs/verification/IMPLEMENTATION.md) · [Native replacement qualification](NATIVE_REPLACEMENT_QUALIFICATION.md)
 
 ## Outcomes and remaining gates
 
