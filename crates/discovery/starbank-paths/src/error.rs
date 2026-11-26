@@ -12,7 +12,7 @@ pub enum LimitKind {
 /// Failure encountered while checking an auto-detection candidate.
 #[derive(Debug)]
 pub struct CandidateFailure {
-	/// Location checked, when the operating system provided one.
+	/// Candidate location, when the operating system provided one.
 	pub path: Option<PathBuf>,
 	/// Underlying error during discovery.
 	pub error: PathError,
@@ -54,6 +54,9 @@ pub enum PathError {
 	},
 	/// A directory entry was replaced during the scan.
 	EntryChanged(PathBuf),
+	/// An automatic Windows candidate used a network, device, or ambiguous path form.
+	#[cfg(windows)]
+	UnsupportedCandidate,
 	/// Windows could not resolve its Documents known folder.
 	#[cfg(windows)]
 	KnownFolder(i32),
@@ -113,6 +116,10 @@ impl fmt::Display for PathError {
 				"Directory entry changed while reading {}",
 				path.display()
 			),
+			#[cfg(windows)]
+			Self::UnsupportedCandidate => {
+				f.write_str("Automatic Windows bank discovery requires an absolute drive path")
+			}
 			#[cfg(windows)]
 			Self::KnownFolder(hresult) => write!(
 				f,

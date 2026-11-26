@@ -1,5 +1,8 @@
 #[cfg(any(test, windows, target_os = "macos"))]
-use std::{fs, io, path::PathBuf};
+use std::{
+	fs, io,
+	path::{Path, PathBuf},
+};
 
 use crate::{CandidateFailure, PathError, PathSelection, ScanLimits};
 
@@ -109,11 +112,10 @@ fn resolve_candidates(
 				continue;
 			}
 		};
-		let canonical = match fs::canonicalize(&path) {
-			Ok(path) => path,
-			Err(source) if source.kind() == io::ErrorKind::NotFound => continue,
-			Err(source) => {
-				let error = PathError::io(&path, source);
+		let canonical = match canonical_candidate(&path, |candidate| fs::canonicalize(candidate)) {
+			Ok(Some(canonical)) => canonical,
+			Ok(None) => continue,
+			Err(error) => {
 				diagnostics.push(CandidateFailure {
 					path: Some(path),
 					error,
@@ -159,6 +161,45 @@ fn resolve_candidates(
 		return Err(diagnostics.swap_remove(index).error);
 	}
 	Err(PathError::NotFound { diagnostics })
+}
+
+#[cfg(any(test, windows, target_os = "macos"))]
+fn canonical_candidate(
+	path: &Path,
+	canonicalize: impl FnOnce(&Path) -> io::Result<PathBuf>,
+) -> Result<Option<PathBuf>, PathError> {
+	#[cfg(windows)]
+	check_windows_candidate(path)?;
+	let canonical = match canonicalize(path) {
+		Ok(canonical) => canonical,
+		Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(None),
+		Err(source) => return Err(PathError::io(path, source)),
+	};
+	// A drive path may resolve through a link to a path in another namespace.
+	// Refuse that target before probing its account and bank directories.
+	#[cfg(windows)]
+	check_windows_candidate(&canonical)?;
+	Ok(Some(canonical))
+}
+
+#[cfg(windows)]
+fn check_windows_candidate(path: &Path) -> Result<(), PathError> {
+	use std::path::{Component, Prefix};
+
+	let drive = matches!(path.components().next(),
+		Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_))
+	);
+	if path.is_absolute()
+		&& drive
+		&& path.components().all(|component| match component {
+			Component::ParentDir => false,
+			Component::Normal(name) => !name.as_encoded_bytes().contains(&b':'),
+			_ => true,
+		}) {
+		Ok(())
+	} else {
+		Err(PathError::UnsupportedCandidate)
+	}
 }
 
 #[cfg(test)]
@@ -256,6 +297,60 @@ mod tests {
 			redirect.join(GAME_DIRECTORY).canonicalize()?
 		);
 		Ok(())
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn automatic_policy_rejects_windows_network_device_and_ambiguous_candidates() {
+		for candidate in [
+			r"\\fileserver\Users\Documents\StarCraft II",
+			r"\\?\UNC\fileserver\Users\Documents\StarCraft II",
+			r"\\.\C:\Documents\StarCraft II",
+			r"\\.\PIPE\Documents\StarCraft II",
+			r"\\?\GLOBALROOT\Device\Mup\fileserver\Users\Documents",
+			r"\\?\Volume{11223344-0000-0000-0000-000000000000}\Documents",
+			r"C:Documents\StarCraft II",
+			r"\Documents\StarCraft II",
+			r"Documents\StarCraft II",
+			r"C:\Documents\..\Other\StarCraft II",
+			r"C:\Documents:stream\StarCraft II",
+		] {
+			assert!(
+				matches!(
+					canonical_candidate(Path::new(candidate), |_| panic!(
+						"rejected path was probed"
+					)),
+					Err(PathError::UnsupportedCandidate)
+				),
+				"{candidate}"
+			);
+		}
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn automatic_policy_retains_ordinary_and_verbatim_drive_paths() {
+		for candidate in [
+			r"C:\Users\Local\Documents\StarCraft II",
+			r"D:\OneDrive - Example\Documents\StarCraft II",
+			r"\\?\E:\Redirected Documents\StarCraft II",
+		] {
+			assert!(
+				check_windows_candidate(Path::new(candidate)).is_ok(),
+				"{candidate}"
+			);
+		}
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn resolver_rejects_a_resolved_target_in_the_network_namespace() {
+		let drive_path = Path::new(r"C:\Documents\StarCraft II");
+		let resolved = PathBuf::from(r"\\?\UNC\fileserver\Users\Documents\StarCraft II");
+		assert!(matches!(
+			canonical_candidate(drive_path, |_| Ok(resolved)),
+			Err(PathError::UnsupportedCandidate)
+		));
 	}
 
 	#[test]
