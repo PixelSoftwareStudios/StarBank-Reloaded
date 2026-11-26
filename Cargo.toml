@@ -13,6 +13,7 @@ members = [
     "crates/engineering/starbank-source-check",
     "crates/engineering/starbank-testkit",
     "crates/formats/sc2bank",
+    "crates/formats/sc2bank/fuzz",
     "crates/foundation/starbank-core",
     "crates/platform/starbank-fs",
 ]
