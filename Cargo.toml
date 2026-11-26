@@ -1,5 +1,8 @@
 [workspace]
-members = ["crates/foundation/starbank-core"]
+members = [
+    "crates/engineering/starbank-source-check",
+    "crates/foundation/starbank-core",
+]
 resolver = "3"
 
 [workspace.package]
