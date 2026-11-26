@@ -29,4 +29,6 @@ On November 27, 2026, `run.sh structural` ran against `e2cf03533264146e23815f38f
 
 On November 27, 2026, both unchanged targets ran from a clean archive of `3855597143f3d4c3677b01e1b953905a1f6fb38c` on macOS 14.7.2 arm64. The scratch runner used the same seeds and 90-second budgets as the commands above. AddressSanitizer and libFuzzer completed 267,922 scalar executions from 22 seeds and 271,068 structural executions from 70 seeds, each in 91 seconds. Both exited successfully with no assertion failure, sanitizer report or failure artifact. The workspace lockfile stayed byte-identical. Rustc `1.101.0-nightly (708c94ef0)`, cargo-fuzz 0.13.2 and libfuzzer-sys 0.4.13 were used.
 
+The maintained scalar command also ran with its default 20-second budget and all 22 seeds. It completed 68,940 executions in 21 seconds with zero failures.
+
 Longer sanitizer campaigns and targets for the other formats remain pending.
