@@ -1,4 +1,4 @@
-//! Reads StarCraft II bank XML and writes targeted value edits without reformatting the document.
+//! Reads StarCraft II bank XML and writes targeted edits without reformatting the document.
 #![forbid(unsafe_code)]
 
 mod error;
@@ -7,6 +7,7 @@ mod model;
 mod parse;
 mod preflight;
 mod serialize;
+mod signature;
 
 pub use error::{Location, ParseError, ParseErrorKind, SerializeError};
 pub use limits::{LimitKind, Limits};
@@ -16,3 +17,4 @@ pub use model::{
 };
 pub use parse::parse;
 pub use serialize::{ValueEdit, serialize};
+pub use signature::replace_signature;

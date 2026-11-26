@@ -40,6 +40,7 @@ impl ValueId {
 pub struct BankDocument {
 	pub(crate) source: String,
 	pub(crate) limits: Limits,
+	pub(crate) root_range: Range<usize>,
 	pub(crate) version: Option<String>,
 	pub(crate) signature: Option<StoredSignature>,
 	pub(crate) sections: Vec<Section>,
@@ -79,6 +80,7 @@ impl BankDocument {
 #[derive(Clone, Debug)]
 pub struct StoredSignature {
 	pub(crate) value: Option<String>,
+	pub(crate) value_range: Option<Range<usize>>,
 	pub(crate) source_range: Range<usize>,
 }
 

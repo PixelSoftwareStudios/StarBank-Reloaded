@@ -1,6 +1,6 @@
 use std::{iter, ops::Range, str};
 
-use roxmltree::{Document, Node, ParsingOptions, TextPos};
+use roxmltree::{Attribute, Document, Node, ParsingOptions, TextPos};
 
 use crate::{
 	BankDocument, Key, KeyId, LimitKind, Limits, Location, OpaqueReason, ParseError,
@@ -8,13 +8,13 @@ use crate::{
 	ValueNode, preflight,
 };
 
-const BANK: &str = "Bank";
+pub(crate) const BANK: &str = "Bank";
 const SECTION: &str = "Section";
 const KEY: &str = "Key";
-const SIGNATURE: &str = "Signature";
+pub(crate) const SIGNATURE: &str = "Signature";
 const VERSION: &str = "version";
 const NAME: &str = "name";
-const VALUE: &str = "value";
+pub(crate) const VALUE: &str = "value";
 const PI_OPENING: &str = "<?";
 const PI_CLOSING: &str = "?>";
 
@@ -173,8 +173,11 @@ fn project(
 					.at(Location::at(source, child.range().start)));
 			}
 			has_unprojected_bank_nodes |= child.children().any(is_significant);
+			let value = unqualified_attribute(child, VALUE);
 			signature = Some(StoredSignature {
-				value: decoded_attribute(child, VALUE),
+				value: value.map(|attribute| attribute.value().to_owned()),
+				value_range: value
+					.and_then(|attribute| attribute_value_range(source, attribute.range())),
 				source_range: child.range(),
 			});
 		} else {
@@ -185,6 +188,7 @@ fn project(
 	Ok(BankDocument {
 		source: source.to_owned(),
 		limits,
+		root_range: root.range(),
 		version: decoded_attribute(root, VERSION),
 		signature,
 		sections,
@@ -293,9 +297,15 @@ fn attribute_value_range(source: &str, range: Range<usize>) -> Option<Range<usiz
 }
 
 fn decoded_attribute(node: Node<'_, '_>, name: &str) -> Option<String> {
+	unqualified_attribute(node, name).map(|attribute| attribute.value().to_owned())
+}
+
+fn unqualified_attribute<'node, 'source>(
+	node: Node<'node, 'source>,
+	name: &str,
+) -> Option<Attribute<'node, 'source>> {
 	node.attributes()
 		.find(|attribute| attribute.namespace().is_none() && attribute.name() == name)
-		.map(|attribute| attribute.value().to_owned())
 }
 
 fn is_unqualified(node: Node<'_, '_>, name: &str) -> bool {

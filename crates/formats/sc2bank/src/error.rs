@@ -146,6 +146,8 @@ pub enum SerializeError {
 		/// Prohibited Unicode scalar.
 		character: char,
 	},
+	/// The proposed signature is not an uppercase hexadecimal digest.
+	InvalidSignature,
 	/// The output exceeds a configured limit.
 	LimitExceeded(LimitKind),
 	/// The source span cannot safely be replaced.
@@ -166,8 +168,9 @@ impl fmt::Display for SerializeError {
 				id.get(),
 				u32::from(*character),
 			),
+			Self::InvalidSignature => write!(output, "expected an uppercase hexadecimal signature"),
 			Self::LimitExceeded(limit) => write!(output, "XML output limit exceeded ({limit:?})"),
-			Self::InvalidSourceSpan => write!(output, "unsafe source span for value edit"),
+			Self::InvalidSourceSpan => write!(output, "unsafe source span for XML edit"),
 			Self::InvalidOutput(error) => {
 				write!(output, "could not validate edited bank ({error})")
 			}
