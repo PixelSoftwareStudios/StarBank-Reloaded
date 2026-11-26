@@ -278,6 +278,15 @@ name = "starbank-core"
 version = "0.1.0"
 
 [[package]]
+name = "starbank-editor"
+version = "0.1.0"
+dependencies = [
+ "sc2bank",
+ "starbank-core",
+ "starbank-signature",
+]
+
+[[package]]
 name = "starbank-paths"
 version = "0.1.0"
 dependencies = [

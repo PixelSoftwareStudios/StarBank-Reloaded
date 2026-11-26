@@ -1,0 +1,15 @@
+[package]
+name = "starbank-editor"
+description = "Revisioned, platform-independent editing sessions for SC2 banks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+sc2bank = { path = "../../formats/sc2bank" }
+starbank-core.workspace = true
+starbank-signature = { path = "../starbank-signature" }
+
+[lints]
+workspace = true
