@@ -8,6 +8,8 @@ publish.workspace = true
 
 [dependencies]
 sc2bank = { path = "../../formats/sc2bank" }
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 starbank-core.workspace = true
 starbank-signature = { path = "../starbank-signature" }
 
