@@ -1,0 +1,14 @@
+{
+  "name": "@starbank/platform",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./browser": "./src/browser.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

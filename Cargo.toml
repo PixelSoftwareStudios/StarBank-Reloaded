@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/adapters/starbank-mpq",
+    "crates/bindings/starbank-wasm",
     "crates/discovery/starbank-map-index",
     "crates/discovery/starbank-paths",
     "crates/domain/starbank-backup",
@@ -22,6 +23,10 @@ publish = false
 
 [workspace.dependencies]
 starbank-core = { path = "crates/foundation/starbank-core" }
+starbank-editor = { path = "crates/domain/starbank-editor" }
+
+# Portable bindings
+wasm-bindgen = "=0.2.129"
 
 # Versioned command and settings models
 serde = { version = "=1.0.229", features = ["derive"] }

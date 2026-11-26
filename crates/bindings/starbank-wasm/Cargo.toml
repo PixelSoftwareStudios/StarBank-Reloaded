@@ -1,0 +1,16 @@
+[package]
+name = "starbank-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+starbank-editor.workspace = true
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

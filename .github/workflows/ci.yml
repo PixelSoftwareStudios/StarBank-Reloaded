@@ -27,13 +27,13 @@ jobs:
       - run: cargo run --locked -p starbank-source-check
 
   native:
-    name: Rust on ${{ matrix.os }}
+    name: Rust native on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,13 +60,18 @@ jobs:
           persist-credentials: false
       - run: rustup show
       # Keep the package lists explicit when adding portable crates.
-      - run: cargo build --locked --target wasm32-unknown-unknown -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor
-      - run: cargo clippy --locked --target wasm32-unknown-unknown -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor -- -D warnings
+      - run: >-
+          cargo build --locked --target wasm32-unknown-unknown
+          -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor -p starbank-wasm
+      - run: >-
+          cargo clippy --locked --target wasm32-unknown-unknown
+          -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor -p starbank-wasm
+          -- -D warnings
 
   frontend:
-    name: Frontend checks
+    name: Web build and browser tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,7 +80,26 @@ jobs:
         with:
           node-version-file: .node-version
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - run: rustup show
+      - name: Install the matching wasm-bindgen CLI
+        shell: bash
+        run: |
+          bindgen_version=0.2.129
+          bindgen_archive="wasm-bindgen-${bindgen_version}-x86_64-unknown-linux-musl.tar.gz"
+          bindgen_sha256=82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e
+          bindgen_dir="$(mktemp -d "$RUNNER_TEMP/starbank-bindgen.XXXXXX")"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "$bindgen_dir/$bindgen_archive" \
+            "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$bindgen_version/$bindgen_archive"
+          printf '%s  %s\n' "$bindgen_sha256" "$bindgen_dir/$bindgen_archive" | sha256sum --check
+          tar -xzf "$bindgen_dir/$bindgen_archive" -C "$bindgen_dir" --strip-components=1 \
+            "${bindgen_archive%.tar.gz}/wasm-bindgen"
+          test "$("$bindgen_dir/wasm-bindgen" --version)" = "wasm-bindgen $bindgen_version"
+          printf '%s\n' "$bindgen_dir" >> "$GITHUB_PATH"
       - run: pnpm install --frozen-lockfile
+      # Building generates the bindings needed by the source checks and tests.
+      - run: pnpm build
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm build
+      - run: pnpm --filter @starbank/web exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm --filter @starbank/web test:browser

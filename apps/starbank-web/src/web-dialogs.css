@@ -1,0 +1,64 @@
+.web-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  margin: auto;
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  color: var(--shell-fg);
+  background: var(--map-pane-bg);
+}
+
+.web-dialog::backdrop {
+  background: #1118;
+}
+
+.web-dialog h2 {
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.web-dialog-fields,
+.web-dialog-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.web-dialog-fields {
+  gap: 0.75rem;
+}
+
+.web-dialog-fields .web-dialog-check {
+  flex-direction: row;
+  align-items: center;
+}
+
+.web-dialog input:not([type="checkbox"]),
+.web-dialog textarea {
+  width: 100%;
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.web-dialog textarea {
+  min-height: 10rem;
+  font-family: monospace;
+}
+
+.web-dialog p {
+  margin-block: 0.65rem;
+}
+
+.web-dialog [role="alert"] {
+  color: light-dark(#92233c, #ffacac);
+}
+
+.web-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

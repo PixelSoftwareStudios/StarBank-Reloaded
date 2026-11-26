@@ -3,12 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite",
+    "build": "pnpm run wasm && vite build",
+    "dev": "pnpm run wasm && vite",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wasm": "sh ../../tools/build-web-wasm.sh",
+    "test:browser": "node test/browser.mjs"
   },
   "dependencies": {
+    "@starbank/engine-client": "workspace:*",
+    "@starbank/platform": "workspace:*",
     "@starbank/ui": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -22,6 +26,7 @@
     "@vitejs/plugin-react": "6.3.0",
     "typescript": "catalog:",
     "vite": "8.3.8",
-    "vitest": "5.1.2"
+    "vitest": "5.1.2",
+    "playwright": "1.65.1"
   }
 }
