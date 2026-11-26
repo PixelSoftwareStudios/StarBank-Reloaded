@@ -1,0 +1,15 @@
+# Build
+/dist
+/tmp
+*.app
+*.exe
+*.tar.xz
+fyne_metadata_init.go
+
+# Environment
+.env
+
+# Misc
+.DS_Store
+stuff-testing.go
+docs/temp

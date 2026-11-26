@@ -23,8 +23,13 @@ type MapItem struct {
 	// HasBankFiles is always true for items returned by DiscoverMaps since
 	// discovery only yields actual .SC2Bank files.
 	HasBankFiles bool
-	// IsBlizzardMap is reserved for future use; always false currently.
+	// IsBlizzardMap is true when the map cache identifies the author as
+	// "Blizzard Entertainment". Populated by app.go after calling
+	// mapinfo.ScanCache.
 	IsBlizzardMap bool
+	// AuthorName is the human-readable map author name from the cache.
+	// Empty until enriched by app.go after calling mapinfo.ScanCache.
+	AuthorName string
 }
 
 // DiscoverMaps walks one or more Banks folder paths and returns all .SC2Bank
@@ -76,11 +81,10 @@ func discoverInFolder(banksFolder string) []MapItem {
 			}
 			name := strings.TrimSuffix(bankFile.Name(), filepath.Ext(bankFile.Name()))
 			items = append(items, MapItem{
-				Name:          name,
-				AuthorID:      authorID,
-				BankPath:      filepath.Join(authorPath, bankFile.Name()),
-				HasBankFiles:  true,
-				IsBlizzardMap: false,
+				Name:         name,
+				AuthorID:     authorID,
+				BankPath:     filepath.Join(authorPath, bankFile.Name()),
+				HasBankFiles: true,
 			})
 		}
 	}

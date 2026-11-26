@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -11,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"starbank/internal/editor"
+	"starbank/internal/mapinfo"
 	"starbank/internal/maps"
 	"starbank/internal/ui/utils"
 	"starbank/internal/ui/views"
@@ -65,9 +67,9 @@ func (a *App) Run() {
 	a.window.ShowAndRun()
 }
 
-// initSC2Path auto-detects (or reads from settings) the SC2 root path and
-// discovers all .SC2Bank files found under it, populating state.AllMaps.
-// On failure it sets state.PathLoadError so the sidebar can show the reason.
+// initSC2Path auto-detects (or reads from settings) the SC2 root path,
+// discovers all .SC2Bank files, and enriches them with Blizzard author info
+// from the Battle.net map cache.
 func (a *App) initSC2Path() {
 	// Honour a manual override stored in settings.
 	if a.state.Settings.SC2RootOverride != "" {
@@ -75,6 +77,7 @@ func (a *App) initSC2Path() {
 			a.state.SC2Root = a.state.Settings.SC2RootOverride
 			a.state.BankFolders = folders
 			a.state.AllMaps = maps.DiscoverMaps(folders)
+			a.enrichMapsFromCache()
 			return
 		}
 	}
@@ -94,6 +97,32 @@ func (a *App) initSC2Path() {
 	a.state.SC2Root = root
 	a.state.BankFolders = folders
 	a.state.AllMaps = maps.DiscoverMaps(folders)
+	a.enrichMapsFromCache()
+}
+
+// enrichMapsFromCache scans the Battle.net map cache and populates
+// IsBlizzardMap and AuthorName on each entry in state.AllMaps.
+func (a *App) enrichMapsFromCache() {
+	if len(a.state.AllMaps) == 0 {
+		return
+	}
+	reg := mapinfo.ScanCache()
+	fmt.Printf("[mapinfo] registry contains %d entries\n", len(reg))
+	for k, v := range reg {
+		fmt.Printf("[mapinfo]   bank=%q  author=%q  isBlizzard=%v\n",
+			k, v.AuthorName, v.IsBlizzard())
+	}
+
+	for i := range a.state.AllMaps {
+		name := strings.ToLower(a.state.AllMaps[i].Name)
+		if rec, ok := reg[name]; ok {
+			a.state.AllMaps[i].AuthorName = rec.AuthorName
+			a.state.AllMaps[i].IsBlizzardMap = rec.IsBlizzard()
+		}
+		m := a.state.AllMaps[i]
+		fmt.Printf("[maps] name=%q  authorID=%q  authorName=%q  isBlizzard=%v  path=%s\n",
+			m.Name, m.AuthorID, m.AuthorName, m.IsBlizzardMap, m.BankPath)
+	}
 }
 
 // updatePathStatus sets the status label to reflect the current load state.
@@ -325,6 +354,7 @@ func (a *App) handleFolderSelected(selectedPath string) {
 		a.state.SC2Root = sc2Root
 		a.state.BankFolders = bankFolders
 		a.state.AllMaps = maps.DiscoverMaps(bankFolders)
+		a.enrichMapsFromCache()
 		a.state.Settings.SC2RootOverride = selectedPath
 		_ = a.state.Settings.Save()
 	}
