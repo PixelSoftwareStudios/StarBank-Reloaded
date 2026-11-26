@@ -10,6 +10,7 @@ mod lexeme;
 mod prepare;
 mod profile;
 mod protocol;
+mod raw;
 mod session;
 mod structure;
 
@@ -24,5 +25,6 @@ pub use profile::{ProfileEdit, ProfileEvidence, ProfileSessionError, ProfileValu
 pub use protocol::{
 	Engine, MAX_CONTROL_BYTES, MAX_OPERATIONS, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
 };
+pub use raw::RawNumberKind;
 pub use session::{Session, ValueChange};
 pub use structure::{StructuralOutcome, StructureChange};

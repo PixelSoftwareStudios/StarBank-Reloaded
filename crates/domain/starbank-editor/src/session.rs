@@ -9,6 +9,8 @@ use crate::{
 	history::{Direction, History},
 	identity::{Identities, Occurrence},
 	normalize_value,
+	prepare::SaveOrder,
+	raw::validate_raw_numbers,
 };
 
 /// A proposed exact value replacement in an atomic transaction.
@@ -30,6 +32,7 @@ pub struct Session {
 	pub(crate) id_cursor: u64,
 	pub(crate) opening: Arc<[u8]>,
 	pub(crate) token: Arc<()>,
+	pub(crate) save_order: SaveOrder,
 	pub(crate) opening_ids: Arc<Identities>,
 	saved: Arc<[u8]>,
 	revision: Revision,
@@ -59,6 +62,7 @@ impl Session {
 			saved: opening.clone(),
 			opening,
 			token: Arc::new(()),
+			save_order: SaveOrder::default(),
 			opening_ids: ids.clone(),
 			ids,
 			revision: Revision::INITIAL,
@@ -194,11 +198,16 @@ impl Session {
 		self.commit(document, self.ids.clone(), self.id_cursor)
 	}
 
-	/// Applies a fully valid raw replacement, invalidating prior occurrence identities.
+	/// Applies an exact raw replacement, invalidating prior occurrence identities.
+	///
+	/// Raw numeric attributes use ungrouped integer or decimal text. Grouped input can
+	/// be entered through structured edits. Raw XML is retained byte-for-byte, and
+	/// inherited malformed numeric lexemes can remain unchanged at their projected path.
 	///
 	/// # Errors
 	///
-	/// A stale revision or invalid draft leaves the previous checked document intact.
+	/// Stale revisions, invalid XML, and new invalid or grouped numeric attributes
+	/// leave the previous checked document intact.
 	pub fn replace_raw(
 		&mut self,
 		expected: Revision,
@@ -209,6 +218,7 @@ impl Session {
 			return Ok(self.revision);
 		}
 		let document = parse(bytes, self.limits).map_err(EditorError::Parse)?;
+		validate_raw_numbers(&self.document, &document)?;
 		let mut cursor = self.id_cursor;
 		let identities = Arc::new(Identities::allocate(&document, &mut cursor)?);
 		self.commit(document, identities, cursor)

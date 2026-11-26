@@ -4,13 +4,16 @@ use sc2bank::Limits;
 use starbank_core::Revision;
 use starbank_signature::SigningContext;
 
-use crate::{ExportSigning, Session, ValueChange};
+use crate::{ExportSigning, OccurrenceId, OpeningDiff, Session, ValueChange};
 
+mod diff;
 mod error;
 mod reply;
 mod request;
 mod snapshot;
+mod structure;
 
+use self::diff::WireOccurrenceKind;
 use self::error::ProtocolError;
 use self::reply::{ReplyResult, Scope};
 use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
@@ -46,6 +49,7 @@ struct OpenDocument {
 
 enum Output {
 	Snapshot,
+	Diff(OpeningDiff),
 	Raw(Vec<u8>),
 	Prepared {
 		status: WireSignatureStatus,
@@ -148,6 +152,12 @@ impl Engine {
 		}
 		match execute(&mut active.session, target.expected, operation, bytes) {
 			Ok(Output::Snapshot) => active.snapshot(request_id),
+			Ok(Output::Diff(diff)) => WireReply::encode(
+				Some(request_id),
+				active.scope(),
+				ReplyResult::Diff((&diff).into()),
+				None,
+			),
 			Ok(Output::Raw(bytes)) => WireReply::encode(
 				Some(request_id),
 				active.scope(),
@@ -221,6 +231,23 @@ fn execute(
 		Operation::Snapshot => return Ok(Output::Snapshot),
 		Operation::Raw => return Ok(Output::Raw(session.document().source().to_vec())),
 		Operation::SetValues(edits) => session.set_values(expected, &interpret_edits(&edits)?),
+		Operation::Structure(edit) => session
+			.apply_structure(expected, edit.interpret()?)
+			.map(|result| result.revision),
+		Operation::Revert(revert) => {
+			let id = parse_occurrence(&revert.id)?;
+			match revert.kind {
+				WireOccurrenceKind::Section => session.revert_section(expected, id),
+				WireOccurrenceKind::Key => session.revert_key(expected, id),
+				WireOccurrenceKind::Value => session.revert_value(expected, id),
+			}
+		}
+		Operation::Diff => {
+			return session
+				.opening_diff()
+				.map(Output::Diff)
+				.map_err(|error| ProtocolError::editor(&error, ProtocolError::Internal));
+		}
 		Operation::Undo => session.undo(expected),
 		Operation::Redo => session.redo(expected),
 		Operation::Reset => session.reset(expected),
@@ -253,16 +280,16 @@ fn interpret_edits(edits: &[WireEdit]) -> Result<Vec<ValueChange<'_>>, ProtocolE
 	edits
 		.iter()
 		.map(|edit| {
-			let id = edit
-				.id
-				.parse()
-				.map_err(|_| ProtocolError::InvalidOccurrence)?;
 			Ok(ValueChange {
-				id,
+				id: parse_occurrence(&edit.id)?,
 				value: &edit.value,
 			})
 		})
 		.collect()
+}
+
+fn parse_occurrence(id: &str) -> Result<OccurrenceId, ProtocolError> {
+	id.parse().map_err(|_| ProtocolError::InvalidOccurrence)
 }
 
 fn interpret_context(options: ContextOptions) -> Result<Option<SigningContext>, ProtocolError> {

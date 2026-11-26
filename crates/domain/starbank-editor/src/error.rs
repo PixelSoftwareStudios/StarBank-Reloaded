@@ -3,7 +3,7 @@ use std::fmt;
 use sc2bank::{ParseError, SerializeError, StructuralEditError};
 use starbank_core::Revision;
 
-use crate::{LexemeError, OccurrenceId, ProfileSessionError};
+use crate::{LexemeError, OccurrenceId, ProfileSessionError, RawNumberKind};
 
 /// A rejected editor operation. The current document remains unchanged.
 #[derive(Debug)]
@@ -43,6 +43,13 @@ pub enum EditorError {
 		/// Rejected lexical form.
 		source: LexemeError,
 	},
+	/// The raw draft introduced an invalid or grouped numeric attribute.
+	InvalidRawNumber {
+		/// Type of numeric attribute that failed validation.
+		kind: RawNumberKind,
+		/// Zero-based byte offset of the attribute content in the submitted XML.
+		byte: usize,
+	},
 	/// The value proposed for a new element failed validation.
 	InvalidAddedValue {
 		/// Parent key of the proposed value.
@@ -66,6 +73,10 @@ pub enum EditorError {
 	Profile(ProfileSessionError),
 	/// The save receipt belongs to a different open session.
 	WrongSession,
+	/// The session cannot allocate another preparation sequence.
+	PrepareOrderExhausted,
+	/// A later prepared save was already verified and acknowledged.
+	StaleSaveAcknowledgement,
 }
 
 impl fmt::Display for EditorError {
@@ -90,6 +101,13 @@ impl fmt::Display for EditorError {
 			Self::OpaqueValue(id) => write!(formatter, "value {id} requires raw XML editing"),
 			Self::EditLimit => formatter.write_str("edit exceeds document limits"),
 			Self::InvalidValue { id, source } => write!(formatter, "invalid value {id}: {source}"),
+			Self::InvalidRawNumber { kind, byte } => {
+				let expected = match kind {
+					RawNumberKind::Integer => "an ungrouped integer",
+					RawNumberKind::Fixed => "an ungrouped exact decimal",
+				};
+				write!(formatter, "expected {expected} in raw XML at byte {byte}")
+			}
 			Self::InvalidAddedValue { key, source } => {
 				write!(formatter, "invalid new value for key {key}: {source}")
 			}
@@ -104,6 +122,12 @@ impl fmt::Display for EditorError {
 			Self::Profile(source) => source.fmt(formatter),
 			Self::WrongSession => {
 				formatter.write_str("prepared export belongs to another document")
+			}
+			Self::PrepareOrderExhausted => {
+				formatter.write_str("save preparation sequence exhausted")
+			}
+			Self::StaleSaveAcknowledgement => {
+				formatter.write_str("a later prepared save was already acknowledged")
 			}
 		}
 	}

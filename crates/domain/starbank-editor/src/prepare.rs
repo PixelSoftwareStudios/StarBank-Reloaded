@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+	Arc,
+	atomic::{AtomicU64, Ordering},
+};
 
 use sc2bank::{BankDocument, parse, serialize};
 use starbank_core::Revision;
@@ -20,6 +23,7 @@ pub enum ExportSigning<'context> {
 pub struct PreparedExport {
 	bytes: Arc<[u8]>,
 	revision: Revision,
+	sequence: u64,
 	signature: SignatureStatus,
 	token: Arc<()>,
 	context: Option<SigningContext>,
@@ -43,12 +47,29 @@ impl PreparedExport {
 	}
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct SaveOrder {
+	next: AtomicU64,
+	acknowledged: Option<u64>,
+}
+
+impl SaveOrder {
+	fn issue(&self) -> Result<u64, EditorError> {
+		// This counter assigns order only. The session's exclusive borrow controls acknowledgement.
+		self.next
+			.try_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+				next.checked_add(1)
+			})
+			.map_err(|_| EditorError::PrepareOrderExhausted)
+	}
+}
+
 impl Session {
 	/// Prepares checked output without changing the document or its checkpoints.
 	///
 	/// # Errors
 	///
-	/// Reports stale revisions, invalid output or signing failures.
+	/// Reports stale revisions, invalid output, signing failures or exhausted preparation order.
 	pub fn prepare(
 		&self,
 		expected: Revision,
@@ -77,6 +98,7 @@ impl Session {
 		Ok(PreparedExport {
 			bytes,
 			revision: expected,
+			sequence: self.save_order.issue()?,
 			signature,
 			token: self.token.clone(),
 			context,
@@ -92,13 +114,21 @@ impl Session {
 	///
 	/// # Errors
 	///
-	/// Rejects a receipt from another session or a signed update that would exhaust revisions.
+	/// Rejects a receipt from another session, a receipt superseded by a newer verified save,
+	/// or a signed update that would exhaust revisions.
 	pub fn acknowledge_verified_active_save(
 		&mut self,
 		mut prepared: PreparedExport,
 	) -> Result<Revision, EditorError> {
 		if !Arc::ptr_eq(&self.token, &prepared.token) {
 			return Err(EditorError::WrongSession);
+		}
+		if self
+			.save_order
+			.acknowledged
+			.is_some_and(|sequence| prepared.sequence <= sequence)
+		{
+			return Err(EditorError::StaleSaveAcknowledgement);
 		}
 		let revision = if prepared.revision == self.revision()
 			&& let Some(document) = prepared.signed_document.take()
@@ -110,6 +140,7 @@ impl Session {
 		};
 		self.context = prepared.context;
 		self.saved_checkpoint(prepared.bytes);
+		self.save_order.acknowledged = Some(prepared.sequence);
 		Ok(revision)
 	}
 }

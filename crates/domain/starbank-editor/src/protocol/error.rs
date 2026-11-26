@@ -17,10 +17,12 @@ pub(super) enum ProtocolError {
 	StaleRevision,
 	InvalidContext,
 	InvalidOccurrence,
+	RevertUnavailable,
 	DuplicateOccurrence,
 	OpaqueValue,
 	InvalidInteger,
 	InvalidFixed,
+	InvalidRawNumber,
 	UnsupportedValueKind,
 	NoHistory,
 	EditLimit,
@@ -51,12 +53,14 @@ impl ProtocolError {
 			Self::InvalidOccurrence => {
 				"An occurrence ID is invalid or no longer belongs to the document."
 			}
+			Self::RevertUnavailable => "The selected occurrence has no matching opening content.",
 			Self::DuplicateOccurrence => {
 				"An edit transaction cannot change an occurrence more than once."
 			}
 			Self::OpaqueValue => "This value must be edited in Raw View.",
 			Self::InvalidInteger => "Enter an integer with optional comma grouping.",
 			Self::InvalidFixed => "Enter an exact decimal with optional comma grouping.",
+			Self::InvalidRawNumber => "Use ungrouped integer or exact decimal text in Raw View.",
 			Self::UnsupportedValueKind => "This value type has no supported structured edit.",
 			Self::NoHistory => "There is no history entry in the requested direction.",
 			Self::EditLimit => "The edit exceeds the engine document limit.",
@@ -72,21 +76,19 @@ impl ProtocolError {
 	pub(super) fn editor(error: &EditorError, fallback: Self) -> Self {
 		match error {
 			EditorError::StaleRevision { .. } => Self::StaleRevision,
-			EditorError::UnknownValue(_) => Self::InvalidOccurrence,
+			EditorError::UnknownValue(_)
+			| EditorError::UnknownKey(_)
+			| EditorError::UnknownSection(_) => Self::InvalidOccurrence,
+			EditorError::RevertUnavailable(_) => Self::RevertUnavailable,
 			EditorError::DuplicateValue(_) => Self::DuplicateOccurrence,
 			EditorError::OpaqueValue(_) => Self::OpaqueValue,
-			EditorError::InvalidValue {
-				source: LexemeError::InvalidInteger,
-				..
-			} => Self::InvalidInteger,
-			EditorError::InvalidValue {
-				source: LexemeError::InvalidFixed,
-				..
-			} => Self::InvalidFixed,
-			EditorError::InvalidValue {
-				source: LexemeError::UnsupportedKind,
-				..
-			} => Self::UnsupportedValueKind,
+			EditorError::InvalidValue { source, .. }
+			| EditorError::InvalidAddedValue { source, .. } => match source {
+				LexemeError::InvalidInteger => Self::InvalidInteger,
+				LexemeError::InvalidFixed => Self::InvalidFixed,
+				LexemeError::UnsupportedKind => Self::UnsupportedValueKind,
+			},
+			EditorError::InvalidRawNumber { .. } => Self::InvalidRawNumber,
 			EditorError::NoHistory => Self::NoHistory,
 			EditorError::EditLimit => Self::EditLimit,
 			_ => fallback,

@@ -161,6 +161,8 @@ fn verified_older_save_keeps_later_edits_dirty_and_rejects_other_sessions() {
 	let second = session
 		.set_values(first, &[ValueChange { id, value: "9" }])
 		.unwrap();
+	let copy = session.prepare(second, ExportSigning::Preserve).unwrap();
+	assert_eq!(copy.bytes(), session.document().source());
 	let foreign = open()
 		.prepare(Revision::INITIAL, ExportSigning::Preserve)
 		.unwrap();
@@ -193,6 +195,57 @@ fn signing_preparation_uses_destination_context_and_only_acknowledgement_adopts_
 	let signed = session.acknowledge_verified_active_save(prepared).unwrap();
 	assert!(signed > Revision::INITIAL);
 	assert_eq!(values(&session), ids);
+	assert_eq!(session.signature_status(), SignatureStatus::Valid);
+	assert!(!session.is_dirty());
+}
+
+#[test]
+fn delayed_acknowledgement_cannot_rewind_a_verified_checkpoint() {
+	let mut session = open();
+	let id = values(&session)[0];
+	let first = session
+		.set_values(Revision::INITIAL, &[ValueChange { id, value: "8" }])
+		.unwrap();
+	let older = session.prepare(first, ExportSigning::Preserve).unwrap();
+	let second = session
+		.set_values(first, &[ValueChange { id, value: "9" }])
+		.unwrap();
+	let newer = session.prepare(second, ExportSigning::Preserve).unwrap();
+
+	assert_eq!(
+		session.acknowledge_verified_active_save(newer).unwrap(),
+		second
+	);
+	assert!(matches!(
+		session.acknowledge_verified_active_save(older),
+		Err(EditorError::StaleSaveAcknowledgement)
+	));
+	assert_eq!(session.revision(), second);
+	assert_eq!(contents(&session)[0], "9");
+	assert!(!session.is_dirty());
+}
+
+#[test]
+fn delayed_acknowledgement_cannot_replace_same_revision_signing_context() {
+	let mut session = open();
+	let older_context = SigningContext::new("1-S2-1-100", "1-S2-1-200", "Older").unwrap();
+	let newer_context = SigningContext::new("1-S2-1-100", "1-S2-1-200", "Newer").unwrap();
+	let older = session
+		.prepare(Revision::INITIAL, ExportSigning::Sign(&older_context))
+		.unwrap();
+	let newer = session
+		.prepare(Revision::INITIAL, ExportSigning::Sign(&newer_context))
+		.unwrap();
+	assert_ne!(older.bytes(), newer.bytes());
+	let saved_bytes = newer.bytes().to_vec();
+
+	let signed = session.acknowledge_verified_active_save(newer).unwrap();
+	assert!(matches!(
+		session.acknowledge_verified_active_save(older),
+		Err(EditorError::StaleSaveAcknowledgement)
+	));
+	assert_eq!(session.revision(), signed);
+	assert_eq!(session.document().source(), saved_bytes);
 	assert_eq!(session.signature_status(), SignatureStatus::Valid);
 	assert!(!session.is_dirty());
 }

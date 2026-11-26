@@ -2,7 +2,9 @@ use serde::{Deserialize, Deserializer};
 use serde_json::value::RawValue;
 use starbank_core::Revision;
 
+use super::diff::WireOccurrenceKind;
 use super::error::ProtocolError;
+use super::structure::WireStructure;
 use super::{MAX_OPERATIONS, PROTOCOL_VERSION};
 
 const MAX_REQUEST_ID_BYTES: usize = 128;
@@ -26,6 +28,9 @@ pub(super) enum Operation {
 	Snapshot,
 	Raw,
 	SetValues(Vec<WireEdit>),
+	Structure(WireStructure),
+	Diff,
+	Revert(RevertOptions),
 	ReplaceRaw,
 	Undo,
 	Redo,
@@ -48,6 +53,13 @@ pub(super) struct ContextOptions {
 #[serde(deny_unknown_fields)]
 pub(super) struct CloseOptions {
 	pub(super) discard: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RevertOptions {
+	pub(super) kind: WireOccurrenceKind,
+	pub(super) id: String,
 }
 
 #[derive(Deserialize)]
@@ -116,6 +128,9 @@ enum CommandKind {
 	Snapshot,
 	Raw,
 	SetValues,
+	Structure,
+	Diff,
+	Revert,
 	ReplaceRaw,
 	Undo,
 	Redo,
@@ -198,8 +213,7 @@ fn decode_action(
 	let operation = match kind {
 		CommandKind::Open => return Err(ProtocolError::InvalidRequest),
 		CommandKind::SetValues => {
-			let SetValuesOptions { edits } =
-				decode_payload(payload.ok_or(ProtocolError::InvalidRequest)?)?;
+			let SetValuesOptions { edits } = required_payload(payload)?;
 			if edits.is_empty() {
 				return Err(ProtocolError::EmptyEdit);
 			}
@@ -213,6 +227,8 @@ fn decode_action(
 					.collect::<Result<_, _>>()?,
 			)
 		}
+		CommandKind::Structure => Operation::Structure(required_payload(payload)?),
+		CommandKind::Revert => Operation::Revert(required_payload(payload)?),
 		CommandKind::Prepare => Operation::Prepare(context_options(payload)?),
 		CommandKind::Close => Operation::Close(optional_payload(payload)?),
 		kind => {
@@ -227,6 +243,7 @@ fn payload_free_operation(kind: CommandKind) -> Result<Operation, ProtocolError>
 	match kind {
 		CommandKind::Snapshot => Ok(Operation::Snapshot),
 		CommandKind::Raw => Ok(Operation::Raw),
+		CommandKind::Diff => Ok(Operation::Diff),
 		CommandKind::ReplaceRaw => Ok(Operation::ReplaceRaw),
 		CommandKind::Undo => Ok(Operation::Undo),
 		CommandKind::Redo => Ok(Operation::Redo),
@@ -247,6 +264,12 @@ fn context_options(payload: Option<&RawValue>) -> Result<ContextOptions, Protoco
 	Ok(ContextOptions {
 		context: options.context.map(decode_payload).transpose()?,
 	})
+}
+
+fn required_payload<'a, T: Deserialize<'a>>(
+	payload: Option<&'a RawValue>,
+) -> Result<T, ProtocolError> {
+	decode_payload(payload.ok_or(ProtocolError::InvalidRequest)?)
 }
 
 fn optional_payload<'a, T: Default + Deserialize<'a>>(

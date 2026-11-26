@@ -4,6 +4,7 @@ use serde::Serialize;
 use starbank_core::Revision;
 
 use super::PROTOCOL_VERSION;
+use super::diff::WireDiff;
 use super::error::ProtocolError;
 use super::snapshot::{Snapshot, WireSignatureStatus};
 
@@ -34,6 +35,7 @@ struct Response<'a> {
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
 pub(super) enum ReplyResult<'a> {
 	Snapshot(Snapshot<'a>),
+	Diff(WireDiff<'a>),
 	Raw {},
 	Prepared {
 		signature_status: WireSignatureStatus,
