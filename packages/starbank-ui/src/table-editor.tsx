@@ -1,30 +1,12 @@
 import { useId, useMemo, useState } from "react";
-import type { EditorRow, EditorSection } from "starbank-editor";
+import {
+  type EditorRow,
+  type EditorSection,
+  groupNumberLexeme,
+} from "starbank-editor";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
-const NUMERIC_GROUP_SIZE = 3;
 const WINDOW_THRESHOLD = 150;
-
-function groupNumberLexeme(type: string, value: string): string {
-  if (
-    (type !== "int" && type !== "fixed") ||
-    !/^-?[0-9]+(?:\.[0-9]+)?$/.test(value)
-  ) {
-    return value;
-  }
-  const negative = value.startsWith("-");
-  const [integer = "", fraction] = (negative ? value.slice(1) : value).split(
-    ".",
-  );
-  if (integer.length <= NUMERIC_GROUP_SIZE) return value;
-  const groups = [];
-  for (let end = integer.length; end > 0; end -= NUMERIC_GROUP_SIZE) {
-    groups.push(integer.slice(Math.max(0, end - NUMERIC_GROUP_SIZE), end));
-  }
-  const sign = negative ? "-" : "";
-  const decimals = fraction === undefined ? "" : `.${fraction}`;
-  return sign + groups.reverse().join(",") + decimals;
-}
 
 function rowLabel(row: EditorRow) {
   return row.childName ? `${row.name} · ${row.childName}` : row.name;

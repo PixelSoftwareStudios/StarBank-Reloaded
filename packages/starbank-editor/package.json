@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "react-number-format": "5.4.5",
     "starbank-engine-client": "workspace:*",
     "zustand": "5.1.0"
   },

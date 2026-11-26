@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { defaultSettings } from "starbank-platform/settings";
 import {
   AppShell,
   type BankEditorDocument,
@@ -77,6 +78,30 @@ describe("bank editor", () => {
     expect(normalizeDraft(gold, "12,34")).toBeNull();
     expect(normalizeDraft(experience, "-1,,234.50")).toBeNull();
     expect(normalizeDraft(note, "A, C")).toBe("A, C");
+  });
+
+  it("groups display values without losing precision or lexical padding", () => {
+    const rows = [
+      gold,
+      { ...experience, value: "-9007199254740993.500" },
+      { ...note, value: "00042" },
+    ];
+    const markup = renderToStaticMarkup(
+      <AppShell
+        name="StarBank Web"
+        preferences={{ settings: defaultSettings(), change() {} }}
+        editor={{
+          document: {
+            ...document,
+            sections: [{ id: "player", name: "Player", rows }],
+          },
+          onEditValues: async () => ({ ok: true }),
+        }}
+      />,
+    );
+    expect(markup).toContain('value="00,042"');
+    expect(markup).toContain('value="-9,007,199,254,740,993.500"');
+    expect(markup).toContain('value="00042"');
   });
 
   it("preserves exact edited strings and identifies invalid targets before apply", () => {
