@@ -5,6 +5,14 @@ use crate::{EditorError, LexemeError};
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum ProtocolError {
+	InvalidProfile,
+	InvalidProfileIdentity,
+	ProfileContextRequired,
+	ProfileUnavailable,
+	InvalidProfileValue,
+	ProfileArithmeticOverflow,
+	ProfileReadOnly,
+	StaleProfilePreview,
 	InvalidRequest,
 	UnsupportedVersion,
 	RequestTooLarge,
@@ -37,6 +45,24 @@ pub(super) enum ProtocolError {
 impl ProtocolError {
 	pub(super) fn message(self) -> &'static str {
 		match self {
+			Self::InvalidProfileIdentity => {
+				"The supplied profile identity is invalid or conflicts with the open bank."
+			}
+			Self::InvalidProfile => "The file is not a supported local bank profile.",
+			Self::ProfileContextRequired => {
+				"Set the bank’s author and filename context before importing a legacy profile."
+			}
+			Self::ProfileUnavailable => "The selected profile no longer matches this bank.",
+			Self::InvalidProfileValue => {
+				"A value falls outside the profile’s declared mapping or bounds."
+			}
+			Self::ProfileArithmeticOverflow => {
+				"A dependent value exceeds the profile’s exact numeric range."
+			}
+			Self::ProfileReadOnly => "The profile calculates this field from other values.",
+			Self::StaleProfilePreview => {
+				"The profile edit preview is outdated. Preview the current change again."
+			}
 			Self::InvalidRequest => "The request does not match the engine protocol.",
 			Self::UnsupportedVersion => {
 				"This engine does not support the requested protocol version."

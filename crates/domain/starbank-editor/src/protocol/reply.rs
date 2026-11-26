@@ -6,6 +6,7 @@ use starbank_core::Revision;
 use super::PROTOCOL_VERSION;
 use super::diff::WireDiff;
 use super::error::ProtocolError;
+use super::profile::{ProfilePreview, ProfileView};
 use super::snapshot::{Snapshot, WireSignatureStatus};
 
 /// Encoded reply and an optional binary payload carried outside JSON.
@@ -35,6 +36,8 @@ struct Response<'a> {
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
 pub(super) enum ReplyResult<'a> {
 	Snapshot(Snapshot<'a>),
+	Profile(ProfileView<'a>),
+	ProfilePreview(ProfilePreview),
 	Diff(WireDiff<'a>),
 	Raw {},
 	Prepared {

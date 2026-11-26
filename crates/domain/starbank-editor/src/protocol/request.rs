@@ -4,6 +4,7 @@ use starbank_core::Revision;
 
 use super::diff::WireOccurrenceKind;
 use super::error::ProtocolError;
+use super::profile::ProfileOperation;
 use super::structure::WireStructure;
 use super::{MAX_OPERATIONS, PROTOCOL_VERSION};
 
@@ -26,6 +27,7 @@ pub(super) struct Target {
 
 pub(super) enum Operation {
 	Snapshot,
+	Profile(ProfileOperation),
 	Raw,
 	SetValues(Vec<WireEdit>),
 	Structure(WireStructure),
@@ -125,6 +127,11 @@ struct RawCommand<'a> {
 #[serde(rename_all = "snake_case")]
 enum CommandKind {
 	Open,
+	ProfileLoad,
+	ProfileSnapshot,
+	ProfileClear,
+	ProfilePreview,
+	ProfileApply,
 	Snapshot,
 	Raw,
 	SetValues,
@@ -229,6 +236,15 @@ fn decode_action(
 		}
 		CommandKind::Structure => Operation::Structure(required_payload(payload)?),
 		CommandKind::Revert => Operation::Revert(required_payload(payload)?),
+		CommandKind::ProfileLoad => {
+			Operation::Profile(ProfileOperation::Load(required_payload(payload)?))
+		}
+		CommandKind::ProfilePreview => {
+			Operation::Profile(ProfileOperation::Preview(required_payload(payload)?))
+		}
+		CommandKind::ProfileApply => {
+			Operation::Profile(ProfileOperation::Apply(required_payload(payload)?))
+		}
 		CommandKind::Prepare => Operation::Prepare(context_options(payload)?),
 		CommandKind::Close => Operation::Close(optional_payload(payload)?),
 		kind => {
@@ -242,6 +258,8 @@ fn decode_action(
 fn payload_free_operation(kind: CommandKind) -> Result<Operation, ProtocolError> {
 	match kind {
 		CommandKind::Snapshot => Ok(Operation::Snapshot),
+		CommandKind::ProfileSnapshot => Ok(Operation::Profile(ProfileOperation::Snapshot)),
+		CommandKind::ProfileClear => Ok(Operation::Profile(ProfileOperation::Clear)),
 		CommandKind::Raw => Ok(Operation::Raw),
 		CommandKind::Diff => Ok(Operation::Diff),
 		CommandKind::ReplaceRaw => Ok(Operation::ReplaceRaw),

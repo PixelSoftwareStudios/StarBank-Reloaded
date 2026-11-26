@@ -8,8 +8,10 @@ use crate::{ExportSigning, OccurrenceId, OpeningDiff, Session, ValueChange};
 
 mod diff;
 mod error;
+mod native_resign;
 mod native_restore;
 mod native_save;
+mod profile;
 mod reply;
 mod request;
 mod snapshot;
@@ -17,6 +19,7 @@ mod structure;
 
 use self::diff::WireOccurrenceKind;
 use self::error::ProtocolError;
+use self::profile::{ProfilePreview, Profiles};
 use self::reply::{ReplyResult, Scope};
 use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
 use self::snapshot::{Snapshot, WireSignatureStatus};
@@ -51,10 +54,13 @@ pub struct Engine {
 struct OpenDocument {
 	id: String,
 	session: Session,
+	profiles: Profiles,
 }
 
 enum Output {
 	Snapshot,
+	Profile,
+	ProfilePreview(ProfilePreview),
 	Diff(OpeningDiff),
 	Raw(Vec<u8>),
 	Prepared {
@@ -119,6 +125,7 @@ impl Engine {
 		self.active.insert(OpenDocument {
 			id: format!("document-{sequence}"),
 			session,
+			profiles: Profiles::default(),
 		})
 	}
 
@@ -159,8 +166,30 @@ impl Engine {
 			self.active = None;
 			return reply;
 		}
-		match execute(&mut active.session, target.expected, operation, bytes) {
+		let result = if let Operation::Profile(operation) = operation {
+			active
+				.profiles
+				.execute(&mut active.session, target.expected, operation, bytes)
+		} else {
+			execute(&mut active.session, target.expected, operation, bytes)
+		};
+		match result {
 			Ok(Output::Snapshot) => active.snapshot(request_id),
+			Ok(Output::Profile) => match active.profiles.view(&active.session) {
+				Ok(profile) => WireReply::encode(
+					Some(request_id),
+					active.scope(),
+					ReplyResult::Profile(profile),
+					None,
+				),
+				Err(error) => active.error(request_id, error),
+			},
+			Ok(Output::ProfilePreview(preview)) => WireReply::encode(
+				Some(request_id),
+				active.scope(),
+				ReplyResult::ProfilePreview(preview),
+				None,
+			),
 			Ok(Output::Diff(diff)) => WireReply::encode(
 				Some(request_id),
 				active.scope(),
@@ -261,7 +290,9 @@ fn execute(
 		Operation::Redo => session.redo(expected),
 		Operation::Reset => session.reset(expected),
 		Operation::Prepare(options) => return prepare(session, expected, options),
-		Operation::ReplaceRaw | Operation::Close(_) => return Err(ProtocolError::Internal),
+		Operation::ReplaceRaw | Operation::Close(_) | Operation::Profile(_) => {
+			return Err(ProtocolError::Internal);
+		}
 	}
 	.map_err(|error| ProtocolError::editor(&error, ProtocolError::InvalidEdit))?;
 	Ok(Output::Snapshot)

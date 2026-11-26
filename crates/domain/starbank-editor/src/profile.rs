@@ -18,6 +18,12 @@ pub struct ProfileEvidence<'a> {
 	pub fingerprint: Option<&'a str>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ProfileIdentity<'a> {
+	pub(crate) author: &'a str,
+	pub(crate) bank_name: &'a str,
+}
+
 /// A request to edit one control in the identified profile.
 #[derive(Clone, Copy, Debug)]
 pub struct ProfileEdit<'a> {
@@ -99,14 +105,27 @@ impl Session {
 		registry: &'a ProfileRegistry,
 		evidence: ProfileEvidence<'_>,
 	) -> MatchOutcome<'a> {
-		let Some(context) = self.context.as_ref() else {
+		self.match_profile_using(registry, evidence, None)
+	}
+
+	pub(crate) fn match_profile_using<'a>(
+		&'a self,
+		registry: &'a ProfileRegistry,
+		evidence: ProfileEvidence<'_>,
+		identity: Option<ProfileIdentity<'_>>,
+	) -> MatchOutcome<'a> {
+		let context = self.context.as_ref().map(|context| ProfileIdentity {
+			author: context.author(),
+			bank_name: context.bank_name(),
+		});
+		let Some(known) = context.or(identity) else {
 			return MatchOutcome::Unknown;
 		};
 		registry.match_bank(
 			&self.document,
 			&BankIdentity {
-				author: Some(context.author()),
-				bank_name: context.bank_name(),
+				author: Some(known.author),
+				bank_name: known.bank_name,
 				map_version: evidence.map_version,
 				fingerprint: evidence.fingerprint,
 			},
@@ -124,7 +143,17 @@ impl Session {
 		registry: &ProfileRegistry,
 		edit: ProfileEdit<'_>,
 	) -> Result<Vec<ProfileValueChange>, EditorError> {
-		let proposal = self.checked_profile_edits(expected, registry, edit)?;
+		self.preview_profile_using(expected, registry, edit, None)
+	}
+
+	pub(crate) fn preview_profile_using(
+		&self,
+		expected: Revision,
+		registry: &ProfileRegistry,
+		edit: ProfileEdit<'_>,
+		identity: Option<ProfileIdentity<'_>>,
+	) -> Result<Vec<ProfileValueChange>, EditorError> {
+		let proposal = self.checked_profile_edits(expected, registry, edit, identity)?;
 		if !proposal.is_empty() {
 			serialize(&self.document, &value_edits(&proposal), self.limits)
 				.map_err(EditorError::Serialize)?;
@@ -157,7 +186,17 @@ impl Session {
 		registry: &ProfileRegistry,
 		edit: ProfileEdit<'_>,
 	) -> Result<Revision, EditorError> {
-		let proposal = self.checked_profile_edits(expected, registry, edit)?;
+		self.apply_profile_using(expected, registry, edit, None)
+	}
+
+	pub(crate) fn apply_profile_using(
+		&mut self,
+		expected: Revision,
+		registry: &ProfileRegistry,
+		edit: ProfileEdit<'_>,
+		identity: Option<ProfileIdentity<'_>>,
+	) -> Result<Revision, EditorError> {
+		let proposal = self.checked_profile_edits(expected, registry, edit, identity)?;
 		self.commit_value_edits(&value_edits(&proposal))
 	}
 
@@ -166,9 +205,10 @@ impl Session {
 		expected: Revision,
 		registry: &ProfileRegistry,
 		edit: ProfileEdit<'_>,
+		identity: Option<ProfileIdentity<'_>>,
 	) -> Result<Vec<ProposedValueEdit>, EditorError> {
 		self.require_revision(expected)?;
-		let binding = match self.match_profile(registry, edit.evidence) {
+		let binding = match self.match_profile_using(registry, edit.evidence, identity) {
 			MatchOutcome::Matched(binding) => binding,
 			MatchOutcome::Incompatible => {
 				return Err(EditorError::Profile(ProfileSessionError::Incompatible));
