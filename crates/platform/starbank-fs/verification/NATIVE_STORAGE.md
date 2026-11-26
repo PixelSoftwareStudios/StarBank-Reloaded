@@ -60,3 +60,5 @@ cargo test -p starbank-fs --locked --test windows_storage -- --ignored
 ```
 
 See the Microsoft [CreateFileW sharing and open flags](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew), [handle-relative names](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile), [volume GUID path contract](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew), and [file information structures](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex). The handle-relative implementation comes from the pinned [cap-primitives 4.0.3 backend](https://docs.rs/crate/cap-primitives/4.0.3/source/src/windows/fs/create_file_at_w.rs).
+
+The Windows create-only qualification records the local cross-check, prospective outcome model and remaining native NTFS cases. [Windows create-only qualification](WINDOWS_CREATE_QUALIFICATION.md)
