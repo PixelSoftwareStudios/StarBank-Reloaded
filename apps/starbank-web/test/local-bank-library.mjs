@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  truncate,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,15 +80,40 @@ export async function verifyLocalImports(page, initial) {
     .filter({ hasText: "Unsaved changes" })
     .waitFor();
 
-  page.once("dialog", (confirmation) => confirmation.dismiss());
   await beta.click();
+  const switchBank = page.getByRole("dialog", { name: "Unsaved bank changes" });
+  await switchBank.waitFor();
+  await page.keyboard.press("Escape");
   await library
     .getByRole("status")
     .filter({ hasText: "The current bank is still open." })
     .waitFor();
   await page.getByRole("heading", { name: "Alpha.SC2Bank" }).waitFor();
-  page.once("dialog", (confirmation) => confirmation.accept());
   await beta.click();
+  await switchBank.getByRole("button", { name: "Save a copy…" }).click();
+  const exportBank = page.getByRole("dialog", { name: "Save a bank copy" });
+  await exportBank
+    .getByRole("checkbox", { name: "Re-sign this copy" })
+    .uncheck();
+  await exportBank.getByRole("button", { name: "Prepare download" }).click();
+  const continueOpening = exportBank.getByRole("button", {
+    name: "Continue after download",
+  });
+  assert(await continueOpening.isDisabled());
+  const downloading = page.waitForEvent("download");
+  await exportBank
+    .getByRole("link", { name: "Download Alpha.SC2Bank" })
+    .click();
+  const download = await downloading;
+  assert.equal(download.suggestedFilename(), "Alpha.SC2Bank");
+  assert.deepEqual(
+    await readFile(await download.path()),
+    Buffer.from(initial.replace('int="001"', 'int="009"')),
+  );
+  await page
+    .getByRole("heading", { name: "Alpha.SC2Bank", includeHidden: true })
+    .waitFor();
+  await continueOpening.click();
   await page.getByRole("heading", { name: "Beta.XML" }).waitFor();
   assert.equal(await value.inputValue(), "002");
 

@@ -31,7 +31,7 @@ import {
 } from "./bank-session";
 import { LocalBankLibrary } from "./local-bank-library";
 import { useBrowserSettings } from "./use-browser-settings";
-import { ClipboardDialog, ExportDialog } from "./web-dialogs";
+import { ClipboardDialog, ExportDialog, SwitchBankDialog } from "./web-dialogs";
 import "./web-dialogs.css";
 
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
@@ -55,6 +55,11 @@ export function StarBankWeb() {
   const [hasDraft, setHasDraft] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [copyPreview, setCopyPreview] = useState<string>();
+  const [pendingOpen, setPendingOpen] = useState<{
+    save: boolean;
+    nextName: string;
+    resolve: (proceed: boolean) => void;
+  }>();
 
   useEffect(() => {
     let mounted = true;
@@ -133,13 +138,12 @@ export function StarBankWeb() {
         };
       }
       const discardCurrent = document?.dirty ?? false;
-      if (
-        discardCurrent &&
-        !window.confirm(
-          "Discard changes in the current bank and open another bank?",
-        )
-      ) {
-        return { ok: false, message: "The current bank is still open." };
+      if (discardCurrent) {
+        const proceed = await new Promise<boolean>((resolve) => {
+          setPendingOpen({ nextName: file.name, save: false, resolve });
+        });
+        if (!proceed)
+          return { ok: false, message: "The current bank is still open." };
       }
       setDocument(await bankSession().open(file, discardCurrent));
       setOpenedFile(file);
@@ -305,6 +309,11 @@ export function StarBankWeb() {
     }
   }
 
+  function finishSwitch(proceed: boolean) {
+    setPendingOpen(undefined);
+    pendingOpen?.resolve(proceed);
+  }
+
   return (
     <>
       <AppShell
@@ -326,7 +335,7 @@ export function StarBankWeb() {
           )
         }
       />
-      {showExport && document && (
+      {showExport && document && !pendingOpen && (
         <ExportDialog
           name={document.name}
           initialSign={preferences.settings.autoResignOnSave}
@@ -339,6 +348,24 @@ export function StarBankWeb() {
           dismiss={() => setShowExport(false)}
         />
       )}
+      {pendingOpen &&
+        document &&
+        (pendingOpen.save ? (
+          <ExportDialog
+            name={document.name.replace(/\.xml$/i, ".SC2Bank")}
+            initialSign={preferences.settings.autoResignOnSave}
+            prepare={exportCopy}
+            continueAfterDownload={() => finishSwitch(true)}
+            dismiss={() => finishSwitch(false)}
+          />
+        ) : (
+          <SwitchBankDialog
+            name={pendingOpen.nextName}
+            save={() => setPendingOpen({ ...pendingOpen, save: true })}
+            discard={() => finishSwitch(true)}
+            cancel={() => finishSwitch(false)}
+          />
+        ))}
       {copyPreview !== undefined && (
         <ClipboardDialog
           xml={copyPreview}

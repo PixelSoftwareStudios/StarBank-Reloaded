@@ -522,15 +522,18 @@ async function verify(name) {
     );
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
 
-    page.once("dialog", (confirmation) => confirmation.dismiss());
+    const switchBank = page.getByRole("dialog", {
+      name: "Unsaved bank changes",
+    });
     await chooseBank("Replacement.SC2Bank", initial);
+    await switchBank.getByRole("button", { name: "Cancel" }).click();
     await page
       .getByRole("status")
       .filter({ hasText: "The current bank is still open." })
       .waitFor();
 
-    page.once("dialog", (confirmation) => confirmation.accept());
     await chooseBank("Malformed.SC2Bank", "<Bank>");
+    await switchBank.getByRole("button", { name: "Discard and open" }).click();
     await page
       .getByRole("status")
       .filter({ hasText: "The bank XML could not be opened safely." })
@@ -538,11 +541,11 @@ async function verify(name) {
     await page.getByRole("heading", { name: documentName }).waitFor();
     await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
 
-    page.once("dialog", (confirmation) => confirmation.accept());
     await chooseBank(
       "Replacement.SC2Bank",
       initial.replace('int="001"', 'int="002"'),
     );
+    await switchBank.getByRole("button", { name: "Discard and open" }).click();
     await page.getByRole("heading", { name: "Replacement.SC2Bank" }).waitFor();
     assert.equal(await value.inputValue(), "002");
     await verifyStructuralEditing(page, value);

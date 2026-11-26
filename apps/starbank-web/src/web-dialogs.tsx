@@ -15,6 +15,7 @@ export function ExportDialog({
   initialSign = false,
   prepare,
   prepareBackup,
+  continueAfterDownload,
   dismiss,
 }: {
   name: string;
@@ -23,7 +24,8 @@ export function ExportDialog({
     name: string,
     context?: EngineSigningContext,
   ) => Promise<DownloadPreparation>;
-  prepareBackup: () => Promise<DownloadPreparation>;
+  prepareBackup?: () => Promise<DownloadPreparation>;
+  continueAfterDownload?: () => void;
   dismiss: () => void;
 }) {
   const [filename, setFilename] = useState(name);
@@ -33,6 +35,7 @@ export function ExportDialog({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [prepared, setPrepared] = useState<DownloadPreparation>();
+  const [downloadRequested, setDownloadRequested] = useState(false);
   const downloadLink = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
@@ -46,6 +49,7 @@ export function ExportDialog({
   ): Promise<void> {
     setWorking(true);
     setError("");
+    setDownloadRequested(false);
     try {
       setPrepared(await makeDownload());
     } catch (failure) {
@@ -80,16 +84,31 @@ export function ExportDialog({
               Back
             </button>
             <button className="editor-button" type="button" onClick={dismiss}>
-              Close
+              {continueAfterDownload ? "Cancel" : "Close"}
             </button>
             <a
               ref={downloadLink}
               className="editor-button editor-primary"
               href={prepared.download.href}
               download={prepared.download.name}
+              onClick={
+                continueAfterDownload
+                  ? () => setDownloadRequested(true)
+                  : undefined
+              }
             >
               Download {prepared.download.name}
             </a>
+            {continueAfterDownload && (
+              <button
+                className="editor-button editor-primary"
+                type="button"
+                disabled={!downloadRequested}
+                onClick={continueAfterDownload}
+              >
+                Continue after download
+              </button>
+            )}
           </div>
         </>
       ) : (
@@ -147,14 +166,16 @@ export function ExportDialog({
             >
               Cancel
             </button>
-            <button
-              className="editor-button"
-              type="button"
-              disabled={working}
-              onClick={() => void prepareCopy(prepareBackup)}
-            >
-              Prepare opening backup
-            </button>
+            {prepareBackup && (
+              <button
+                className="editor-button"
+                type="button"
+                disabled={working}
+                onClick={() => void prepareCopy(prepareBackup)}
+              >
+                Prepare opening backup
+              </button>
+            )}
             <button
               className="editor-button editor-primary"
               type="submit"
@@ -165,6 +186,39 @@ export function ExportDialog({
           </div>
         </form>
       )}
+    </WebDialog>
+  );
+}
+
+export function SwitchBankDialog({
+  name,
+  save,
+  discard,
+  cancel,
+}: {
+  name: string;
+  save: () => void;
+  discard: () => void;
+  cancel: () => void;
+}) {
+  return (
+    <WebDialog title="Unsaved bank changes" close={cancel}>
+      <p>Save a copy of your changes or discard them before opening {name}.</p>
+      <div className="web-dialog-actions">
+        <button className="editor-button" type="button" onClick={cancel}>
+          Cancel
+        </button>
+        <button className="editor-button" type="button" onClick={discard}>
+          Discard and open
+        </button>
+        <button
+          className="editor-button editor-primary"
+          type="button"
+          onClick={save}
+        >
+          Save a copy…
+        </button>
+      </div>
     </WebDialog>
   );
 }
