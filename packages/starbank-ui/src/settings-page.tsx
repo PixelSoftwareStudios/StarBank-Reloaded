@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
+import { InventoryActions } from "./inventory-browser";
+import type { MapInventory } from "./map-sidebar";
 
 export type SettingsKey = Exclude<keyof AppSettings, "version">;
 export type ChangeSetting = <Key extends SettingsKey>(
@@ -30,6 +32,7 @@ export interface SettingsPageProps {
   readonly onChange: ChangeSetting;
   readonly onBack: () => void;
   readonly discovery?: SettingsDiscoveryControls;
+  readonly inventory?: MapInventory;
   readonly backupAvailable?: boolean;
   readonly issue?: string;
   readonly readOnly?: boolean;
@@ -73,6 +76,7 @@ export function SettingsPage({
   onChange,
   onBack,
   discovery,
+  inventory,
   backupAvailable = false,
   issue,
   readOnly = false,
@@ -105,10 +109,15 @@ export function SettingsPage({
         </div>
       )}
 
+      {!discovery && inventory?.controls && (
+        <Group title="Bank discovery">
+          <InventoryDiscoveryFields inventory={inventory} />
+        </Group>
+      )}
+
       <Group title="General" disabled={readOnly}>
-        {discovery ? (
-          <DiscoveryFields discovery={discovery} />
-        ) : (
+        {discovery && <DiscoveryFields discovery={discovery} />}
+        {!discovery && !inventory?.controls && (
           <p className="settings-page-note">
             Automatic bank discovery and account selection are available in the
             desktop app.
@@ -289,6 +298,66 @@ function ChoiceField<Value extends string>({
         ))}
       </select>
     </label>
+  );
+}
+
+function InventoryDiscoveryFields({ inventory }: { inventory: MapInventory }) {
+  const { controls, rootName } = inventory;
+  const scanning = inventory.status === "scanning";
+  let status: string;
+  switch (inventory.status) {
+    case "scanning":
+      status = inventory.message ?? "Scanning bank folders…";
+      break;
+    case "ready":
+      status =
+        inventory.message ??
+        (inventory.incomplete
+          ? "Some inventory results could not be loaded."
+          : "Bank inventory ready.");
+      break;
+    case "cancelled":
+      status = "Bank scan canceled.";
+      break;
+    case "failed":
+      status = inventory.message;
+      break;
+    case "manual-required":
+      status = "Automatic bank discovery is unavailable. Select a folder.";
+      break;
+    case "root-not-found":
+      status = "No SC2 Bank Folder path auto-detected, please select a folder";
+      break;
+    case "unavailable":
+      status = "Bank inventory has not been loaded.";
+      break;
+  }
+
+  return (
+    <>
+      {controls && (
+        <InventoryActions
+          controls={controls}
+          rootName={rootName}
+          scanning={scanning}
+        />
+      )}
+      <p className="settings-page-note">{status}</p>
+      {scanning && (
+        <progress
+          aria-label="Bank discovery progress"
+          max={inventory.total || undefined}
+          value={inventory.total ? inventory.scanned : undefined}
+        />
+      )}
+      {scanning &&
+        inventory.scanned !== undefined &&
+        inventory.total !== undefined && (
+          <p className="settings-page-note">
+            {inventory.scanned} of {inventory.total} map archives inspected
+          </p>
+        )}
+    </>
   );
 }
 

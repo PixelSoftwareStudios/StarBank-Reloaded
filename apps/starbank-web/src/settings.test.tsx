@@ -232,3 +232,28 @@ test("settings render manual folder and backup controls only when available", ()
   expect(desktop).toContain("Player One");
   expect(desktop).toContain("without an automatic backup");
 });
+
+test("settings present archive progress with cancellation when preferences are read-only", () => {
+  const noChange = () => undefined;
+  const settings = renderToStaticMarkup(
+    <SettingsPage
+      settings={defaultSettings()}
+      onBack={noChange}
+      onChange={noChange}
+      readOnly
+      inventory={{
+        status: "scanning",
+        message: "Inspecting cached map metadata…",
+        scanned: 2,
+        total: 5,
+        rootName: "Banks",
+        controls: { onCancel: noChange },
+      }}
+    />,
+  );
+  expect(settings).toContain("<legend>Bank discovery</legend>");
+  expect(settings).toContain('aria-label="Bank discovery progress"');
+  expect(settings).toContain('max="5" value="2"');
+  expect(settings).toContain("2 of 5 map archives inspected");
+  expect(settings).toContain('<button type="button">Cancel scan</button>');
+});

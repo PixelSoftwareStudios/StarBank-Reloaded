@@ -143,7 +143,13 @@ fn a_cancellation_releases_the_scan_lease_without_executing_another_scan() -> io
 		service.start_scan(ScanMode::Refresh),
 		Err(InventoryError::Busy)
 	));
-	service.cancel().expect("cancel current scan");
+	service
+		.cancel(lease.generation - 1)
+		.expect("ignore stale cancel");
+	assert!(!lease.cancellation.is_cancelled());
+	service
+		.cancel(lease.generation)
+		.expect("cancel current scan");
 	assert!(lease.cancellation.is_cancelled());
 	drop(lease);
 	let next = service
@@ -275,5 +281,47 @@ fn legacy_folder_hint_does_not_authorize_a_scan() -> io::Result<()> {
 		.start_scan(ScanMode::Refresh)
 		.expect("automatic scan lease");
 	assert!(scan.root.is_none());
+	Ok(())
+}
+
+#[test]
+fn map_index_activity_emits_actual_archive_counts_and_honors_cancel_boundary() -> io::Result<()> {
+	let temp = tempfile::tempdir()?;
+	let root = temp.path().canonicalize()?;
+	let bank_root = root.join("Selected bank fixture");
+	write(&bank_root, "Shared.sc2bank", b"<Bank/>")?;
+	let map_root = root.join("Archives");
+	write(&map_root, "first.s2ma", ALPHA)?;
+	write(&map_root, "second.s2ma", RIVAL)?;
+	let roots = [map_root];
+	let service = InventoryService::default();
+	let mut events = Vec::new();
+	service
+		.scan_with_progress(ScanMode::Manual(bank_root.clone()), &roots, |event| {
+			events.push(serde_json::to_value(event).expect("progress JSON"));
+		})
+		.expect("two observed archives");
+	assert_eq!(events[0]["stage"], "locating_folder");
+	assert_eq!(events[1]["stage"], "enumerating_banks");
+	assert_eq!(events[2]["stage"], "indexing_maps");
+	assert_eq!(
+		events[3],
+		serde_json::json!({"generation": "1", "stage": "inspecting_archives", "completed": 1, "total": 2})
+	);
+	assert_eq!(
+		events[4],
+		serde_json::json!({"generation": "1", "stage": "inspecting_archives", "completed": 2, "total": 2})
+	);
+	assert_eq!(events.len(), 5);
+
+	let cancelled = service.scan_with_progress(ScanMode::Refresh, &roots, |event| {
+		let message = serde_json::to_value(event).expect("progress JSON");
+		assert_eq!(message["generation"], "2");
+		if message["stage"] == "indexing_maps" {
+			service.cancel(2).expect("request cancellation");
+		}
+	});
+	assert!(matches!(cancelled, Err(InventoryError::Cancelled)));
+	assert!(service.start_scan(ScanMode::Refresh).is_ok());
 	Ok(())
 }

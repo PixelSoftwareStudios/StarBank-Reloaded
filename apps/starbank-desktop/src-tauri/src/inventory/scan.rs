@@ -10,8 +10,9 @@ use starbank_paths::{
 };
 
 use super::{
-	InventoryError, InventoryReason, InventorySnapshot, InventoryStatus,
+	InventoryError, InventoryProgress, InventoryReason, InventorySnapshot, InventoryStatus,
 	authority::{AuthorizedRoot, DirectoryIdentity, is_native_disk_path, ordinary_directories},
+	progress::InventoryProgressPublisher,
 	projection::{self, OpaqueIds, Projection, project},
 	root_record::ManualRoot,
 };
@@ -29,7 +30,10 @@ pub(super) fn collect_inventory(
 	ids: &OpaqueIds,
 	generation: u64,
 	cancellation: &Cancellation,
+	progress: &mut InventoryProgressPublisher<impl FnMut(InventoryProgress)>,
 ) -> Result<(Projection, Option<ManualRoot>), InventoryError> {
+	check_cancelled(cancellation)?;
+	progress.locating_folder();
 	let manual_path = manual.map(|root| root.path.as_path());
 	if let Some(root) = manual
 		&& let Some(identity) = root.identity
@@ -77,6 +81,7 @@ pub(super) fn collect_inventory(
 		path: root.path().to_owned(),
 		identity: Some(root.identity()),
 	});
+	progress.enumerating_banks();
 	let banks = match inventory_banks(&selection, BANK_SCAN_LIMITS) {
 		Ok(banks) => banks,
 		Err(error) => return Ok((path_failure(manual_path, &error), accepted)),
@@ -98,7 +103,10 @@ pub(super) fn collect_inventory(
 			..IndexLimits::default()
 		},
 	};
-	let result = scan_maps(request, cancellation, |_| {});
+	progress.indexing_maps();
+	let result = scan_maps(request, cancellation, |update| {
+		progress.inspected_archive(update)
+	});
 	let maps = match result {
 		Ok(report) => Some(report),
 		Err(ScanError::Cancelled) => return Err(InventoryError::Cancelled),

@@ -139,6 +139,7 @@ export function AppShell({
             <Suspense fallback={<p role="status">Loading settings…</p>}>
               <SettingsPage
                 settings={preferences.settings}
+                inventory={inventory}
                 onChange={preferences.change}
                 onBack={() => setSettingsOpen(false)}
                 issue={preferences.issue}

@@ -2,12 +2,13 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Mutex};
 
 use serde::Serialize;
 use starbank_map_index::{Cancellation, known_cache_roots};
-use tauri::{Manager as _, State, WebviewWindow};
+use tauri::{Manager as _, State, WebviewWindow, ipc::Channel};
 
 use crate::commands::{self, CommandError, DesktopEngine, OpenedBank};
 
 mod authority;
 mod batch;
+mod progress;
 mod projection;
 mod root_record;
 mod scan;
@@ -18,6 +19,8 @@ use batch::MapMembers;
 #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 pub(crate) use batch::scan_batch_fixture;
 pub(crate) use batch::{InventoryBatch, InventoryBatchMember};
+pub(crate) use progress::InventoryProgress;
+use progress::InventoryProgressPublisher;
 use projection::OpaqueIds;
 pub(crate) use projection::{InventoryReason, InventorySnapshot, InventoryStatus};
 use root_record::{ManualRoot, RootRecordStore};
@@ -25,6 +28,7 @@ use scan::{check_cancelled, collect_inventory};
 
 const PICK_FOLDER_TITLE: &str = "Select SC2 Bank Folder";
 const OPEN_REQUEST: &str = "open";
+const MAX_GENERATION_DIGITS: usize = 20;
 
 #[derive(Default)]
 pub(crate) struct InventoryService {
@@ -96,17 +100,11 @@ impl InventoryService {
 		self
 	}
 
-	fn refresh(&self) -> Result<InventorySnapshot, InventoryError> {
-		self.scan(ScanMode::Refresh)
-	}
-
-	fn use_automatic(&self) -> Result<InventorySnapshot, InventoryError> {
-		self.scan(ScanMode::Automatic)
-	}
-
-	fn cancel(&self) -> Result<(), InventoryError> {
+	fn cancel(&self, generation: u64) -> Result<(), InventoryError> {
 		let state = self.state.lock().map_err(|_| InventoryError::Unavailable)?;
-		if let Some(active) = &state.active {
+		if state.generation == generation
+			&& let Some(active) = &state.active
+		{
 			active.cancel();
 		}
 		Ok(())
@@ -142,16 +140,34 @@ impl InventoryService {
 			.or_else(|| self.starting_directory.clone()))
 	}
 
-	fn scan(&self, mode: ScanMode) -> Result<InventorySnapshot, InventoryError> {
-		self.scan_with_roots(mode, &known_cache_roots())
+	fn scan(
+		&self,
+		mode: ScanMode,
+		progress: Channel<InventoryProgress>,
+	) -> Result<InventorySnapshot, InventoryError> {
+		self.scan_with_progress(mode, &known_cache_roots(), |update| {
+			// A closed webview must not interrupt a scan or its native state.
+			let _ = progress.send(update);
+		})
 	}
 
+	#[cfg(test)]
 	fn scan_with_roots(
 		&self,
 		mode: ScanMode,
 		map_roots: &[PathBuf],
 	) -> Result<InventorySnapshot, InventoryError> {
+		self.scan_with_progress(mode, map_roots, |_| {})
+	}
+
+	fn scan_with_progress(
+		&self,
+		mode: ScanMode,
+		map_roots: &[PathBuf],
+		notify: impl FnMut(InventoryProgress),
+	) -> Result<InventorySnapshot, InventoryError> {
 		let lease = self.start_scan(mode)?;
+		let mut progress = InventoryProgressPublisher::new(lease.generation, notify);
 		let ((mut snapshot, banks), accepted_root) = collect_inventory(
 			lease.root.as_ref(),
 			map_roots,
@@ -159,6 +175,7 @@ impl InventoryService {
 			&lease.ids,
 			lease.generation,
 			&lease.cancellation,
+			&mut progress,
 		)?;
 		let mut state = self.state.lock().map_err(|_| InventoryError::Unavailable)?;
 		check_cancelled(&lease.cancellation)?;
@@ -254,21 +271,29 @@ impl Drop for ScanLease<'_> {
 #[tauri::command]
 pub(crate) async fn refresh_inventory(
 	window: WebviewWindow,
+	progress: Channel<InventoryProgress>,
 ) -> Result<InventorySnapshot, InventoryError> {
 	let app = window.app_handle().clone();
-	tauri::async_runtime::spawn_blocking(move || app.state::<InventoryService>().refresh())
-		.await
-		.map_err(|_| InventoryError::Unavailable)?
+	tauri::async_runtime::spawn_blocking(move || {
+		app.state::<InventoryService>()
+			.scan(ScanMode::Refresh, progress)
+	})
+	.await
+	.map_err(|_| InventoryError::Unavailable)?
 }
 
 #[tauri::command]
 pub(crate) async fn use_automatic_inventory(
 	window: WebviewWindow,
+	progress: Channel<InventoryProgress>,
 ) -> Result<InventorySnapshot, InventoryError> {
 	let app = window.app_handle().clone();
-	tauri::async_runtime::spawn_blocking(move || app.state::<InventoryService>().use_automatic())
-		.await
-		.map_err(|_| InventoryError::Unavailable)?
+	tauri::async_runtime::spawn_blocking(move || {
+		app.state::<InventoryService>()
+			.scan(ScanMode::Automatic, progress)
+	})
+	.await
+	.map_err(|_| InventoryError::Unavailable)?
 }
 
 #[tauri::command]
@@ -276,6 +301,7 @@ pub(crate) async fn select_inventory_folder(
 	window: WebviewWindow,
 	engine: State<'_, DesktopEngine>,
 	inventory: State<'_, InventoryService>,
+	progress: Channel<InventoryProgress>,
 ) -> Result<Option<InventorySnapshot>, InventoryError> {
 	let _dialog = engine.dialog().map_err(|_| InventoryError::Busy)?;
 	let mut dialog = rfd::AsyncFileDialog::new()
@@ -291,7 +317,7 @@ pub(crate) async fn select_inventory_folder(
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
-			.scan(ScanMode::Manual(path))
+			.scan(ScanMode::Manual(path), progress)
 			.map(Some)
 	})
 	.await
@@ -301,8 +327,15 @@ pub(crate) async fn select_inventory_folder(
 #[tauri::command]
 pub(crate) fn cancel_inventory(
 	inventory: State<'_, InventoryService>,
+	generation: String,
 ) -> Result<(), InventoryError> {
-	inventory.cancel()
+	if generation.len() > MAX_GENERATION_DIGITS {
+		return Err(InventoryError::Unavailable);
+	}
+	let generation = generation
+		.parse()
+		.map_err(|_| InventoryError::Unavailable)?;
+	inventory.cancel(generation)
 }
 
 #[tauri::command]

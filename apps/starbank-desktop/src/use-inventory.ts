@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapInventory, MapListItem } from "starbank-ui";
 import type { FileDialogReply } from "./transport";
@@ -20,12 +20,26 @@ interface InventorySnapshot {
   incomplete: boolean;
 }
 
+type InventoryProgress = { generation: string } & (
+  | { stage: "locating_folder" | "enumerating_banks" | "indexing_maps" }
+  | { stage: "inspecting_archives"; completed: number; total: number }
+);
+
+const PROGRESS_LABELS: Record<InventoryProgress["stage"], string> = {
+  locating_folder: "Finding the bank folder…",
+  enumerating_banks: "Scanning for bank files…",
+  indexing_maps: "Finding cached map archives…",
+  inspecting_archives: "Inspecting cached map metadata…",
+};
+
 const FAILURE_TEXT = {
   invalid_folder: "Select a StarCraft II folder or a folder containing banks.",
   unreadable: "The StarCraft II folder could not be read.",
   too_many_entries: "The folder exceeds the bank scan limit.",
   too_many_matches: "The folder exceeds the map association limit.",
   identifier_conflict: "The inventory could not distinguish two entries.",
+  configuration_unavailable:
+    "The saved bank folder could not be read or updated.",
 };
 const INVENTORY_FAILURE = "The bank inventory could not be loaded.";
 
@@ -50,6 +64,7 @@ export function useInventory({
   const [snapshot, setSnapshot] = useState<InventorySnapshot>();
   const [query, setQuery] = useState<InventoryQuery>();
   const [message, setMessage] = useState<string>();
+  const [progress, setProgress] = useState<InventoryProgress>();
   const [cancelled, setCancelled] = useState(false);
   const [map, setMap] = useState<string | null>(null);
   const active = useRef(false);
@@ -60,8 +75,19 @@ export function useInventory({
     setMessage(undefined);
     setCancelled(false);
     setQuery(command);
+    setProgress(undefined);
+    let receiving = true;
+    let generation: string | undefined;
+    const channel = new Channel<InventoryProgress>((update) => {
+      if (!receiving || (generation && update.generation !== generation))
+        return;
+      generation = update.generation;
+      setProgress(update);
+    });
     try {
-      const result = await invoke<InventorySnapshot | null>(command);
+      const result = await invoke<InventorySnapshot | null>(command, {
+        progress: channel,
+      });
       if (result) setSnapshot(result);
     } catch (error) {
       if (error === "cancelled") setCancelled(true);
@@ -72,8 +98,10 @@ export function useInventory({
             : INVENTORY_FAILURE,
         );
     } finally {
+      receiving = false;
       active.current = false;
       setQuery(undefined);
+      setProgress(undefined);
     }
   }, []);
 
@@ -87,14 +115,33 @@ export function useInventory({
     onUseAutomatic: snapshot?.manual
       ? () => void run("use_automatic_inventory")
       : undefined,
-    onCancel: () => {
-      void invoke("cancel_inventory").catch(() =>
-        setMessage("The scan could not be canceled."),
-      );
-    },
+    onCancel: progress
+      ? () => {
+          void invoke("cancel_inventory", {
+            generation: progress.generation,
+          }).catch(() => setMessage("The scan could not be canceled."));
+        }
+      : undefined,
   };
   const rootName = snapshot?.rootName;
-  if (query) return { status: "scanning", controls, rootName };
+  const failure = snapshot?.reason ? FAILURE_TEXT[snapshot.reason] : undefined;
+  if (query) {
+    return {
+      status: "scanning",
+      controls,
+      rootName,
+      message:
+        message ??
+        (progress
+          ? PROGRESS_LABELS[progress.stage]
+          : query === "select_inventory_folder"
+            ? "Choose a bank folder…"
+            : "Starting inventory scan…"),
+      ...(progress?.stage === "inspecting_archives"
+        ? { scanned: progress.completed, total: progress.total }
+        : {}),
+    };
+  }
   if (cancelled) return { status: "cancelled", controls, rootName };
   if (snapshot?.status === "ready") {
     return {
@@ -109,7 +156,7 @@ export function useInventory({
         disabled,
       },
       incomplete: snapshot.incomplete,
-      message,
+      message: message ?? failure,
       controls,
       rootName,
     };
@@ -117,10 +164,7 @@ export function useInventory({
   if (message || snapshot?.status === "failed") {
     return {
       status: "failed",
-      message:
-        message ??
-        (snapshot?.reason && FAILURE_TEXT[snapshot.reason]) ??
-        INVENTORY_FAILURE,
+      message: message ?? failure ?? INVENTORY_FAILURE,
       controls,
       rootName,
     };
