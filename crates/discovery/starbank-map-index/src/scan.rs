@@ -199,7 +199,7 @@ pub struct IndexReport {
 	pub cache_state: CacheState,
 	/// Whether any selected cache location could not be completely visited.
 	pub incomplete: bool,
-	/// Local files that could not be inspected or cached safely.
+	/// Warnings for local files that could only be inspected in part or could not be inspected or cached.
 	pub issues: Vec<IndexIssue>,
 }
 
@@ -215,16 +215,7 @@ pub struct IndexReport {
 pub fn scan_maps(
 	request: IndexRequest<'_>,
 	cancellation: &Cancellation,
-	on_progress: impl FnMut(Progress<'_>),
-) -> Result<IndexReport, ScanError> {
-	scan_with(request, cancellation, on_progress, read_archive)
-}
-
-fn scan_with(
-	request: IndexRequest<'_>,
-	cancellation: &Cancellation,
 	mut on_progress: impl FnMut(Progress<'_>),
-	read: impl Fn(&mut File) -> Result<MapMetadata, IndexIssueKind> + Sync,
 ) -> Result<IndexReport, ScanError> {
 	cancellation.check()?;
 	let limits = request.limits.capped();
@@ -267,49 +258,49 @@ fn scan_with(
 		worker_limit,
 		cancellation,
 		&cache,
-		&read,
 		|position, result| {
 			let work = &enumeration.work[position];
 			completed += 1;
-			match result {
-				Ok((metadata, was_cached)) => {
+			let record = match result {
+				Ok((ArchiveMetadata { metadata, warnings }, was_cached)) => {
 					retained = retained.saturating_add(metadata_size(&work.path, &metadata));
 					if retained > limits.max_metadata_bytes {
 						return Err(ScanError::Limit(IndexLimit::Metadata));
 					}
 					cache_hits += usize::from(was_cached);
-					if cache_path.is_some() {
+					// Reread partial records so a cache hit cannot hide their warnings.
+					if cache_path.is_some() && warnings.is_empty() {
 						updated_cache.insert(
 							&work.path,
 							work.fingerprint.clone(),
 							metadata.clone(),
 						);
 					}
+					issues.extend(warnings.into_iter().map(|kind| IndexIssue {
+						path: work.path.clone(),
+						kind,
+					}));
 					maps.push(MapRecord {
 						archive: work.path.clone(),
 						modified_nanos: work.fingerprint.modified_nanos,
 						metadata,
 					});
-					on_progress(Progress {
-						generation: request.generation,
-						completed,
-						total,
-						record: maps.last(),
-					});
+					maps.last()
 				}
 				Err(kind) => {
 					issues.push(IndexIssue {
 						path: work.path.clone(),
 						kind,
 					});
-					on_progress(Progress {
-						generation: request.generation,
-						completed,
-						total,
-						record: None,
-					});
+					None
 				}
-			}
+			};
+			on_progress(Progress {
+				generation: request.generation,
+				completed,
+				total,
+				record,
+			});
 			Ok(())
 		},
 	)?;
@@ -339,8 +330,10 @@ fn process_work(
 	worker_limit: usize,
 	cancellation: &Cancellation,
 	cache: &Cache,
-	read: &(impl Fn(&mut File) -> Result<MapMetadata, IndexIssueKind> + Sync),
-	mut consume: impl FnMut(usize, Result<(MapMetadata, bool), IndexIssueKind>) -> Result<(), ScanError>,
+	mut consume: impl FnMut(
+		usize,
+		Result<(ArchiveMetadata, bool), IndexIssueKind>,
+	) -> Result<(), ScanError>,
 ) -> Result<(), ScanError> {
 	let next = AtomicUsize::new(0);
 	thread::scope(|scope| {
@@ -355,10 +348,7 @@ fn process_work(
 						let Some(work) = work.get(position) else {
 							break;
 						};
-						if send
-							.send((position, process_one(work, cache, read)))
-							.is_err()
-						{
+						if send.send((position, process_one(work, cache))).is_err() {
 							break;
 						}
 					}
@@ -377,17 +367,22 @@ fn process_work(
 fn process_one(
 	work: &ArchiveWork,
 	cache: &Cache,
-	read: &impl Fn(&mut File) -> Result<MapMetadata, IndexIssueKind>,
-) -> Result<(MapMetadata, bool), IndexIssueKind> {
+) -> Result<(ArchiveMetadata, bool), IndexIssueKind> {
 	if let Some(metadata) = cache.get(&work.path, &work.fingerprint) {
-		return Ok((metadata.clone(), true));
+		return Ok((
+			ArchiveMetadata {
+				metadata: metadata.clone(),
+				warnings: Vec::new(),
+			},
+			true,
+		));
 	}
 	let mut file = crate::open::archive(&work.scope, &work.relative).map_err(IndexIssueKind::Io)?;
 	let opened = file.metadata().map_err(IndexIssueKind::Io)?;
 	if !opened.is_file() || Fingerprint::of(&opened) != work.fingerprint {
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
-	let metadata = read(&mut file)?;
+	let metadata = read_archive(&mut file)?;
 	let checked = file.metadata().map_err(IndexIssueKind::Io)?;
 	let current = work
 		.scope
@@ -402,25 +397,26 @@ fn process_one(
 	Ok((metadata, false))
 }
 
-fn read_archive(file: &mut File) -> Result<MapMetadata, IndexIssueKind> {
+struct ArchiveMetadata {
+	metadata: MapMetadata,
+	warnings: Vec<IndexIssueKind>,
+}
+
+fn read_archive(file: &mut File) -> Result<ArchiveMetadata, IndexIssueKind> {
 	let mut archive = MetadataArchive::open(file).map_err(IndexIssueKind::Archive)?;
-	let script = match archive
-		.read(MetadataEntry::MapScript)
-		.map_err(IndexIssueKind::Archive)?
+	let mut warnings = Vec::new();
+	let script = match read_optional_member(&mut archive, MetadataEntry::MapScript, &mut warnings)?
 	{
 		Some(script) => Some(script),
-		None => archive
-			.read(MetadataEntry::BaseMapScript)
-			.map_err(IndexIssueKind::Archive)?,
+		None => read_optional_member(&mut archive, MetadataEntry::BaseMapScript, &mut warnings)?,
 	};
 	let mut metadata = parse_metadata(script.as_deref(), None).map_err(IndexIssueKind::Metadata)?;
 	if metadata
 		.title
 		.as_deref()
 		.is_none_or(|title| title.contains(['?', '\u{fffd}']))
-		&& let Some(header) = archive
-			.read(MetadataEntry::DocumentHeader)
-			.map_err(IndexIssueKind::Archive)?
+		&& let Some(header) =
+			read_optional_member(&mut archive, MetadataEntry::DocumentHeader, &mut warnings)?
 		&& let Some(title) = parse_metadata(None, Some(&header))
 			.map_err(IndexIssueKind::Metadata)?
 			.title
@@ -428,7 +424,22 @@ fn read_archive(file: &mut File) -> Result<MapMetadata, IndexIssueKind> {
 		metadata.title = Some(title);
 		metadata.title_source = Some(MapTitleSource::DocumentHeader);
 	}
-	Ok(metadata)
+	Ok(ArchiveMetadata { metadata, warnings })
+}
+
+fn read_optional_member(
+	archive: &mut MetadataArchive<&mut File>,
+	entry: MetadataEntry,
+	warnings: &mut Vec<IndexIssueKind>,
+) -> Result<Option<Vec<u8>>, IndexIssueKind> {
+	match archive.read(entry) {
+		Ok(bytes) => Ok(bytes),
+		Err(error @ MpqError::UnsupportedEntry(_)) => {
+			warnings.push(IndexIssueKind::Archive(error));
+			Ok(None)
+		}
+		Err(error) => Err(IndexIssueKind::Archive(error)),
+	}
 }
 
 fn metadata_size(path: &Path, metadata: &MapMetadata) -> usize {
