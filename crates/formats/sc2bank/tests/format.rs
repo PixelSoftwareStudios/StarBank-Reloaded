@@ -350,6 +350,54 @@ fn parse_errors_have_typed_categories_and_positions() {
 }
 
 #[test]
+fn validator_diagnostics_use_xml_line_endings_and_character_columns() {
+	for newline in ["\n", "\r", "\r\n"] {
+		let source = format!("<Bank>{newline}<!-- π --><1/>{newline}</Bank>");
+		let error = parse(source.as_bytes(), Limits::default()).unwrap_err();
+		let location = error.location().unwrap();
+		assert_eq!(error.kind(), ParseErrorKind::InvalidXml);
+		assert_eq!(location.byte, source.find('1'), "{newline:?}");
+		assert_eq!((location.line, location.column), (2, 12), "{newline:?}");
+		assert_eq!(
+			error.to_string(),
+			"invalid XML at 2:12 (invalid name token)"
+		);
+	}
+}
+
+#[test]
+fn processing_instruction_data_requires_xml_whitespace_after_the_target() {
+	let valid: &[&[u8]] = &[
+		b"<Bank><?test?></Bank>",
+		b"<Bank><?test /?></Bank>",
+		b"<?test\r\ndata?><Bank/><?other?>",
+		"<?xml-stylesheet href='style.xml'?><Bank><?π-1 data?></Bank>".as_bytes(),
+		b"<?xml\tversion='1.0'?><Bank/>",
+		"\u{feff}<?xml\r\nversion='1.0'?><Bank/>".as_bytes(),
+	];
+	for source in valid {
+		let bank = parse(source, Limits::default()).unwrap();
+		assert_eq!(serialize(&bank, &[], Limits::default()).unwrap(), *source);
+	}
+
+	let invalid: &[&[u8]] = &[
+		b"<Bank><?test*?></Bank>",
+		b"<Bank><?test/?></Bank>",
+		b"<Bank><?xml*?></Bank>",
+		b"<Bank><?XmL?></Bank>",
+		b"<?test*?><Bank/>",
+		b"<Bank/><?xMl*?>",
+		b"<Bank><?xml\tversion='1.0'?></Bank>",
+	];
+	for source in invalid {
+		let error = parse(source, Limits::default())
+			.expect_err("malformed processing instruction must fail");
+		assert_eq!(error.kind(), ParseErrorKind::InvalidXml, "{source:?}");
+		assert!(error.location().is_some(), "{source:?}");
+	}
+}
+
+#[test]
 fn each_resource_limit_rejects_before_export() {
 	let cases: &[(&[u8], Limits, LimitKind)] = &[
 		(

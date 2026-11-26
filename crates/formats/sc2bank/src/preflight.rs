@@ -10,7 +10,7 @@ use crate::{
 };
 
 const UTF8_BOM: char = '\u{feff}';
-const XML_TARGET: &str = "xml";
+pub(crate) const XML_TARGET: &str = "xml";
 const XML_VERSION: &str = "1.0";
 const XML_ENCODING: &str = "UTF-8";
 const VERSION_FIELD: &str = "version";
@@ -19,8 +19,14 @@ const STANDALONE_FIELD: &str = "standalone";
 const XMLNS: &str = "xmlns";
 const XMLNS_PREFIX: &str = "xmlns:";
 
+#[derive(Default)]
+pub(crate) struct Inspection {
+	pub namespace_declarations: Vec<usize>,
+	pub declaration_start: Option<usize>,
+}
+
 /// Scans without a DOM so resource limits apply before tree allocation.
-pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Vec<usize>, ParseError> {
+pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Inspection, ParseError> {
 	check_marker_budget(source, limits.markup_markers)?;
 
 	let xml = source.strip_prefix(UTF8_BOM).unwrap_or(source);
@@ -29,7 +35,7 @@ pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Vec<usize>, ParseE
 	reader.config_mut().enable_all_checks(true);
 	let mut depth = 0usize;
 	let mut nodes = 0u32;
-	let mut namespace_declarations = Vec::new();
+	let mut inspection = Inspection::default();
 
 	loop {
 		let position = offset.saturating_add(position_in(xml, reader.buffer_position()));
@@ -56,6 +62,7 @@ pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Vec<usize>, ParseE
 				}
 				check_scalar(declaration.len(), limits).map_err(|error| error.at(location()))?;
 				check_declaration(declaration).map_err(|error| error.at(location()))?;
+				inspection.declaration_start = Some(position);
 				continue;
 			}
 			Event::Start(tag) | Event::Empty(tag) => {
@@ -68,15 +75,10 @@ pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Vec<usize>, ParseE
 				let declares_namespace =
 					check_tag(tag, limits).map_err(|error| error.at(location()))?;
 				if declares_namespace {
-					namespace_declarations.push(position);
+					inspection.namespace_declarations.push(position);
 				}
 			}
 			Event::PI(instruction) => {
-				if instruction.target().eq_ignore_ascii_case(XML_TARGET) {
-					return Err(ParseError::new(ParseErrorKind::InvalidXml)
-						.with_detail("reserved XML processing instruction target")
-						.at(location()));
-				}
 				check_scalar(instruction.len(), limits).map_err(|error| error.at(location()))?;
 			}
 			Event::Text(text) | Event::Comment(text) => {
@@ -97,7 +99,7 @@ pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Vec<usize>, ParseE
 		nodes += 1;
 	}
 
-	Ok(namespace_declarations)
+	Ok(inspection)
 }
 
 fn position_in(xml: &str, position: u64) -> usize {

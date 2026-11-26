@@ -1,6 +1,6 @@
-use std::{ops::Range, str};
+use std::{iter, ops::Range, str};
 
-use roxmltree::{Document, Node, ParsingOptions};
+use roxmltree::{Document, Node, ParsingOptions, TextPos};
 
 use crate::{
 	BankDocument, Key, KeyId, LimitKind, Limits, Location, OpaqueReason, ParseError,
@@ -15,6 +15,8 @@ const SIGNATURE: &str = "Signature";
 const VERSION: &str = "version";
 const NAME: &str = "name";
 const VALUE: &str = "value";
+const PI_OPENING: &str = "<?";
+const PI_CLOSING: &str = "?>";
 
 /// Parses XML 1.0 bank bytes as UTF-8, preserving the source exactly.
 ///
@@ -32,43 +34,111 @@ pub fn parse(bytes: &[u8], limits: Limits) -> Result<BankDocument, ParseError> {
 	let source = str::from_utf8(bytes).map_err(|error| {
 		ParseError::new(ParseErrorKind::UnsupportedEncoding).with_detail(error.to_string())
 	})?;
-	let namespace_declarations = preflight::inspect(source, limits)?;
+	let inspection = preflight::inspect(source, limits)?;
 	let options = ParsingOptions {
 		allow_dtd: false,
 		// The validator also counts its synthetic document root.
 		nodes_limit: limits.nodes.saturating_add(1),
 		entity_resolver: None,
 	};
-	let xml = Document::parse_with_options(source, options).map_err(xml_error)?;
-	check_decoded_text(source, &xml, limits)?;
-	project(source, xml.root_element(), &namespace_declarations, limits)
+	let xml =
+		Document::parse_with_options(source, options).map_err(|error| xml_error(source, error))?;
+	check_validated_nodes(source, &xml, limits, inspection.declaration_start)?;
+	project(
+		source,
+		xml.root_element(),
+		&inspection.namespace_declarations,
+		limits,
+	)
 }
 
-fn xml_error(error: roxmltree::Error) -> ParseError {
+fn xml_error(source: &str, error: roxmltree::Error) -> ParseError {
 	match error {
 		roxmltree::Error::DtdDetected => ParseError::new(ParseErrorKind::Doctype),
 		roxmltree::Error::NodesLimitReached => preflight::limit_error(LimitKind::Nodes),
 		_ => {
 			let position = error.pos();
-			preflight::invalid_xml(error).at(Location {
-				byte: None,
-				line: position.row,
-				column: position.col,
-			})
+			let location = validator_byte(source, position).map_or(
+				Location {
+					byte: None,
+					line: position.row,
+					column: position.col,
+				},
+				|byte| Location::at(source, byte),
+			);
+			let detail = error.to_string().replace(&format!(" at {position}"), "");
+			ParseError::new(ParseErrorKind::InvalidXml)
+				.with_detail(detail)
+				.at(location)
 		}
 	}
 }
 
-fn check_decoded_text(source: &str, xml: &Document<'_>, limits: Limits) -> Result<(), ParseError> {
-	// The validator can join adjacent character data, CDATA and references into one string.
-	for node in xml.descendants().filter(Node::is_text) {
-		if node
-			.text()
-			.is_some_and(|text| text.len() > limits.scalar_bytes)
+fn validator_byte(source: &str, position: TextPos) -> Option<usize> {
+	// The validator counts only LF as a line break. Recover its byte offset before
+	// reporting the location with the editor's XML line-ending rules.
+	let row = usize::try_from(position.row.checked_sub(1)?).ok()?;
+	let column = usize::try_from(position.col.checked_sub(1)?).ok()?;
+	let mut lines = source.split('\n');
+	let line_start: usize = lines.by_ref().take(row).map(|line| line.len() + 1).sum();
+	let line = lines.next()?;
+	let column_byte = line
+		.char_indices()
+		.map(|(offset, _)| offset)
+		.chain(iter::once(line.len()))
+		.nth(column)?;
+	Some(line_start + column_byte)
+}
+
+fn check_validated_nodes(
+	source: &str,
+	xml: &Document<'_>,
+	limits: Limits,
+	declaration_start: Option<usize>,
+) -> Result<(), ParseError> {
+	for node in xml.descendants() {
+		if let Some(instruction) = node.pi() {
+			// The validator exposes a declaration with non-space XML whitespace as a PI.
+			// The preflight separately validated its complete declaration grammar.
+			if Some(node.range().start) != declaration_start {
+				check_processing_instruction(source, node.range(), instruction.target)?;
+			}
+		} else if node.is_text()
+			&& node
+				.text()
+				.is_some_and(|text| text.len() > limits.scalar_bytes)
 		{
+			// Adjacent character data, CDATA and references can form a single decoded string.
 			return Err(preflight::limit_error(LimitKind::ScalarBytes)
 				.at(Location::at(source, node.range().start)));
 		}
+	}
+	Ok(())
+}
+
+fn check_processing_instruction(
+	source: &str,
+	range: Range<usize>,
+	target: &str,
+) -> Result<(), ParseError> {
+	let location = || Location::at(source, range.start);
+	if target.eq_ignore_ascii_case(preflight::XML_TARGET) {
+		return Err(
+			preflight::invalid_xml("reserved XML processing instruction target").at(location()),
+		);
+	}
+	let remainder = source
+		.get(range.clone())
+		.and_then(|instruction| instruction.strip_prefix(PI_OPENING))
+		.and_then(|instruction| instruction.strip_prefix(target));
+
+	// The validator identifies the XML Name but also accepts adjacent non-Name data.
+	if !remainder.is_some_and(|data| data.starts_with(PI_CLOSING) || data.starts_with(is_xml_space))
+	{
+		return Err(preflight::invalid_xml(
+			"processing instruction data requires intervening whitespace",
+		)
+		.at(location()));
 	}
 	Ok(())
 }
