@@ -209,6 +209,7 @@ export {
   prepareTableDraft,
 } from "starbank-editor";
 export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
+export type { BankBackupPresence } from "./inventory-browser";
 export {
   filterMaps,
   type MapFilters,
@@ -216,5 +217,4 @@ export {
   type MapListItem,
   type MapOptions,
 } from "./map-sidebar";
-
 export type { SettingsPlatformInfo } from "./settings-platform";

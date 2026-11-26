@@ -1,9 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapInventory, MapListItem } from "starbank-ui";
+import { useInventoryBackupStatuses } from "./inventory-backup-status";
 import type { FileDialogReply } from "./transport";
 
 interface InventorySnapshot {
+  generation: string;
   status: "ready" | "root-not-found" | "manual-required" | "failed";
   reason: keyof typeof FAILURE_TEXT | null;
   maps: readonly MapListItem[];
@@ -58,10 +60,12 @@ export function useInventory({
   onOpenBank,
   disabled,
   selectedBankId,
+  backupGeneration = 0,
 }: {
   onOpenBank: (id: string) => void;
   disabled: boolean;
   selectedBankId?: string;
+  backupGeneration?: number;
 }): MapInventory {
   const [snapshot, setSnapshot] = useState<InventorySnapshot>();
   const [query, setQuery] = useState<InventoryQuery>();
@@ -126,6 +130,15 @@ export function useInventory({
     void run("refresh_inventory");
   }, [run]);
 
+  const generation =
+    !query && !cancelled && snapshot?.status === "ready"
+      ? snapshot.generation
+      : undefined;
+  const backupStatuses = useInventoryBackupStatuses(
+    generation,
+    backupGeneration,
+  );
+
   const controls = {
     onRefresh: () => void run("refresh_inventory"),
     onRebuildMapIndex:
@@ -176,6 +189,7 @@ export function useInventory({
         banks: snapshot.banks,
         onOpenBank,
         selectedBankId,
+        backupStatuses,
         disabled,
       },
       incomplete: snapshot.incomplete,

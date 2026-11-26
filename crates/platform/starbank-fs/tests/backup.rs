@@ -385,3 +385,83 @@ fn restore_keeps_confirmed_custom_source_scope_when_the_current_location_changes
 	assert_eq!(fs::read(&path)?, SAVED);
 	Ok(())
 }
+
+#[test]
+fn bulk_presence_keeps_exact_sources_and_does_not_read_payloads() -> Result<(), Box<dyn Error>> {
+	use starbank_fs::{BackupPresence as Presence, BackupPresenceDirectory, scan_backup_presence};
+
+	let sandbox = tempfile::tempdir()?;
+	let root = sandbox.path().canonicalize()?;
+	let first_dir = root.join("first");
+	let second_dir = root.join("second");
+	let managed = root.join("managed");
+	for directory in [&first_dir, &second_dir, &managed] {
+		fs::create_dir(directory)?;
+	}
+	let first = backup_source(&first_dir.join("Shared.SC2Bank"))?;
+	let second = backup_source(&second_dir.join("Shared.SC2Bank"))?;
+	let other = backup_source(&second_dir.join("Other.SC2Bank"))?;
+	let known_empty = backup_source(&second_dir.join("Empty.SC2Bank"))?;
+	fs::write(first.path(), SAVED)?;
+
+	let recorded = catalog().create(&first, BackupPlacement::Managed(&managed))?;
+	fs::remove_file(first.path())?;
+	fs::remove_file(recorded.path())?;
+	fs::write(
+		second_dir.join("Other_20261127_001500.sc2bank.bak.json"),
+		b"corrupt",
+	)?;
+	let input = [first.clone(), second, other, known_empty, first];
+	let locations = [
+		BackupPresenceDirectory::Default(&managed),
+		BackupPresenceDirectory::Default(&managed),
+		BackupPresenceDirectory::Default(&root.join("absent-default")),
+	];
+	assert_eq!(
+		scan_backup_presence(&input, &locations),
+		[
+			Presence::Recorded,
+			Presence::NeverBackedUp,
+			Presence::Unknown,
+			Presence::NeverBackedUp,
+			Presence::Recorded,
+		]
+	);
+	Ok(())
+}
+
+#[test]
+fn replaced_scope_or_unreadable_adjacent_directory_cannot_imply_empty_history()
+-> Result<(), Box<dyn Error>> {
+	use std::os::unix::fs::symlink;
+
+	use starbank_fs::{
+		BackupDirectory, BackupPresence as Presence, BackupPresenceDirectory, scan_backup_presence,
+	};
+
+	let sandbox = tempfile::tempdir()?;
+	let root = sandbox.path().canonicalize()?;
+	let adjacent = root.join("adjacent");
+	let managed = root.join("managed");
+	fs::create_dir(&adjacent)?;
+	fs::create_dir(&managed)?;
+	let path = adjacent.join("Scout.SC2Bank");
+	fs::write(&path, SAVED)?;
+	let source = backup_source(&path)?;
+	let selection = BackupDirectory::capture(&managed)?;
+	let inputs = [source];
+	let scopes = [BackupPresenceDirectory::Selected(&selection)];
+	assert_eq!(
+		scan_backup_presence(&inputs, &scopes),
+		[Presence::NeverBackedUp]
+	);
+
+	fs::rename(&managed, root.join("moved"))?;
+	fs::create_dir(&managed)?;
+	assert_eq!(scan_backup_presence(&inputs, &scopes), [Presence::Unknown]);
+
+	fs::rename(&adjacent, root.join("different"))?;
+	symlink(&managed, &adjacent)?;
+	assert_eq!(scan_backup_presence(&inputs, &[]), [Presence::Unknown]);
+	Ok(())
+}

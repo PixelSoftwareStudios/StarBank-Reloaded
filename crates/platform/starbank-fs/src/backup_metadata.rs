@@ -15,7 +15,7 @@ use crate::{NativeBackupError, StorageError, backup_storage::NativeStorage};
 const ADJACENT_VERSION: u32 = 1;
 const MANAGED_VERSION: u32 = 2;
 const BACKUP_APPENDIX: &str = ".json";
-const METADATA_SUFFIX: &str = ".sc2bank.bak.json";
+pub(super) const METADATA_SUFFIX: &str = ".sc2bank.bak.json";
 const SHA256_BYTES: usize = 32;
 pub(super) const MAX_METADATA_BYTES: usize = 4_096;
 
@@ -64,39 +64,58 @@ impl Metadata {
 		sidecar: &Path,
 		storage: &NativeStorage<'_>,
 	) -> Result<Option<BackupRecord>, NativeBackupError> {
+		if sidecar.parent() != Some(backup_directory(source, placement)?) {
+			return Err(NativeBackupError::MetadataMismatch);
+		}
+		Self::read_at(sidecar, storage)?.record_for(source, placement, sidecar)
+	}
+
+	pub(super) fn read_at(
+		sidecar: &Path,
+		storage: &NativeStorage<'_>,
+	) -> Result<Self, NativeBackupError> {
+		serde_json::from_slice(storage.read_file(sidecar, MAX_METADATA_BYTES)?.bytes())
+			.map_err(|_| NativeBackupError::MetadataMismatch)
+	}
+
+	pub(super) fn scope(&self) -> Option<MetadataScope<'_>> {
+		match (self.schema_version, self.source_path_sha256.as_deref()) {
+			(ADJACENT_VERSION, None) => Some(MetadataScope::Adjacent(&self.source_name)),
+			(MANAGED_VERSION, Some(scope)) => {
+				let mut bytes = [0; SHA256_BYTES];
+				hex::decode_to_slice(scope, &mut bytes).ok()?;
+				Some(MetadataScope::Managed(scope))
+			}
+			_ => None,
+		}
+	}
+
+	pub(super) fn record_for(
+		&self,
+		source: &BankSource,
+		placement: BackupPlacement<'_>,
+		sidecar: &Path,
+	) -> Result<Option<BackupRecord>, NativeBackupError> {
 		let directory = backup_directory(source, placement)?;
 		if sidecar.parent() != Some(directory) {
 			return Err(NativeBackupError::MetadataMismatch);
 		}
-		let metadata: Self =
-			serde_json::from_slice(storage.read_file(sidecar, MAX_METADATA_BYTES)?.bytes())
-				.map_err(|_| NativeBackupError::MetadataMismatch)?;
 		let adjacent = source.path().parent() == Some(directory);
-		match (
-			adjacent,
-			metadata.schema_version,
-			&metadata.source_path_sha256,
-		) {
-			(true, ADJACENT_VERSION, None) => {}
-			(false, MANAGED_VERSION, Some(scope)) => {
-				let mut scope_bytes = [0; SHA256_BYTES];
-				hex::decode_to_slice(scope, &mut scope_bytes)
-					.map_err(|_| NativeBackupError::MetadataMismatch)?;
-				if &source_scope(source) != scope {
-					return Ok(None);
-				}
-			}
+		match (adjacent, self.scope()) {
+			(true, Some(MetadataScope::Adjacent(_))) => {}
+			(false, Some(MetadataScope::Managed(scope))) if scope == source_scope(source) => {}
+			(false, Some(MetadataScope::Managed(_))) => return Ok(None),
 			_ => return Err(NativeBackupError::MetadataMismatch),
 		}
-		if Some(metadata.source_name.as_str()) != original_name(source)
-			|| metadata.signing_context != context(source)
+		if Some(self.source_name.as_str()) != original_name(source)
+			|| self.signing_context != context(source)
 		{
 			return Err(NativeBackupError::MetadataMismatch);
 		}
 		let mut sha256 = [0; SHA256_BYTES];
-		hex::decode_to_slice(metadata.sha256, &mut sha256)
+		hex::decode_to_slice(&self.sha256, &mut sha256)
 			.map_err(|_| NativeBackupError::MetadataMismatch)?;
-		let timestamp = metadata
+		let timestamp = self
 			.timestamp_utc
 			.parse()
 			.map_err(|_| NativeBackupError::MetadataMismatch)?;
@@ -106,10 +125,10 @@ impl Metadata {
 				timestamp,
 				placement,
 			},
-			metadata.sequence,
-			metadata.reason.into(),
+			self.sequence,
+			self.reason.into(),
 			BackupIntegrity {
-				byte_length: metadata.byte_length,
+				byte_length: self.byte_length,
 				sha256,
 			},
 		)
@@ -120,6 +139,11 @@ impl Metadata {
 			Err(NativeBackupError::MetadataMismatch)
 		}
 	}
+}
+
+pub(super) enum MetadataScope<'a> {
+	Adjacent(&'a str),
+	Managed(&'a str),
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,7 +162,7 @@ fn context(source: &BankSource) -> Option<BankContext> {
 	})
 }
 
-fn source_scope(source: &BankSource) -> String {
+pub(super) fn source_scope(source: &BankSource) -> String {
 	// Persist native code units rather than relying on Rust's unspecified OsStr encoding.
 	let path = source.path().as_os_str();
 	let mut digest = Sha256::new();

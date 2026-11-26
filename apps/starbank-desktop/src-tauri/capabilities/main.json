@@ -35,6 +35,7 @@
     "allow-create-batch-backup",
     "allow-cancel-batch-backup",
     "allow-refresh-inventory",
+    "allow-inventory-backup-status",
     "allow-rebuild-map-index",
     "allow-select-inventory-folder",
     "allow-use-automatic-inventory",

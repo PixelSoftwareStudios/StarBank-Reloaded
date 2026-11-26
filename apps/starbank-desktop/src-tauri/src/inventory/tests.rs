@@ -115,7 +115,10 @@ fn manual_inventory_projects_collisions_and_unknowns_using_only_session_ids() ->
 	let refreshed = service
 		.scan_with_roots(ScanMode::Refresh, &map_roots)
 		.expect("refresh");
-	assert_eq!(serialize_snapshot(refreshed)?, snapshot);
+	let mut refreshed = serialize_snapshot(refreshed)?;
+	assert_eq!(refreshed["generation"], "2");
+	refreshed["generation"] = snapshot["generation"].clone();
+	assert_eq!(refreshed, snapshot);
 	assert!(matches!(
 		service.authorize_bank(player_a.to_string_lossy().as_ref()),
 		Err(InventoryError::UnknownBank)

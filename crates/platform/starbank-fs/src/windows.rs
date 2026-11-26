@@ -183,6 +183,10 @@ impl DirectoryScope {
 		let parent = path
 			.parent()
 			.ok_or(StorageError::UnsafePath("missing parent directory"))?;
+		Self::open_parent(parent)
+	}
+
+	fn open_parent(parent: &Path) -> Result<Self, StorageError> {
 		let mut components = parent.components();
 		let Some(Component::Prefix(prefix)) = components.next() else {
 			return Err(StorageError::UnsafePath("a local drive letter is required"));
@@ -247,6 +251,21 @@ impl DirectoryScope {
 		cap_primitives::fs::open(&self.parent, Path::new(name), &options)
 			.map_err(|error| StorageError::io("open regular Windows file", error))
 	}
+}
+
+pub(crate) fn backup_entries(
+	path: &Path,
+) -> Result<impl Iterator<Item = Result<PathBuf, StorageError>> + '_, StorageError> {
+	let scope = DirectoryScope::open_parent(path)?;
+	let entries = cap_primitives::fs::read_base_dir(&scope.parent)
+		.map_err(|error| StorageError::io("read Windows backup directory", error))?;
+	Ok(entries.map(move |entry| {
+		// Keep the directory and its ancestors open without delete sharing.
+		let _scope = &scope;
+		entry
+			.map(|entry| path.join(entry.file_name()))
+			.map_err(|error| StorageError::io("read Windows backup entry", error))
+	}))
 }
 
 fn absolute_path(path: &Path) -> Result<PathBuf, StorageError> {

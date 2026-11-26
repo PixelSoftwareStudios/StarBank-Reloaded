@@ -1,10 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { AppShell, type MapInventory } from "starbank-ui";
+import {
+  AppShell,
+  type BankBackupPresence,
+  type MapInventory,
+} from "starbank-ui";
 import { describe, expect, it } from "vitest";
 import {
   type BankListItem,
   bankScopeChoices,
   filterBanks,
+  mapsWithUnbackedBanks,
   resolveBankAccountScope,
 } from "../../../packages/starbank-ui/src/inventory-browser";
 
@@ -126,6 +131,41 @@ describe("desktop inventory projection", () => {
     expect(markup).toContain("Select Folder…");
     expect(markup).toContain("Refresh");
     expect(markup).not.toContain("Unknown.SC2Bank");
+  });
+
+  it("marks only confirmed map links and preserves the open bank's detailed status", () => {
+    const backupStatuses = new Map<string, BankBackupPresence>([
+      ["first", "never_backed_up"],
+      ["ambiguous", "never_backed_up"],
+      ["unknown", "unknown"],
+    ]);
+    expect([...mapsWithUnbackedBanks(banks, backupStatuses, "")]).toEqual([
+      ["alpha", 1],
+    ]);
+    expect([
+      ...mapsWithUnbackedBanks(
+        banks,
+        backupStatuses,
+        "player:synthetic-player",
+      ),
+    ]).toEqual([]);
+    const markup = render({
+      status: "ready",
+      maps,
+      selectedMapId: "alpha",
+      onSelectMap: () => {},
+      bankBrowser: {
+        banks,
+        onOpenBank: () => {},
+        selectedBankId: "ambiguous",
+        backupStatuses,
+        activeBackupStatus: "At least 1 backup recorded",
+      },
+    });
+    expect(markup).toContain("1 bank without a recorded backup");
+    expect(markup).toContain("No backups recorded");
+    expect(markup).toContain("At least 1 backup recorded");
+    expect(markup).not.toContain("2 banks without recorded backups");
   });
 
   it("offers unmatched files even when no cache maps were discovered", () => {

@@ -6,6 +6,7 @@ import {
   type BankFilter,
   InventoryActions,
   type InventoryControls,
+  mapsWithUnbackedBanks,
 } from "./inventory-browser";
 import { SEARCH_SHORTCUT, useMapSearchShortcut } from "./keyboard-shortcuts";
 import { MapArchiveDate } from "./map-context";
@@ -118,6 +119,13 @@ export function MapSidebar({
   );
   const autoResign = options?.autoResign;
   const browser = ready ? inventory.bankBrowser : undefined;
+  const bankList = browser?.banks;
+  const backupStatuses = browser?.backupStatuses;
+  const account = accountScope.selected;
+  const mapsWithMissingBackups = useMemo(
+    () => mapsWithUnbackedBanks(bankList, backupStatuses, account),
+    [bankList, backupStatuses, account],
+  );
   const selectedMapId = ready ? inventory.selectedMapId : null;
   const bankFilter = useMemo<BankFilter>(
     () =>
@@ -237,6 +245,9 @@ export function MapSidebar({
                       millis={map.modifiedAtMillis}
                       className="inventory-map-modified"
                     />
+                    <MapBackupStatus
+                      count={mapsWithMissingBackups.get(map.id)}
+                    />
                   </button>
                 </li>
               ))}
@@ -329,3 +340,14 @@ export type {
   BankListItem,
   InventoryControls,
 } from "./inventory-browser";
+
+function MapBackupStatus({ count }: { count?: number }) {
+  if (!count) return null;
+  return (
+    <span className="inventory-bank-backup">
+      {count === 1
+        ? "1 bank without a recorded backup"
+        : `${count} banks without recorded backups`}
+    </span>
+  );
+}

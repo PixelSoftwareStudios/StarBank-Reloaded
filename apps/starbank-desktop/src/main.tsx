@@ -317,6 +317,7 @@ function DesktopApp() {
   }
 
   const inventory = useInventory({
+    backupGeneration,
     selectedBankId,
     disabled: busy || hasDraft || closeGuard.pending,
     onOpenBank: (id) => {

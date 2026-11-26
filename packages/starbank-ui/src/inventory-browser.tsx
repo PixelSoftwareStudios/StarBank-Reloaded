@@ -12,10 +12,13 @@ export interface BankListItem {
   displayPath?: string;
 }
 
+export type BankBackupPresence = "recorded" | "never_backed_up" | "unknown";
+
 export interface BankBrowserModel {
   banks: readonly BankListItem[];
   selectedBankId?: string | null;
   activeBackupStatus?: string;
+  backupStatuses?: ReadonlyMap<string, BankBackupPresence>;
   onOpenBank: (bankId: string) => void;
   disabled?: boolean;
 }
@@ -150,6 +153,35 @@ export function filterBanks(
       return inScope.filter((bank) => bank.mapIds.length === 0);
     case "map":
       return inScope.filter((bank) => bank.mapIds.includes(filter.mapId));
+  }
+}
+
+export function mapsWithUnbackedBanks(
+  banks: readonly BankListItem[] | undefined,
+  statuses: ReadonlyMap<string, BankBackupPresence> | undefined,
+  account: string,
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  if (!banks || !statuses) return counts;
+  for (const bank of filterBanks(banks, { kind: "all" }, account)) {
+    if (statuses.get(bank.id) !== "never_backed_up" || bank.mapIds.length !== 1)
+      continue;
+    const [mapId] = bank.mapIds;
+    if (mapId !== undefined) counts.set(mapId, (counts.get(mapId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function bankBackupLabel(model: BankBrowserModel, bankId: string) {
+  if (model.selectedBankId === bankId && model.activeBackupStatus)
+    return model.activeBackupStatus;
+  switch (model.backupStatuses?.get(bankId)) {
+    case "never_backed_up":
+      return "No backups recorded";
+    case "recorded":
+      return "Backup recorded";
+    default:
+      return undefined;
   }
 }
 
@@ -316,27 +348,28 @@ function BankList({
   return (
     <div className="inventory-bank-list">
       <ul aria-label="Bank files">
-        {banks.slice(0, limit).map((bank) => (
-          <li key={bank.id}>
-            <button
-              type="button"
-              aria-current={
-                model.selectedBankId === bank.id ? "true" : undefined
-              }
-              disabled={model.disabled}
-              onClick={() => model.onOpenBank(bank.id)}
-            >
-              <span className="inventory-bank-name">{bank.name}</span>
-              <BankMatchLabel count={bank.mapIds.length} />
-              <BankScopeLabel bank={bank} />
-              {model.selectedBankId === bank.id && model.activeBackupStatus && (
-                <span className="inventory-bank-backup">
-                  {model.activeBackupStatus}
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
+        {banks.slice(0, limit).map((bank) => {
+          const backupLabel = bankBackupLabel(model, bank.id);
+          return (
+            <li key={bank.id}>
+              <button
+                type="button"
+                aria-current={
+                  model.selectedBankId === bank.id ? "true" : undefined
+                }
+                disabled={model.disabled}
+                onClick={() => model.onOpenBank(bank.id)}
+              >
+                <span className="inventory-bank-name">{bank.name}</span>
+                <BankMatchLabel count={bank.mapIds.length} />
+                <BankScopeLabel bank={bank} />
+                {backupLabel && (
+                  <span className="inventory-bank-backup">{backupLabel}</span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {banks.length > limit && (
         <button

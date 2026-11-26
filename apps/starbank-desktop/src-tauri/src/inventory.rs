@@ -7,6 +7,7 @@ use tauri::{Manager as _, State, WebviewWindow, ipc::Channel};
 use crate::commands::{self, CommandError, DesktopEngine, OpenedBank};
 
 mod authority;
+mod backup_status;
 mod batch;
 mod progress;
 mod projection;
@@ -15,6 +16,7 @@ mod scan;
 
 pub(crate) use authority::BankAuthority;
 use authority::is_native_disk_path;
+pub(crate) use backup_status::InventoryBackupStatus;
 use batch::MapMembers;
 #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 pub(crate) use batch::scan_batch_fixture;
@@ -33,6 +35,7 @@ const MAX_GENERATION_DIGITS: usize = 20;
 #[derive(Default)]
 pub(crate) struct InventoryService {
 	state: Mutex<InventoryState>,
+	backup_status_scan: Mutex<()>,
 	cache_path: Option<PathBuf>,
 	starting_directory: Option<PathBuf>,
 	root_record: Option<RootRecordStore>,
@@ -207,6 +210,7 @@ impl InventoryService {
 		if accepted_root.is_some() {
 			state.manual_root = accepted_root;
 		}
+		snapshot.generation = lease.generation.to_string();
 		state.banks = banks;
 		state.map_members = snapshot.map_members();
 		if state.root_record_unavailable {
@@ -283,6 +287,26 @@ impl Drop for ScanLease<'_> {
 			state.active = None;
 		}
 	}
+}
+
+#[tauri::command]
+pub(crate) async fn inventory_backup_status(
+	window: WebviewWindow,
+	generation: String,
+) -> Result<Vec<InventoryBackupStatus>, InventoryError> {
+	if generation.len() > MAX_GENERATION_DIGITS {
+		return Err(InventoryError::Unavailable);
+	}
+	let generation = generation
+		.parse()
+		.map_err(|_| InventoryError::Unavailable)?;
+	let app = window.app_handle().clone();
+	tauri::async_runtime::spawn_blocking(move || {
+		let inventory = app.state::<InventoryService>();
+		inventory.recorded_backups(generation, || crate::backup_location::backup_history(&app))
+	})
+	.await
+	.map_err(|_| InventoryError::Unavailable)?
 }
 
 #[tauri::command]

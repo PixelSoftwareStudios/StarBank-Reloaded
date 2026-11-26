@@ -48,6 +48,7 @@ pub(crate) enum InventoryReason {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct InventorySnapshot {
+	pub(super) generation: String,
 	pub(super) status: InventoryStatus,
 	pub(super) reason: Option<InventoryReason>,
 	pub(super) maps: Vec<MapItem>,
@@ -99,6 +100,7 @@ impl InventorySnapshot {
 
 	pub(super) fn empty(status: InventoryStatus, reason: Option<InventoryReason>) -> Self {
 		Self {
+			generation: String::new(),
 			status,
 			reason,
 			maps: Vec::new(),
