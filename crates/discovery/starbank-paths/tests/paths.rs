@@ -87,6 +87,15 @@ fn inventory_keeps_all_bank_scopes_and_distinct_name_collisions()
 		inventory_banks(&accounts, ScanLimits::default())?,
 		inventory
 	);
+
+	let author_path = root.join("Accounts/123/1-S2-1-987/Banks/1-S2-1-123");
+	let author = is_valid_bank_path(&author_path, ScanLimits::default())?;
+	assert_eq!(author.kind(), SelectionKind::Collection);
+	let author_inventory = inventory_banks(&author, ScanLimits::default())?;
+	assert_eq!(author_inventory.banks.len(), 1);
+	let author_location = &author_inventory.banks[0].locations[0];
+	assert_eq!(author_location.path, nested);
+	assert_eq!(author_location.scope, *selection.bank_roots()[0].scope());
 	Ok(())
 }
 
@@ -107,17 +116,19 @@ fn accepts_explicit_folders_and_files_without_assuming_signing_context()
 
 	let collection = root.join("Hand-picked");
 	let file = write_fixture(&collection, "subfolder/One.sc2bank")?;
-	write_fixture(&collection, "Two.sc2bank")?;
+	let sibling = write_fixture(&collection, "Two.sc2bank")?;
+	let inside = write_fixture(&collection, "Banks/Inside.sc2bank")?;
 	write_fixture(&collection, "Variables.txt")?;
 	write_fixture(&collection, "ExecuteInfo.txt")?;
 	let selection = is_valid_bank_path(&collection, ScanLimits::default())?;
 	assert_eq!(selection.kind(), SelectionKind::Collection);
-	assert_eq!(
-		inventory_banks(&selection, ScanLimits::default())?
-			.banks
-			.len(),
-		2
-	);
+	let inventory = inventory_banks(&selection, ScanLimits::default())?;
+	let locations = inventory
+		.banks
+		.iter()
+		.map(|bank| &bank.locations[0].path)
+		.collect::<Vec<_>>();
+	assert_eq!(locations, [&inside, &sibling, &file]);
 	let selected_file = is_valid_bank_path(&file, ScanLimits::default())?;
 	assert_eq!(selected_file.kind(), SelectionKind::File);
 	let direct = inventory_banks(&selected_file, ScanLimits::default())?;

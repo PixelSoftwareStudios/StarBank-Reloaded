@@ -108,10 +108,10 @@ pub fn is_valid_bank_path(path: &Path, limits: ScanLimits) -> Result<PathSelecti
 	let path = fs::canonicalize(path).map_err(|source| PathError::io(path, source))?;
 	let meta = fs::metadata(&path).map_err(|source| PathError::io(&path, source))?;
 	if meta.is_dir() {
-		// Marker files alone are insufficient evidence in an arbitrary manual
-		// collection, where they may have been copied alongside live banks.
-		let trust_marker_files = named(&path, GAME_DIRECTORY);
-		return Ok(classify_directory(path, limits, trust_marker_files)?.0);
+		// An arbitrary manual collection can contain both loose banks and a
+		// Banks subfolder. Only recognizable game roots use these markers.
+		let trust_game_markers = named(&path, GAME_DIRECTORY);
+		return Ok(classify_directory(path, limits, trust_game_markers)?.0);
 	}
 	if meta.is_file()
 		&& has_extension(&path, BANK_EXTENSION)
@@ -148,7 +148,7 @@ pub(crate) fn probe_game_root(
 fn classify_directory(
 	path: PathBuf,
 	limits: ScanLimits,
-	trust_marker_files: bool,
+	trust_game_markers: bool,
 ) -> Result<(PathSelection, bool), PathError> {
 	let directory = open_ambient(&path)?;
 	let mut roots = Vec::new();
@@ -171,14 +171,14 @@ fn classify_directory(
 				&path,
 				&mut budget,
 				&mut roots,
-				trust_marker_files,
+				trust_game_markers,
 			)?;
 			if markers {
 				SelectionKind::GameRoot
 			} else {
 				roots.push(BankRoot {
 					path: path.clone(),
-					scope: PlayerScope::default(),
+					scope: scope_from_path(&path),
 					directory,
 				});
 				SelectionKind::Collection
@@ -206,7 +206,7 @@ fn find_root_markers(
 	parent: &Path,
 	budget: &mut Budget,
 	roots: &mut Vec<BankRoot>,
-	trust_marker_files: bool,
+	trust_game_markers: bool,
 ) -> Result<bool, PathError> {
 	let mut markers = false;
 	let entries = directory
@@ -218,7 +218,9 @@ fn find_root_markers(
 			.file_name();
 		let path = parent.join(&name);
 		budget.visit(&path, 0)?;
-		if name.eq_ignore_ascii_case(ACCOUNTS) || name.eq_ignore_ascii_case(BANKS) {
+		if name.eq_ignore_ascii_case(ACCOUNTS)
+			|| (trust_game_markers && name.eq_ignore_ascii_case(BANKS))
+		{
 			let metadata = scoped_metadata(directory, &name, &path)?;
 			if metadata.is_dir() {
 				markers = true;
@@ -233,7 +235,7 @@ fn find_root_markers(
 					});
 				}
 			}
-		} else if trust_marker_files
+		} else if trust_game_markers
 			&& (name.eq_ignore_ascii_case(VARIABLES) || name.eq_ignore_ascii_case(EXECUTE_INFO))
 		{
 			markers |= scoped_metadata(directory, &name, &path)?.is_file();
