@@ -6,8 +6,8 @@ This register maps one minimum acceptance case per requirement. Completed entrie
 |---|---|---|---|
 | AT-MIG-01 | REQ-MIG-01 | Reconcile the uploaded and live files. Verify the archived bytes and preserve newer edits. | Passed locally. [Go inventory](../reference/GO_INVENTORY.md) |
 | AT-MIG-02 | REQ-MIG-02 | Inventory and license/notice audit recorded; owner approves release license before publication. | Pending |
-| AT-ENG-01 | REQ-ENG-01 | CI gates formatting, lints, module-root and size checks; no unsupported APIs or invented results. | Pending |
-| AT-ENG-02 | REQ-ENG-02 | Dependency spikes verify real source, license and targets; no Zod/shadcn default or empty crates. | Pending |
+| AT-ENG-01 | REQ-ENG-01 | CI gates formatting, lints, module-root and size checks; no unsupported APIs or invented results. | Local gates passed. Hosted matrix pending. [Evidence](BOOTSTRAP.md) |
+| AT-ENG-02 | REQ-ENG-02 | Dependency spikes verify real source, license and targets; no Zod/shadcn default or empty crates. | Initial dependencies and shell verified. Production target qualification pending. [Evidence](BOOTSTRAP.md) |
 | AT-FMT-01 | REQ-FMT-01 | Read ordinary real/synthetic XML and reparse exported bank; no MPQ dependency. | Pending |
 | AT-FMT-02 | REQ-FMT-02 | Round-trip multi-value, empty and repeated-name fixtures without coalescing; child labels visible. | Pending |
 | AT-FMT-03 | REQ-FMT-03 | Unchanged export byte identical; edited round-trip preserves semantics/unknowns or rejects. | Pending |

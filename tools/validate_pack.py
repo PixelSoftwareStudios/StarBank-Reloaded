@@ -12,9 +12,10 @@ assert req_rows, 'missing requirements'
 ids = {r[0] for r in req_rows}
 assert len(ids) == len(req_rows), 'duplicate requirement IDs'
 tasks = (root / 'TASKS.md').read_text()
+task_sections = dict(re.findall(r'^## (WP-\d+) [^\n]*\n(.*?)(?=^## |\Z)', tasks, re.M | re.S))
 accept = (root / 'docs/verification/ACCEPTANCE_REGISTER.md').read_text()
-for rid, scope, wp in req_rows:
-    assert f'## {wp} ' in tasks and rid in tasks, (rid, wp)
+for rid, _scope, wp in req_rows:
+    assert rid in task_sections.get(wp, ''), (rid, wp)
     assert f'| AT-{rid[4:]} | {rid} |' in accept, rid
 for match in re.finditer(r'\]\(([^)]+)\)', (root / 'START_HERE.md').read_text()):
     path = match.group(1).split('#')[0]

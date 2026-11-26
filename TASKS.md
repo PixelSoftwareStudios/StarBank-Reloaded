@@ -15,8 +15,8 @@ Depends on: none.
 Depends on: 01.
 
 - [x] Verify the pinned toolchain, establish the Rust workspace and record the shared DTO contract and initial risk spikes. [Bootstrap evidence](docs/verification/BOOTSTRAP.md)
-- [ ] Integrate CI and the frontend bootstrap. Qualify remaining production dependency selections at their owning boundaries.
-- [ ] Implement and verify: REQ-ENG-01, REQ-ENG-02, REQ-SCOPE-01.
+- [x] Integrate Rust and frontend CI, the local source gate and the frontend bootstrap.
+- [ ] Verify hosted CI and production dependency and capability selections for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-03 — Lossless format engine
