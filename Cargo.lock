@@ -649,11 +649,13 @@ dependencies = [
 name = "starbank-fs"
 version = "0.1.0"
 dependencies = [
+ "cap-primitives",
  "getrandom",
  "libc",
  "rustix",
  "sha2 0.11.1",
  "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

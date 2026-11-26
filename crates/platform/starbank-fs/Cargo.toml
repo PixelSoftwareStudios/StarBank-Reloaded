@@ -6,13 +6,23 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[target.'cfg(any(target_os = "linux", target_os = "macos", windows))'.dependencies]
+sha2.workspace = true
+
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 getrandom = "=0.4.3"
 rustix = { version = "=1.1.6", features = ["fs"] }
-sha2.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "=0.2.191"
+
+[target.'cfg(windows)'.dependencies]
+cap-primitives = "=4.0.3"
+windows-sys = { version = "=0.61.2", features = [
+	"Win32_Foundation",
+	"Win32_Storage_FileSystem",
+	"Win32_System_WindowsProgramming",
+] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"

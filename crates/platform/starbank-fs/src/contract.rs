@@ -12,6 +12,8 @@ pub struct Fingerprint {
 	pub(crate) directory: crate::native::FileIdentity,
 	#[cfg(any(target_os = "linux", target_os = "macos"))]
 	pub(crate) name: std::ffi::OsString,
+	#[cfg(windows)]
+	pub(crate) windows: crate::windows::ObservedPath,
 	pub(crate) sha256: [u8; 32],
 }
 
@@ -160,7 +162,7 @@ impl StorageError {
 		}
 	}
 
-	#[cfg(any(target_os = "linux", target_os = "macos"))]
+	#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 	pub(crate) fn io(operation: &'static str, source: impl Into<io::Error>) -> Self {
 		Self::Io {
 			operation,

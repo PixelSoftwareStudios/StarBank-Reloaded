@@ -25,7 +25,7 @@ cargo check -p starbank-fs --offline --locked --target x86_64-pc-windows-msvc
 cargo check -p starbank-fs --offline --locked --target wasm32-unknown-unknown
 ```
 
-Windows and WASM cross-check the adapter that reports unsupported. Linux implements checked snapshots and exclusive creation using `renameat2(RENAME_NOREPLACE)` through rustix. The Linux test target was checked locally with Rust 1.99.0 and `--ignore-rust-version` because the installed 1.100.0 compiler lacks the Linux standard library. Execution on Linux and verification with the pinned compiler are pending.
+WASM cross-checks the adapter that reports unsupported. Linux implements checked snapshots and exclusive creation using `renameat2(RENAME_NOREPLACE)` through rustix. The Linux test target was checked locally with Rust 1.99.0 and `--ignore-rust-version` because the installed 1.100.0 compiler lacks the Linux standard library. Execution on Linux and verification with the pinned compiler are pending.
 
 ## Outcomes and remaining gates
 
@@ -33,4 +33,21 @@ The adapter walks directory components without following symlinks and uses direc
 
 The swap preserves a sibling copy even when the caller's retained backup policy is disabled. The receipt names the sibling on success. If a late writer changes the old target, the freshly published bytes may be visible and the displaced writer's version remains as recovery evidence. A post-publish verification or sync failure similarly requires inspection. Callers should not retry an uncertain attempt automatically or treat the sibling as a verified backup. The sibling may have moved during an uncertain exclusive create. No automatic rollback is implemented.
 
-Other filesystems on macOS, Windows native storage, crash and power-loss ordering, special metadata and native lock/share behavior require separate verification. Advisory locking only coordinates writers that honor it. Changing the directory binding or acting after the final fingerprint check can still affect the outcome. The adapter uses observations and recoverable publication so it does not report those ambiguous effects as ordinary retries. These tests do not certify WP-07, and no formal proof or power-loss claim is made.
+Other filesystems on macOS, Windows native writes, crash and power-loss ordering, special metadata and native lock/share behavior require separate verification. Advisory locking only coordinates writers that honor it. Changing the directory binding or acting after the final fingerprint check can still affect the outcome. The adapter uses observations and recoverable publication so it does not report those ambiguous effects as ordinary retries. These tests do not certify WP-07, and no formal proof or power-loss claim is made.
+
+## Windows snapshot qualification
+
+The Windows reader accepts ordinary files on a local drive whose opened root reports a local volume GUID path. It walks one component at a time through held directory handles. The open flags block reparse traversal and recall. Observed links, directory targets, alternate data stream syntax, UNC paths, device paths and offline attributes are refused. The leaf is opened for read sharing only, with no write/delete sharing. The reader checks the 128-bit file ID and volume serial number, directory ID, metadata and bounded bytes before issuing a SHA-256 fingerprint. Windows commit intents return an unsupported outcome before opening the destination.
+
+Rust 1.100.0 cross-Clippy compiled the Windows implementation and its test cases. It also passed the cross-target rustdoc build. The Mac host passed all ten existing native regression tests. Windows tests cover local reads, digest and size, identity changes, access under a competing open, hard links, path syntax, and rejected writes. The symbolic-link test requires Windows link-creation permission and runs separately. The Windows MSVC test link could not complete on the Mac host because the MSVC linker was unavailable. A native Windows runner with a local NTFS fixture remains necessary to execute these cases. Generic Wine results cannot qualify NTFS behavior.
+
+```sh
+cargo clippy -p starbank-fs --all-targets --offline --locked --target x86_64-pc-windows-msvc -- -D warnings
+cargo doc -p starbank-fs --no-deps --offline --locked --target x86_64-pc-windows-msvc
+
+# Execute these commands on Windows with a local NTFS temporary directory.
+cargo test -p starbank-fs --locked --test windows_storage
+cargo test -p starbank-fs --locked --test windows_storage -- --ignored
+```
+
+See the Microsoft [CreateFileW sharing and open flags](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew), [handle-relative names](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile), [volume GUID path contract](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew), and [file information structures](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex). The handle-relative implementation comes from the pinned [cap-primitives 4.0.3 backend](https://docs.rs/crate/cap-primitives/4.0.3/source/src/windows/fs/create_file_at_w.rs).
