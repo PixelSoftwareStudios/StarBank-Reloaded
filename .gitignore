@@ -1,6 +1,11 @@
 # Build
 /dist
 /tmp
+/target/
+node_modules/
+dist/
+.vite/
+coverage/
 *.app
 *.exe
 *.tar.xz
@@ -8,11 +13,10 @@ fyne_metadata_init.go
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Misc
 .DS_Store
 stuff-testing.go
-docs/temp
-
-# Local upstream provenance reference
-/original/docs/blueraja-starbank-8a5edab282632443.txt
+/docs/temp/

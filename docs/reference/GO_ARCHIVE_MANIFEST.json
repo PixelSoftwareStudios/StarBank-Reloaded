@@ -1,0 +1,214 @@
+{
+  "source": "starbank-reloaded(1).zip",
+  "source_sha256": "ede2df023fefe77a9bdeb1c11c0270553fc836854ceba5f43a7683462ae65ab9",
+  "baseline_commit": "59979256b046d092c8e776495cc77070e37aa0d2",
+  "files": [
+    {
+      "path": ".air.toml",
+      "bytes": 1015,
+      "sha256": "4c39b3b550e5be33d9624be958dd1840e628ae0e150e1a3f270061b45ec371cd"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 126,
+      "sha256": "7ea012f8db3dd83afacddb8c43f98f70fdd8b6fffaaf57d3cfa7406bd5dc0c6d",
+      "snapshot_bytes": 116,
+      "snapshot_sha256": "8064b8bf1d988493d81c3fb32cedaac3fb6784b3658beccbff7c0ca06c5039b0"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1077,
+      "sha256": "5dc227d0507d86808f83f6889186aaf91d28989370c00263cbc2aa5709c5b864"
+    },
+    {
+      "path": "README.md",
+      "bytes": 481,
+      "sha256": "71b5f708bf70ddd8adcab1e327e06844d19af950b9bf30ab4eda2d51b54e8fd9"
+    },
+    {
+      "path": "assets/logo.png",
+      "bytes": 5108,
+      "sha256": "bf2fec34e647628b3cbaacde700fd26b332042b96cb9c0c8a0615cd3badda147"
+    },
+    {
+      "path": "cmd/starbank/FyneApp.toml",
+      "bytes": 206,
+      "sha256": "ed4a0f1f6f7a8b8661e91e36abf1f2babb81bc23c98f0232e82da71f27f7bc95"
+    },
+    {
+      "path": "cmd/starbank/main.go",
+      "bytes": 97,
+      "sha256": "2462e532756a55e99ada8495c8a6f62f3b747ee84c5e6fea68e920ec31560960"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "bytes": 4602,
+      "sha256": "e99374bc31df673e49a344ba50b0ca3a38c8ca62292f6c2dc9c52284dcc756fa"
+    },
+    {
+      "path": "docs/PLAN.md",
+      "bytes": 6677,
+      "sha256": "f026812eb3222950168d723a06f0e830db68578971e88200eb8ef44f586046ec"
+    },
+    {
+      "path": "docs/TASKS.md",
+      "bytes": 2062,
+      "sha256": "6709d8b56a303979efa8094f3c333e9d0609679f96c5ab307b7437dbebe62e89"
+    },
+    {
+      "path": "go.mod",
+      "bytes": 1791,
+      "sha256": "a9527267f3b1eee9709829e689db200a0f2fe4d78ec11576b2e073d1ec106550"
+    },
+    {
+      "path": "go.sum",
+      "bytes": 8089,
+      "sha256": "85837435aeb24eeaf45f03f6d85e7411bd5c245fc8aed41fde6363fdbd93bc7f"
+    },
+    {
+      "path": "internal/editor/editor.go",
+      "bytes": 7081,
+      "sha256": "130ca75eaad4bbeed8660b0fca6205ef31e697335f93eba6cb032bbb6200f200"
+    },
+    {
+      "path": "internal/mapinfo/cache.go",
+      "bytes": 5111,
+      "sha256": "8d7bef11ceffd63d5fea598587d3c6b5a5da214739f6676d092bbe538b4a0394"
+    },
+    {
+      "path": "internal/maps/maps.go",
+      "bytes": 2619,
+      "sha256": "8d51b72df776485a409ce9c6e06ae09579cc7f8116d12c52c574b9dba1f2b3dd"
+    },
+    {
+      "path": "internal/schema/embed.go",
+      "bytes": 1060,
+      "sha256": "4001ca60a751087993d88fa2f74e4b605688edf56aace10c896a8e5fb6699412"
+    },
+    {
+      "path": "internal/schema/schema.go",
+      "bytes": 1420,
+      "sha256": "8e158e09e8cf109bde2e63884c87d20451bc1e7968e9bb17eb052ec2e9e7a8ef"
+    },
+    {
+      "path": "internal/schema/schemas/README.md",
+      "bytes": 993,
+      "sha256": "51522de5dcc6f3c477e0659953e18316ec4a5465a09c4a446a2f6ff1432d02d2"
+    },
+    {
+      "path": "internal/settings/settings.go",
+      "bytes": 2257,
+      "sha256": "53251d22d533f0805535bc43f56cc240bb781d2eff2648cd02654f4fbf03e580"
+    },
+    {
+      "path": "internal/ui/app.go",
+      "bytes": 10209,
+      "sha256": "51bbb7b32b91b3d9b6e2515a2af08606e22d998d574089d5e44da14ecb782638"
+    },
+    {
+      "path": "internal/ui/header.go",
+      "bytes": 3097,
+      "sha256": "1e4085545bc04389c3e412bcde55b2979e83cf926135f83d7362ce54209b8f81"
+    },
+    {
+      "path": "internal/ui/sidebar.go",
+      "bytes": 3895,
+      "sha256": "7a3baa6bd36f311668a93113eafee32437b726c96f305c13ed342a7ec5069194"
+    },
+    {
+      "path": "internal/ui/state.go",
+      "bytes": 766,
+      "sha256": "efe3ba64156875eb9cc9637781e4e8ff7757e8aefa0bc6616126517b126f291f"
+    },
+    {
+      "path": "internal/ui/utils/helpers.go",
+      "bytes": 1086,
+      "sha256": "3163ac875c362f21c0360a7bd306b132b68d10330ffa67aeb6aac11a6cc98188"
+    },
+    {
+      "path": "internal/ui/views/raw.go",
+      "bytes": 661,
+      "sha256": "21dc62cd24960ebe4bab95ef09813ccd1015b7eb53321cf08fc1d178812f6214"
+    },
+    {
+      "path": "internal/ui/views/simple.go",
+      "bytes": 885,
+      "sha256": "12c5f26a2c44f49e5578c3b22d351cc903cb59f7de04fb5b6110efe9cdf4dfed"
+    },
+    {
+      "path": "internal/ui/views/table.go",
+      "bytes": 1955,
+      "sha256": "7cb2fd1e6616b6dd1c0debf122a5a309c9c2be7552616a485dfc09cf3bc62122"
+    },
+    {
+      "path": "internal/ui/widgets/breadcrumb.go",
+      "bytes": 1247,
+      "sha256": "5534decfbcb599d21e1d50375aedae292481fa561afcaf30c2661fbd438bb459"
+    },
+    {
+      "path": "internal/ui/widgets/savebar.go",
+      "bytes": 3700,
+      "sha256": "c7e02cd613ea88817c7e39d1512138337fb9f46cd3db5f9ecb4c5c80b1d9850b"
+    },
+    {
+      "path": "justfile",
+      "bytes": 285,
+      "sha256": "d6c97a5cd485b17047355c7108e53b4142a8220679fc565d1d25acf0ddd12621"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/bank_test.go",
+      "bytes": 3995,
+      "sha256": "d1f4be424d8127d841a88ec7b4621a5c69b845a279e7aa12d1837c9a1eaaa35e"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/model.go",
+      "bytes": 2483,
+      "sha256": "5d3f872dead050bd4431f255ea1217fd231c4071543e7c57aa3681d5edff2764"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/parse.go",
+      "bytes": 983,
+      "sha256": "096e9954bf3f9834c8d1255b4e817d405c54d5f73757a16b38152f98c96f0865"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/path.go",
+      "bytes": 6197,
+      "sha256": "efb158f4044df73bbde6453b86b1da0c514de73459358deffba0febef5aee5fc"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/sign.go",
+      "bytes": 1066,
+      "sha256": "0f1dcb6d9a6eb99308cca48ea1926a4676e8c159b5e994324b342ac328da7ea7"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/sign_test.go",
+      "bytes": 2097,
+      "sha256": "405e566f9a712f8af7c3dce4cafdbdb5cfaec1f849887229df5a3231f70fe28e"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/write.go",
+      "bytes": 1058,
+      "sha256": "3ad9721946de12ab39ed53c42962f86d6ff587a2c1b48a37b1fa5299409e35ab"
+    },
+    {
+      "path": "pkg/bankeditorlib/bank/xml.go",
+      "bytes": 1545,
+      "sha256": "01cc458960e1b959f32addca7fe97d52d90513c90f22da4943fba13dee66d164"
+    },
+    {
+      "path": "pkg/bankeditorlib/util/format.go",
+      "bytes": 528,
+      "sha256": "da7cc1a53a3e859a123be204a5a554a196505449695ecf0a8d242a8db922409c"
+    },
+    {
+      "path": "pkg/bankeditorlib/util/sort.go",
+      "bytes": 335,
+      "sha256": "adc8c9dbd0a2c1dbbfc735f6bca29a8fb4a0675870c8b1efa8df4eece8b0c35b"
+    },
+    {
+      "path": "pkg/bankeditorlib/util/validate.go",
+      "bytes": 240,
+      "sha256": "241112946ac114a4844130556f8a844920d2d5a1ee3b440810aad78639e52f8d"
+    }
+  ]
+}

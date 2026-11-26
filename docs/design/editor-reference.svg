@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="500" viewBox="0 0 850 500" role="img" aria-labelledby="title desc">
+<title id="title">StarBank Reloaded desktop concept</title><desc id="desc">Compact dark theme, left Map List and Quick Options, right breadcrumbs and editor tabs, Sections and typed table, Reset and Save at bottom right.</desc>
+<defs><style>text{font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:12px;fill:#d4d4da}.small{font-size:11px;fill:#a5a5af}.strong{font-weight:600;fill:#f0f0f4}.title{font-size:27px;font-weight:600;fill:#f4f4f6}</style><clipPath id="crumb"><rect x="250" y="14" width="480" height="25"/></clipPath></defs>
+<rect x="0" y="0" width="850" height="500" rx="8" fill="#141518" stroke="none"/>
+<rect x="0" y="0" width="236" height="500" rx="0" fill="#1a1b1f" stroke="none"/>
+<path d="M236 0 L236 500" stroke="#36373e" fill="none"/>
+<text x="14" y="23" class="strong" text-anchor="start">Map List</text>
+<path d="M12 33 L224 33" stroke="#36373e" fill="none"/>
+<rect x="12" y="45" width="212" height="29" rx="5" fill="#24252a" stroke="#383940"/>
+<text x="24" y="64" class="small" text-anchor="start">⌕  Search maps…</text>
+<text x="16" y="100" class="" text-anchor="start">Custom Hero Defense</text>
+<text x="16" y="129" class="" text-anchor="start">Entropy TD</text>
+<rect x="8" y="141" width="220" height="26" rx="4" fill="#304b67" stroke="none"/>
+<text x="16" y="158" class="strong" text-anchor="start">Lottery Defence</text>
+<text x="16" y="187" class="" text-anchor="start">Mafia</text>
+<text x="16" y="216" class="" text-anchor="start">MineralZ</text>
+<text x="16" y="245" class="" text-anchor="start">Penguin Warz</text>
+<text x="16" y="274" class="" text-anchor="start">Squadron TD</text>
+<text x="16" y="303" class="" text-anchor="start">The Thing</text>
+<text x="16" y="332" class="" text-anchor="start">Zerg Hex</text>
+<path d="M12 376 L224 376" stroke="#36373e" fill="none"/>
+<text x="14" y="395" class="strong" text-anchor="start">Quick Options</text>
+<rect x="14" y="406" width="13" height="13" rx="3" fill="#548ac1" stroke="none"/>
+<path d="M17 412 l3 3 l5 -6" stroke="#fff" stroke-width="1.5" fill="none"/>
+<text x="34" y="417" class="small" text-anchor="start">Hide Blizzard maps</text>
+<rect x="14" y="427" width="13" height="13" rx="3" fill="#548ac1" stroke="none"/>
+<path d="M17 433 l3 3 l5 -6" stroke="#fff" stroke-width="1.5" fill="none"/>
+<text x="34" y="438" class="small" text-anchor="start">Hide maps without bank files</text>
+<rect x="14" y="448" width="13" height="13" rx="3" fill="#548ac1" stroke="none"/>
+<path d="M17 454 l3 3 l5 -6" stroke="#fff" stroke-width="1.5" fill="none"/>
+<text x="34" y="459" class="small" text-anchor="start">Auto re-sign banks on save</text>
+<text x="224" y="483" class="small" text-anchor="end">More…</text>
+<g clip-path="url(#crumb)">
+<text x="250" y="31" class="small" text-anchor="start">… › 1-S2-1-1234567 › Banks › Lottery Defence ›</text>
+<text x="548" y="31" class="strong" text-anchor="start">sld.SC2Bank</text>
+</g>
+<g stroke="#b6b8c0" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><g><title>Open in Folder</title><path d="M747 23 h6 l3 3 h11 v11 h-20 z M759 20 h9 v9 M768 20 l-8 8"/></g><g><title>Tools</title><path d="M784 21 l12 14 M792 20 l-9 10 M781 33 l4 4"/></g><g><title>Settings</title><circle cx="823" cy="29" r="7"/><circle cx="823" cy="29" r="2.5"/><path d="M823 19 v3 m0 14 v3 m-10-10 h3 m14 0 h3"/></g></g>
+<text x="543" y="82" class="title" text-anchor="middle">Lottery Defence</text>
+<text x="250" y="106" class="small" text-anchor="start">Created by: Map author</text>
+<text x="836" y="106" class="small" text-anchor="end">Last update downloaded: Nov 2026</text>
+<text x="250" y="139" class="" text-anchor="start">Bank file</text>
+<rect x="661" y="120" width="175" height="27" rx="4" fill="#24252a" stroke="#383940"/>
+<text x="674" y="138" class="" text-anchor="start">sld.SC2Bank</text>
+<text x="821" y="138" class="small" text-anchor="start">⌄</text>
+<path d="M250 185 L836 185" stroke="#36373e" fill="none"/>
+<text x="258" y="174" class="small" text-anchor="start">Simple View</text>
+<text x="354" y="174" class="strong" text-anchor="start">Table View</text>
+<text x="447" y="174" class="small" text-anchor="start">Raw View</text>
+<path d="M347 185 L423 185" stroke="#79a9e4" fill="none"/>
+<text x="254" y="209" class="strong" text-anchor="start">Sections</text>
+<rect x="250" y="220" width="115" height="26" rx="4" fill="#304b67" stroke="none"/>
+<text x="258" y="237" class="" text-anchor="start">Player</text>
+<text x="258" y="266" class="" text-anchor="start">Inventory</text>
+<text x="258" y="295" class="" text-anchor="start">Progress</text>
+<text x="258" y="324" class="" text-anchor="start">Stats</text>
+<text x="258" y="353" class="" text-anchor="start">xp</text>
+<path d="M375 198 L375 443" stroke="#36373e" fill="none"/>
+<text x="403" y="209" class="strong" text-anchor="start">Name</text>
+<text x="520" y="209" class="strong" text-anchor="start">Type</text>
+<text x="597" y="209" class="strong" text-anchor="start">Value</text>
+<path d="M386 218 L836 218" stroke="#36373e" fill="none"/>
+<rect x="386" y="230" width="12" height="12" rx="2" fill="none" stroke="#727581"/>
+<text x="403" y="241" class="" text-anchor="start">Gold</text>
+<text x="520" y="241" class="small" text-anchor="start">int</text>
+<rect x="586" y="222" width="250" height="28" rx="4" fill="#23242a" stroke="#393b43"/>
+<text x="598" y="241" class="" text-anchor="start">1,000,000</text>
+<path d="M386 256 L836 256" stroke="#36373e" fill="none"/>
+<rect x="386" y="268" width="12" height="12" rx="2" fill="none" stroke="#727581"/>
+<text x="403" y="279" class="" text-anchor="start">Level</text>
+<text x="520" y="279" class="small" text-anchor="start">int</text>
+<rect x="586" y="260" width="250" height="28" rx="4" fill="#23242a" stroke="#393b43"/>
+<text x="598" y="279" class="" text-anchor="start">50</text>
+<path d="M386 294 L836 294" stroke="#36373e" fill="none"/>
+<rect x="386" y="306" width="12" height="12" rx="2" fill="none" stroke="#727581"/>
+<text x="403" y="317" class="" text-anchor="start">XP</text>
+<text x="520" y="317" class="small" text-anchor="start">int</text>
+<rect x="586" y="298" width="250" height="28" rx="4" fill="#23242a" stroke="#393b43"/>
+<text x="598" y="317" class="" text-anchor="start">250,000</text>
+<path d="M386 332 L836 332" stroke="#36373e" fill="none"/>
+<rect x="386" y="344" width="12" height="12" rx="2" fill="none" stroke="#727581"/>
+<text x="403" y="355" class="" text-anchor="start">Wins</text>
+<text x="520" y="355" class="small" text-anchor="start">int</text>
+<rect x="586" y="336" width="250" height="28" rx="4" fill="#23242a" stroke="#393b43"/>
+<text x="598" y="355" class="" text-anchor="start">125</text>
+<path d="M386 370 L836 370" stroke="#36373e" fill="none"/>
+<rect x="386" y="382" width="12" height="12" rx="2" fill="none" stroke="#727581"/>
+<text x="403" y="393" class="" text-anchor="start">Multiplier</text>
+<text x="520" y="393" class="small" text-anchor="start">fixed</text>
+<rect x="586" y="374" width="250" height="28" rx="4" fill="#23242a" stroke="#393b43"/>
+<text x="598" y="393" class="" text-anchor="start">1.5</text>
+<path d="M250 451 L836 451" stroke="#36373e" fill="none"/>
+<circle cx="255" cy="475" r="3" fill="#d5a45b"/>
+<text x="266" y="479" class="small" text-anchor="start">2 unsaved changes</text>
+<text x="713" y="479" class="" text-anchor="start">Reset</text>
+<rect x="748" y="461" width="88" height="30" rx="5" fill="#477fbc" stroke="none"/>
+<text x="779" y="480" class="strong" text-anchor="middle">Save</text>
+<path d="M808 462 L808 490" stroke="#86a9d1" fill="none"/>
+<text x="822" y="480" class="strong" text-anchor="middle">⌄</text>
+</svg>

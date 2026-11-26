@@ -1,0 +1,6 @@
+# Confirm that the established pin is available before bootstrapping Cargo.
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
