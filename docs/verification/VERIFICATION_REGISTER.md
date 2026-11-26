@@ -18,3 +18,7 @@ All Pending unless stated otherwise. Evidence is crate-local; these rows track i
 | VO-12 | REQ-MIG-01, REQ-ENG-01/02, REQ-QA-01 | Hash validation, fmt/lint/structural checks, CI and test audit | Archived Go unchanged; evidence honest, required tests mapped, no fabricated passes |
 
 Formal verification palette is deliberate but selective. Kani proof bounds, Loom/Shuttle schedules, TLC finite state bounds and Lean/hax/Aeneas extraction limits must be explicit. If tool incompatibility blocks a specific obligation, document substitute evidence and ask before claiming equivalent proof. Real crash/power-loss, Windows ACL and browser durability cannot be proven by a model alone. See EVS-1.
+
+VO-01 has scoped Miri evidence for 46 parser and writer cases and a maintained AddressSanitizer fuzz harness for scalar edits. The namespace declaration budget case passed natively and has no interpreter result. [Miri evidence and remaining tool scopes](../../crates/formats/sc2bank/verification/MIRI.md) · [Fuzz harness](../../crates/formats/sc2bank/fuzz/README.md)
+
+VO-09 and VO-10 include the 10,000-value production browser gate, nested static asset and worker loading under the packaged headers, and offline exact backup and recovery. [Browser and native verification](IMPLEMENTATION.md) · [Measured Chromium startup and interaction baseline](BROWSER_PERFORMANCE.md)

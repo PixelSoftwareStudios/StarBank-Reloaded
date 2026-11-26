@@ -14,7 +14,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-StarBank Web opens individual banks or a local bank list from selected files and folders. It edits Table and Raw views and offers Simple View for matching local profiles. Structural edits, diffs, targeted reverts, and exact or re-signed downloads work offline after the editor finishes loading.
+StarBank Web opens individual banks or a local bank list from selected files and folders. It edits Table and Raw views and offers Simple View for matching local profiles. Structural edits, targeted reverts, signed downloads and byte-exact backups of the opening file work offline after the editor loads. The shared engine preserves UTF-8 and BOM-marked UTF-16 bank files.
 
 Run the Tauri desktop development host or the command-line editor from the same checkout.
 
@@ -23,7 +23,7 @@ pnpm --filter starbank-desktop run dev
 cargo run --locked -p starbank-cli -- --help
 ```
 
-The desktop app opens local banks and browses banks from an authorized SC2 folder. Verified overwrite and restore are available on qualified macOS APFS targets. macOS and Linux support create-only exports and confirmation-gated batch backups. Windows storage supports reads. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing, backups and read-only map metadata inspection. See the [CLI guide](apps/starbank-cli/README.md) and [verified platform scope](docs/verification/IMPLEMENTATION.md).
+The desktop app opens local banks and browses banks from an authorized SC2 folder. Verified overwrite and restore are available on qualified macOS APFS targets. macOS and Linux support create-only signed copies and confirmation-gated batch backups. Windows supports reading banks and editing in memory. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing, backups and read-only map metadata inspection. [CLI guide](apps/starbank-cli/README.md) · [Verified platform scope](docs/verification/IMPLEMENTATION.md) · [Local packages](docs/verification/DISTRIBUTION.md)
 
 `just --list` lists the local test, build, and packaging recipes.
 

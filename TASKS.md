@@ -23,8 +23,9 @@ Depends on: 01.
 
 Depends on: 02.
 
-- [x] Implement bounded UTF-8 parsing, lossless unchanged export and targeted existing-value edits. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
-- [ ] Qualify real SC2 inputs and other encodings, complete fuzz coverage and verify the remaining acceptance cases for REQ-FMT-01, REQ-FMT-02, REQ-FMT-03 and REQ-FMT-04.
+- [x] Implement bounded UTF-8 and BOM-marked UTF-16 parsing, lossless export, and native-byte-preserving value, structural and signature edits. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [x] Check in and run the bounded lossless-format fuzz target. [Fuzz harness](crates/formats/sc2bank/fuzz/README.md)
+- [ ] Qualify real SC2 inputs, confirm the observed encoding scope, and extend fuzzing to structural edits and sustained runs for REQ-FMT-01, REQ-FMT-02, REQ-FMT-03 and REQ-FMT-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-04 — Signature and context
@@ -32,7 +33,8 @@ Depends on: 02.
 Depends on: 03.
 
 - [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Compare synthetic vectors with the pinned v2.0 signer.
-- [ ] Verify game-generated digests and complete automatic and explicit re-sign flows for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
+- [x] Wire automatic and explicit re-signing, including create-only signed copies of external banks. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Verify actual game-generated digests and game acceptance for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03. Finish checking the native picker flow for external banks.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-05 — Editor transactions and validation
@@ -48,7 +50,8 @@ Depends on: 03,04.
 Depends on: 05.
 
 - [x] Implement versioned schema, compatible legacy migration, explicit identity matching and exact atomic dependent edits in the engine.
-- [ ] Wire Simple View and qualify actual game profiles and identity evidence.
+- [x] Wire Simple View and verify synthetic profile selection, dependent changes and one-step undo. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Qualify actual game profiles and their identity evidence.
 - [ ] Implement and verify: REQ-PROF-01, REQ-PROF-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -57,7 +60,8 @@ Depends on: 05.
 Depends on: 04,05.
 
 - [x] Implement checked preparation, exclusive creation, verified local APFS replacement, backup snapshots and reversible restore policy.
-- [ ] Qualify Windows writes, Linux replacement, interrupted-save recovery and the full application save and backup flow.
+- [x] Verify the APFS save, backup and restore paths with a synthetic bank. Exercise process termination and retained bytes around replacement. [Native storage evidence](crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
+- [ ] Qualify native Windows writes, Linux replacement that preserves hidden metadata, and physical power-loss recovery. [Native replacement evidence](crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -74,7 +78,8 @@ Depends on: 02.
 Depends on: 02.
 
 - [x] Implement bounded read-only metadata inspection for supported MPQ V1/V2/V4 layouts and test synthetic StormLib fixtures.
-- [ ] Qualify the real SC2 corpus and authorized repair and export behavior.
+- [x] Exercise verified archival copies and explicit capability fallback with synthetic MPQ fixtures. [Copy qualification](crates/adapters/starbank-mpq/verification/MAP_EXPORT.md)
+- [ ] Qualify the authorized real SC2 corpus and repair writer.
 - [ ] Implement and verify: REQ-MPQ-01, REQ-MPQ-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -83,7 +88,8 @@ Depends on: 02.
 Depends on: 08,09.
 
 - [x] Implement bounded and cancellable metadata indexing, incremental cache and ambiguity-preserving association. Verify synthetic archives and cache failures.
-- [ ] Connect map selection, filters and metadata status to the native application and test real cache layouts.
+- [x] Connect map selection, filters, metadata, progress and generation-scoped cancellation to the native application. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Test real cache layouts and live cancellation across platforms.
 - [ ] Implement and verify: REQ-MAP-02, REQ-MAP-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -92,7 +98,8 @@ Depends on: 08,09.
 Depends on: 02,08.
 
 - [x] Implement and browser-check the resizable map list, search, filters, selection and Quick Options using synthetic inventory. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
-- [ ] Wire discovery and settings. Complete breadcrumbs, menus, map metadata and bank choice for REQ-UI-01, REQ-UI-02, REQ-UI-03 and REQ-UI-04.
+- [x] Wire discovery, settings, breadcrumbs, menus, map metadata and bank choice. Verify responsive behavior and editor shortcuts. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Verify the remaining native visual and accessibility cases for REQ-UI-01, REQ-UI-02, REQ-UI-03 and REQ-UI-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-12 — Live editor UI
@@ -100,7 +107,8 @@ Depends on: 02,08.
 Depends on: 05,06,07,10,11.
 
 - [x] Implement controlled Table and CodeMirror Raw views, same-value bulk editing, draft safeguards and callback-driven file actions.
-- [ ] Finish all live platform bindings, Simple View, and backup and save flows.
+- [x] Bind live Table, Raw, and Simple View and qualify the supported local save, backup and restore flows with synthetic banks. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Complete the installed native platform and assistive technology matrix. Keep writes scoped to qualified storage.
 - [ ] Implement and verify: REQ-UI-05, REQ-UI-06, REQ-UI-07, REQ-UI-08.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -109,7 +117,8 @@ Depends on: 05,06,07,10,11.
 Depends on: 11,12.
 
 - [x] Implement versioned browser preferences, legacy decoding and the shared settings page. Preserve in-flight drafts across settings navigation.
-- [ ] Complete native preference persistence, root authorization and remaining platform settings.
+- [x] Persist native preferences and authorized roots. Share account selection, appearance, automatic backup policy and platform capability information in Settings. Add explicit map-index rebuild. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Complete the managed backup location and retention controls.
 - [ ] Implement and verify: REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -118,7 +127,9 @@ Depends on: 11,12.
 Depends on: 03,04,05,06,11,12.
 
 - [x] Wire the browser to the shared WASM engine and verify offline local editing, guarded switching, copy fallback and downloads in Chromium, Firefox and WebKit.
-- [ ] Complete live profile and structural editing controls, optional writable file handles, and static deployment verification.
+- [x] Verify live profile and structural editing controls and exact opening backups across the supported browser engines. [Browser write qualification](docs/verification/BROWSER_WRITES.md)
+- [x] Ship static editor and worker response headers and verify local static hosting at a nested path in the browser matrix. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
+- [ ] Verify the static hosted build. Reassess writable handles if browsers expose the needed conflict and recovery guarantees.
 - [ ] Implement and verify: REQ-WEB-01, REQ-WEB-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -127,7 +138,8 @@ Depends on: 03,04,05,06,11,12.
 Depends on: 05,07,08.
 
 - [x] Implement typed local bank commands, versioned JSON, exact patch selectors, dry-run, guarded effects, backup and restore, and the CLI skill.
-- [ ] Finish map inspection and cross-adapter and native Windows runtime conformance.
+- [x] Implement read-only map inspection and qualify the local CLI on macOS and Linux. [CLI guide](apps/starbank-cli/README.md)
+- [ ] Verify native Windows runtime and complete cross-adapter conformance.
 - [ ] Implement and verify: REQ-CLI-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -136,7 +148,8 @@ Depends on: 05,07,08.
 Depends on: 12,13,14,15.
 
 - [x] Build and launch the Tauri host on macOS and link the tested Linux arm64 executable.
-- [ ] Verify signed packages and file associations, real Windows and macOS install/open flows, release licensing and Linux packaging.
+- [x] Verify the local unsigned macOS disk image and the Debian arm64 package and its install, launch and purge flow. [Distribution evidence](docs/verification/DISTRIBUTION.md)
+- [ ] Verify signed packages, Windows Explorer registration and uninstall, installed macOS open flows, and release licensing.
 - [ ] Implement and verify: REQ-DIST-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -144,6 +157,7 @@ Depends on: 12,13,14,15.
 
 Depends on: 03–16.
 
+- [x] Record a repeatable Chromium startup and interaction baseline and run the bounded XML sanitizer and Miri checks. [Browser timing](docs/verification/BROWSER_PERFORMANCE.md) · [Miri evidence](crates/formats/sc2bank/verification/MIRI.md)
 - [ ] Ongoing from first WP; report actual tests, fault injection, corpus parity, measured budgets and formal coverage.
 - [ ] Implement and verify: REQ-PERF-01, REQ-QA-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
