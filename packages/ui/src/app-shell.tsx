@@ -2,6 +2,7 @@ import { type AppSettings, MAP_PANE_WIDTH } from "@starbank/platform/settings";
 import {
   type CSSProperties,
   lazy,
+  type ReactNode,
   Suspense,
   useEffect,
   useId,
@@ -41,12 +42,14 @@ export function AppShell({
   mapOptions,
   editor,
   preferences,
+  workspaceAccessory,
 }: {
   name: string;
   inventory?: MapInventory;
   mapOptions?: MapOptions;
   editor?: BankEditorController;
   preferences?: PreferencesController;
+  workspaceAccessory?: ReactNode;
 }) {
   const mapPaneId = useId();
   const [mapPaneWidth, setMapPaneWidth] = useState<number>(
@@ -101,6 +104,7 @@ export function AppShell({
       data-density={settings?.density}
     >
       <main className="bank-workspace min-w-0">
+        {workspaceAccessory}
         <div className="editor-surface" hidden={showSettings}>
           {editor ? (
             <EditorPane
@@ -161,7 +165,7 @@ export function AppShell({
   );
 }
 
-export { preloadRawEditor } from "./bank-editor";
+export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
 export {
   type BankEditorController,
   type BankEditorDocument,

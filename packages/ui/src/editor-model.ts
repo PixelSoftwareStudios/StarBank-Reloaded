@@ -3,6 +3,7 @@ import type {
   EngineRevertTarget,
   EngineStructureChange,
 } from "@starbank/engine-client/protocol";
+import type { EditorProfileController } from "./simple-profile-model";
 
 export interface EditorTarget {
   id: string;
@@ -57,10 +58,12 @@ export type EditorAction = (
 ) => Promise<EditorActionResult>;
 
 export interface BankEditorController {
+  profile?: EditorProfileController;
   document?: BankEditorDocument;
   busy?: boolean;
   status?: string;
   onOpen?: () => Promise<EditorActionResult>;
+  onReveal?: EditorAction;
   onOpenFile?: (file: File) => Promise<EditorActionResult>;
   onEditValues?: (
     target: EditorTarget,

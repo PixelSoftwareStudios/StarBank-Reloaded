@@ -1,4 +1,8 @@
-import type { EngineSigningContext } from "@starbank/engine-client/protocol";
+import { EngineTransportError } from "@starbank/engine-client";
+import type {
+  EngineProfile,
+  EngineSigningContext,
+} from "@starbank/engine-client/protocol";
 import {
   prepareBankDownload,
   writeBankClipboard,
@@ -9,13 +13,15 @@ import {
   type BankEditorDocument,
   type EditorAction,
   type EditorTarget,
-  preloadRawEditor,
+  preloadEditorTools,
   preloadSettingsPage,
 } from "@starbank/ui";
 import { useEffect, useRef, useState } from "react";
 import {
+  type BankEditCommand,
   type BrowserBankSession,
   createBankSession,
+  encodeBankXml,
   readPreparedXml,
 } from "./bank-session";
 import { useBrowserSettings } from "./use-browser-settings";
@@ -32,8 +38,10 @@ export function StarBankWeb() {
   }, [preferences.settings.theme, preferences.settings.textSize]);
   const session = useRef<BrowserBankSession>(null);
   const [document, setDocument] = useState<BankEditorDocument>();
+  const [profile, setProfile] = useState<EngineProfile>();
   const [status, setStatus] = useState("Loading the bank engine…");
   const [ready, setReady] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [copyPreview, setCopyPreview] = useState<string>();
 
@@ -43,7 +51,7 @@ export function StarBankWeb() {
       session.current = createBankSession();
       void Promise.all([
         session.current.ready(),
-        preloadRawEditor(),
+        preloadEditorTools(),
         preloadSettingsPage(),
       ]).then(
         () => {
@@ -69,14 +77,14 @@ export function StarBankWeb() {
   }, []);
 
   useEffect(() => {
-    if (!document?.dirty) return;
+    if (!document?.dirty && !hasDraft) return;
     const confirmNavigation = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", confirmNavigation);
     return () => window.removeEventListener("beforeunload", confirmNavigation);
-  }, [document?.dirty]);
+  }, [document?.dirty, hasDraft]);
 
   function bankSession(): BrowserBankSession {
     if (!session.current) throw new Error("The bank engine is unavailable.");
@@ -93,6 +101,7 @@ export function StarBankWeb() {
   const controller: BankEditorController = {
     document,
     status,
+    onDraftChange: setHasDraft,
     onOpenFile: ready
       ? async (file) => {
           const discardCurrent = document?.dirty ?? false;
@@ -105,27 +114,55 @@ export function StarBankWeb() {
             return { ok: false, message: "The current bank is still open." };
           }
           setDocument(await bankSession().open(file, discardCurrent));
+          setProfile(undefined);
           return { ok: true };
         }
       : undefined,
-    onEditValues: async (target, edits) => {
-      setDocument(
-        await bankSession().edit(activeDocument(target).name, target, {
-          kind: "set_values",
-          payload: { edits },
-        }),
-      );
-      return { ok: true };
+    onEditValues: (target, edits) =>
+      apply(target, { kind: "set_values", payload: { edits } }),
+    onStructure: (target, change) =>
+      apply(target, { kind: "structure", payload: change }),
+    onRevert: (target, selection) =>
+      apply(target, { kind: "revert", payload: selection }),
+    onDiff: async (target) => {
+      activeDocument(target);
+      const diff = await bankSession().diff(target);
+      return { ok: true, diff };
     },
-    onReplaceXml: async (target, xml) => {
-      setDocument(
+    onReplaceXml: async (target, xml) =>
+      publish(
         await bankSession().replaceXml(
           activeDocument(target).name,
           target,
           xml,
         ),
-      );
-      return { ok: true };
+      ),
+    profile: {
+      current: profile ?? { status: "unloaded" },
+      requireAuthor: true,
+      onLoad: async (target, file, author) => {
+        const { name } = activeDocument(target);
+        setProfile(await bankSession().loadProfile(target, name, file, author));
+        return { ok: true };
+      },
+      onClear: async (target) => {
+        activeDocument(target);
+        setProfile(await bankSession().clearProfile(target));
+        return { ok: true };
+      },
+      onPreview: (target, { profile_id, field_id, input }) => {
+        activeDocument(target);
+        return bankSession().previewProfile(target, {
+          profile_id,
+          field_id,
+          input,
+        });
+      },
+      onApply: (target, previewId) =>
+        apply(target, {
+          kind: "profile_apply",
+          payload: { preview_id: previewId },
+        }),
     },
     onUndo: navigate("undo"),
     onRedo: navigate("redo"),
@@ -150,30 +187,62 @@ export function StarBankWeb() {
     },
   };
 
+  async function publish(next: BankEditorDocument) {
+    if (profile !== undefined && profile.status !== "unloaded") {
+      try {
+        setProfile(await bankSession().profile(next));
+      } catch {
+        setProfile(undefined);
+        setDocument(next);
+        return {
+          ok: true,
+          message: "Bank updated. Reload the profile to refresh Simple View.",
+        } as const;
+      }
+    }
+    setDocument(next);
+    return { ok: true } as const;
+  }
+
+  async function apply(target: EditorTarget, command: BankEditCommand) {
+    return publish(
+      await bankSession().edit(activeDocument(target).name, target, command),
+    );
+  }
+
   function navigate(kind: "undo" | "redo" | "reset"): EditorAction {
-    return async (target) => {
-      setDocument(
-        await bankSession().edit(activeDocument(target).name, target, { kind }),
-      );
-      return { ok: true };
-    };
+    return (target) => apply(target, { kind });
   }
 
   async function exportCopy(name: string, context?: EngineSigningContext) {
     if (!document) throw new Error("Open a bank to prepare a download.");
-    const { bytes, signatureStatus } = await bankSession().prepare(
-      document,
-      context,
-    );
-    return {
-      download: prepareBankDownload(bytes, name),
-      signatureMessage:
-        signatureStatus === "valid"
-          ? "Signature verified. Keep this filename when using the bank."
-          : signatureStatus === "unsigned"
-            ? undefined
-            : "This copy contains a signature that could not be verified.",
-    };
+    try {
+      const { bytes, signatureStatus } = await bankSession().prepare(
+        document,
+        context,
+      );
+      return {
+        download: prepareBankDownload(bytes, name),
+        message:
+          signatureStatus === "valid"
+            ? "Signature verified. Keep this filename when using the bank."
+            : signatureStatus === "unsigned"
+              ? undefined
+              : "This copy contains a signature that could not be verified.",
+      };
+    } catch (error) {
+      if (!isUnavailableEngine(error)) throw error;
+      if (context) {
+        throw new Error(
+          "The bank engine stopped. Clear Re-sign this copy to prepare a recovery download.",
+        );
+      }
+      return {
+        download: prepareBankDownload(encodeBankXml(document.xml), name),
+        message:
+          "The bank engine stopped. This recovery copy contains the last accepted revision. Its signature has not been re-verified.",
+      };
+    }
   }
 
   return (
@@ -199,4 +268,9 @@ export function StarBankWeb() {
       )}
     </>
   );
+}
+
+function isUnavailableEngine(error: unknown): boolean {
+  if (!(error instanceof EngineTransportError)) return false;
+  return error.code !== "busy" && error.code !== "limit";
 }

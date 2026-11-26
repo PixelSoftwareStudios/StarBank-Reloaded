@@ -1,4 +1,23 @@
 import * as v from "valibot";
+import {
+  type EngineProfileCommand,
+  profilePreviewSchema,
+  profileSchema,
+} from "./profile-protocol";
+
+export type {
+  EngineProfile,
+  EngineProfileEdit,
+  EngineProfileIdentity,
+  EngineProfileInput,
+  EngineProfileLoad,
+  EngineProfilePreview,
+} from "./profile-protocol";
+export {
+  bankFilenameStem,
+  MAX_PROFILE_BYTES,
+  profileLoadForFile,
+} from "./profile-protocol";
 
 export const EDITOR_SCHEMA_VERSION = 1;
 
@@ -59,6 +78,7 @@ export interface EngineRevertTarget {
 }
 
 export type EngineCommand =
+  | EngineProfileCommand
   | {
       readonly kind: "open";
       readonly payload?: {
@@ -171,6 +191,11 @@ export type EngineOccurrenceDiff = v.InferOutput<typeof engineOccurrenceDiff>;
 const emptyPayload = v.object({});
 const resultSchema = v.variant("kind", [
   v.object({ kind: v.literal("snapshot"), payload: engineSnapshot }),
+  v.object({ kind: v.literal("profile"), payload: profileSchema }),
+  v.object({
+    kind: v.literal("profile_preview"),
+    payload: profilePreviewSchema,
+  }),
   v.object({ kind: v.literal("raw"), payload: emptyPayload }),
   v.object({ kind: v.literal("diff"), payload: engineDiff }),
   v.object({

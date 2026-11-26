@@ -1,12 +1,13 @@
-import type { EngineSigningContext } from "@starbank/engine-client/protocol";
+import {
+  bankFilenameStem,
+  type EngineSigningContext,
+} from "@starbank/engine-client/protocol";
 import type { BankDownload } from "@starbank/platform/browser";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-const BANK_EXTENSION = ".sc2bank";
-
 interface DownloadPreparation {
   readonly download: BankDownload;
-  readonly signatureMessage?: string;
+  readonly message?: string;
 }
 
 export function ExportDialog({
@@ -30,20 +31,20 @@ export function ExportDialog({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [prepared, setPrepared] = useState<DownloadPreparation>();
+  const downloadLink = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
-    return () => prepared?.download.release();
+    if (!prepared) return;
+    downloadLink.current?.focus();
+    return () => prepared.download.release();
   }, [prepared]);
 
   async function prepareDownload(): Promise<void> {
     setWorking(true);
     setError("");
     try {
-      const stem = filename.slice(0, -BANK_EXTENSION.length);
-      if (
-        stem.length === 0 ||
-        !filename.toLowerCase().endsWith(BANK_EXTENSION)
-      ) {
+      const stem = bankFilenameStem(filename);
+      if (!stem) {
         throw new Error("Choose a filename ending in .SC2Bank.");
       }
       const context = sign ? { author, player, bank_name: stem } : undefined;
@@ -63,9 +64,7 @@ export function ExportDialog({
     <WebDialog title="Save a bank copy" close={dismiss} busy={working}>
       {prepared ? (
         <>
-          {prepared.signatureMessage && (
-            <p role="status">{prepared.signatureMessage}</p>
-          )}
+          {prepared.message && <p role="status">{prepared.message}</p>}
           <div className="web-dialog-actions">
             <button
               className="editor-button"
@@ -74,7 +73,11 @@ export function ExportDialog({
             >
               Back
             </button>
+            <button className="editor-button" type="button" onClick={dismiss}>
+              Close
+            </button>
             <a
+              ref={downloadLink}
               className="editor-button editor-primary"
               href={prepared.download.href}
               download={prepared.download.name}

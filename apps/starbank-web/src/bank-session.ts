@@ -2,11 +2,16 @@ import { EngineWorkerClient } from "@starbank/engine-client";
 import {
   decodeEngineReply,
   type EngineCommand,
+  type EngineDiff,
+  type EngineProfile,
+  type EngineProfileEdit,
+  type EngineProfilePreview,
   type EngineSignatureStatus,
   type EngineSigningContext,
   type EngineSnapshot,
   type EngineTarget,
   engineRequest,
+  profileLoadForFile,
 } from "@starbank/engine-client/protocol";
 import { readBankFile } from "@starbank/platform/browser";
 import type { BankEditorDocument, EditorTarget } from "@starbank/ui";
@@ -22,6 +27,25 @@ const signatureText: Record<EngineSignatureStatus, string> = {
   valid: "Signature verified",
   invalid: "Invalid signature",
 };
+
+export type BankEditCommand = Extract<
+  EngineCommand,
+  {
+    kind:
+      | "set_values"
+      | "undo"
+      | "redo"
+      | "reset"
+      | "structure"
+      | "revert"
+      | "profile_apply";
+  }
+>;
+
+type ProfileCommand = Extract<
+  EngineCommand,
+  { kind: "profile_load" | "profile_snapshot" | "profile_clear" }
+>;
 
 interface PreparedBank {
   readonly bytes: ArrayBuffer;
@@ -64,10 +88,7 @@ export class BrowserBankSession {
   async edit(
     name: string,
     target: EditorTarget,
-    command: Exclude<
-      EngineCommand,
-      { kind: "open" | "prepare" | "close" | "raw" }
-    >,
+    command: BankEditCommand,
   ): Promise<BankEditorDocument> {
     return this.#update(name, command, this.#target(target));
   }
@@ -85,8 +106,77 @@ export class BrowserBankSession {
       name,
       { kind: "replace_raw" },
       this.#target(target),
-      xmlEncoder.encode(xml).buffer,
+      encodeBankXml(xml),
     );
+  }
+
+  async diff(target: EditorTarget): Promise<EngineDiff> {
+    const { reply } = await this.#dispatch(
+      { kind: "diff" },
+      this.#target(target),
+    );
+    if (reply.result.kind !== "diff" || reply.revision !== target.revision) {
+      throw new Error(
+        "The bank engine did not return changes for the requested revision.",
+      );
+    }
+    return reply.result.payload;
+  }
+
+  async loadProfile(
+    target: EditorTarget,
+    bankName: string,
+    file: File,
+    author?: string,
+  ): Promise<EngineProfile> {
+    const payload = profileLoadForFile(file, bankName, author);
+    const bytes = await file.arrayBuffer();
+    return this.#profile(target, { kind: "profile_load", payload }, bytes);
+  }
+
+  profile(target: EditorTarget): Promise<EngineProfile> {
+    return this.#profile(target, { kind: "profile_snapshot" });
+  }
+
+  clearProfile(target: EditorTarget): Promise<EngineProfile> {
+    return this.#profile(target, { kind: "profile_clear" });
+  }
+
+  async previewProfile(
+    target: EditorTarget,
+    payload: EngineProfileEdit,
+  ): Promise<EngineProfilePreview> {
+    const { reply } = await this.#dispatch(
+      { kind: "profile_preview", payload },
+      this.#target(target),
+    );
+    if (
+      reply.result.kind !== "profile_preview" ||
+      reply.revision !== target.revision
+    ) {
+      throw new Error(
+        "The bank engine did not return a profile preview for this revision.",
+      );
+    }
+    return reply.result.payload;
+  }
+
+  async #profile(
+    target: EditorTarget,
+    command: ProfileCommand,
+    bytes?: ArrayBuffer,
+  ): Promise<EngineProfile> {
+    const { reply } = await this.#dispatch(
+      command,
+      this.#target(target),
+      bytes,
+    );
+    if (reply.result.kind !== "profile" || reply.revision !== target.revision) {
+      throw new Error(
+        "The bank engine did not return a profile for this revision.",
+      );
+    }
+    return reply.result.payload;
   }
 
   async prepare(
@@ -170,6 +260,10 @@ export class BrowserBankSession {
   }
 }
 
+export function encodeBankXml(xml: string): ArrayBuffer {
+  return xmlEncoder.encode(xml).buffer;
+}
+
 export function readPreparedXml(bytes: ArrayBuffer): string {
   return xmlDecoder.decode(bytes);
 }
@@ -191,9 +285,14 @@ function projectDocument(
     sections: snapshot.sections.map((section) => ({
       id: section.id,
       name: section.name ?? "(Unnamed section)",
+      keys: section.keys.map((key) => ({
+        id: key.id,
+        name: key.name ?? "(Unnamed key)",
+      })),
       rows: section.keys.flatMap((key) =>
         key.values.map((value) => ({
           id: value.id,
+          keyId: key.id,
           name: key.name ?? "(Unnamed key)",
           childName: value.name,
           type: value.kind ?? "Opaque",

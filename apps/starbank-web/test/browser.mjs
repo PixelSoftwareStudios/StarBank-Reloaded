@@ -144,12 +144,163 @@ async function verifyPreferences(page) {
   await back.click();
 }
 
+async function verifyStructuralEditing(page, value) {
+  const changeStructure = async (action, configure) => {
+    await page.getByRole("button", { name: "Edit structure…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit bank structure" });
+    await dialog.getByLabel("Action").selectOption({ label: action });
+    await configure(dialog);
+    await dialog.getByRole("button", { name: action, exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+  };
+
+  await value.fill("003");
+  await page
+    .getByText("Unapplied Table View changes", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    ),
+    false,
+    "A staged draft must guard page navigation",
+  );
+  await page.getByRole("button", { name: "Discard draft" }).click();
+  assert.equal(
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    ),
+    true,
+    "A discarded draft must release the navigation guard",
+  );
+
+  await changeStructure("Add section", (dialog) =>
+    dialog.getByLabel("Name", { exact: true }).fill("Temporary"),
+  );
+  await changeStructure("Add key", async (dialog) => {
+    await dialog.getByLabel(/^Section/).selectOption({ label: "Temporary" });
+    await dialog.getByLabel("Name", { exact: true }).fill("EmptyKey");
+  });
+  await changeStructure("Add value", async (dialog) => {
+    await dialog.getByLabel(/^Section/).selectOption({ label: "Temporary" });
+    await dialog.getByLabel(/^Key/).selectOption({ label: "EmptyKey" });
+    await dialog.getByLabel(/^Value type/).selectOption("int");
+    await dialog.getByLabel("Value", { exact: true }).fill("007");
+  });
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "EmptyKey · Value value" })
+      .inputValue(),
+    "007",
+  );
+
+  await changeStructure("Rename key", async (dialog) => {
+    await dialog.getByLabel(/^Section/).selectOption({ label: "Player" });
+    await dialog.getByLabel(/^Key/).selectOption({ label: "Gold" });
+    await dialog.getByLabel("Name", { exact: true }).fill("Coins");
+  });
+  await page.getByRole("button", { name: "Changes…" }).click();
+  const diff = page.getByRole("dialog", { name: "Changes since opening" });
+  await diff.getByText("Changed key Coins", { exact: true }).waitFor();
+  await diff.getByRole("button", { name: "Revert key Coins" }).click();
+  await diff.waitFor({ state: "hidden" });
+  assert.equal(await value.inputValue(), "002");
+
+  await page.getByRole("tab", { name: "Raw View" }).click();
+  await page
+    .locator(".cm-content")
+    .filter({ hasText: /name="EmptyKey"/ })
+    .waitFor();
+  await page.getByRole("tab", { name: "Table View" }).click();
+  page.once("dialog", (confirmation) => confirmation.accept());
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  await page.waitForFunction(() =>
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+  );
+}
+
+async function verifySimpleView(page, chooseBank) {
+  const profileFixtures = new URL(
+    "../../../crates/domain/starbank-profiles/tests/fixtures/",
+    import.meta.url,
+  );
+  const profile = await readFile(new URL("training.json", profileFixtures));
+  const bank = await readFile(
+    new URL("training.sc2bank", profileFixtures),
+    "utf8",
+  );
+  await chooseBank("TrainingBank.SC2Bank", bank);
+  await page.getByRole("heading", { name: "TrainingBank.SC2Bank" }).waitFor();
+  const tab = page.getByRole("tab", { name: "Simple View" });
+  assert.equal(await tab.count(), 0);
+
+  await page.getByText("Bank profile", { exact: true }).click();
+  const authorInput = page.getByLabel("Map author handle supplied by you");
+  const fileInput = page.getByLabel("Bank profile file", { exact: true });
+  const loadProfile = async (author) => {
+    await authorInput.fill(author);
+    await fileInput.setInputFiles({
+      name: "training.json",
+      mimeType: "application/json",
+      buffer: profile,
+    });
+  };
+  await loadProfile("9-S2-1-124");
+  await page
+    .getByRole("status")
+    .filter({
+      hasText: "The loaded profile belongs to a different bank identity.",
+    })
+    .waitFor();
+  assert.equal(await tab.count(), 0);
+  await loadProfile("9-S2-1-123");
+  await tab.click();
+  const panel = page.getByRole("tabpanel", { name: "Simple View" });
+  const score = panel.getByRole("textbox", { name: /^Score/ });
+  await score.waitFor();
+  assert.equal(await score.inputValue(), "01.00");
+  await score.fill("2.00");
+  await page.getByRole("button", { name: "Preview edits" }).click();
+  const preview = panel.getByRole("region", {
+    name: "Proposed profile changes",
+  });
+  await preview.getByRole("cell", { name: "12.25", exact: true }).waitFor();
+  await preview.getByRole("cell", { name: "4.25", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Apply preview" }).click();
+  await preview.waitFor({ state: "hidden" });
+
+  await page.getByRole("tab", { name: "Raw View" }).click();
+  const xml = page.locator(".cm-content");
+  await xml.filter({ hasText: /<Score fixed='2.00'/ }).waitFor();
+  assert.match(await xml.textContent(), /<Reward fixed="12\.25"/u);
+  assert.match(await xml.textContent(), /<Total fixed="4\.25"/u);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await xml.filter({ hasText: /<Score fixed='01.00'/ }).waitFor();
+  await tab.click();
+  assert.equal(await score.inputValue(), "01.00");
+  await page.getByRole("button", { name: "Clear profile" }).click();
+  await tab.waitFor({ state: "detached" });
+}
+
 async function verify(name) {
   const browser = await playwright[name].launch({ timeout: 15_000 });
   const server = await startServer();
   try {
     const context = await browser.newContext({ acceptDownloads: true });
     await context.addInitScript(() => {
+      const BrowserWorker = globalThis.Worker;
+      globalThis.Worker = class extends BrowserWorker {
+        constructor(url, options) {
+          super(url, options);
+          globalThis.addEventListener(
+            "starbank-test-stop-worker",
+            () => {
+              this.dispatchEvent(new Event("error"));
+            },
+            { once: true },
+          );
+        }
+      };
       Object.defineProperty(navigator, "clipboard", {
         value: {
           write: () =>
@@ -176,12 +327,17 @@ async function verify(name) {
     const assetRequests = requests.length;
 
     const fileInput = page.getByLabel("Bank file", { exact: true });
-    const chooseBank = async (fileName, xml) =>
-      fileInput.setInputFiles({
+    const chooseBank = async (fileName, xml) => {
+      await page.waitForFunction(() => {
+        const input = document.querySelector('input[aria-label="Bank file"]');
+        return input instanceof HTMLInputElement && !input.disabled;
+      });
+      await fileInput.setInputFiles({
         name: fileName,
         mimeType: "application/octet-stream",
         buffer: Buffer.from(xml),
       });
+    };
     await chooseBank(documentName, initial);
     const value = page.getByRole("textbox", { name: "Gold · Value value" });
     await value.waitFor();
@@ -277,6 +433,50 @@ async function verify(name) {
     );
     await page.getByRole("heading", { name: "Replacement.SC2Bank" }).waitFor();
     assert.equal(await value.inputValue(), "002");
+    await verifyStructuralEditing(page, value);
+    await verifySimpleView(page, chooseBank);
+    await chooseBank(
+      "Replacement.SC2Bank",
+      initial.replace('int="001"', 'int="002"'),
+    );
+    await page.getByRole("heading", { name: "Replacement.SC2Bank" }).waitFor();
+
+    await page.evaluate(() =>
+      globalThis.dispatchEvent(new Event("starbank-test-stop-worker")),
+    );
+    await page.getByRole("button", { name: "Save As…" }).click();
+    dialog = page.getByRole("dialog", { name: "Save a bank copy" });
+    await dialog.getByLabel("Re-sign this copy").check();
+    await dialog.getByLabel("Map author handle").fill("1-S2-1-999");
+    await dialog.getByLabel("Player handle").fill("1-S2-1-321");
+    await dialog.getByRole("button", { name: "Prepare download" }).click();
+    await dialog
+      .getByRole("alert")
+      .filter({ hasText: "Clear Re-sign this copy" })
+      .waitFor();
+    await dialog.getByLabel("Re-sign this copy").uncheck();
+    await dialog.getByRole("button", { name: "Prepare download" }).click();
+    await dialog
+      .getByRole("status")
+      .filter({
+        hasText: "This recovery copy contains the last accepted revision.",
+      })
+      .waitFor();
+    const recoveryLink = dialog.getByRole("link", {
+      name: "Download Replacement.SC2Bank",
+    });
+    await page.waitForFunction(() =>
+      document.activeElement?.matches("dialog a[download]"),
+    );
+    const pendingRecovery = page.waitForEvent("download");
+    await recoveryLink.press("Enter");
+    const recovery = await pendingRecovery;
+    assert.deepEqual(
+      await readFile(await recovery.path()),
+      Buffer.from(initial.replace('int="001"', 'int="002"')),
+    );
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
 
     assert.deepEqual(browserErrors, []);
     const networkUrls = requests.filter((url) => url.startsWith("http"));
@@ -285,7 +485,7 @@ async function verify(name) {
       requests.slice(assetRequests).every((url) => url.startsWith("blob:")),
     );
     console.log(
-      `${name} ${browser.version()} passed offline open, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, guarded file switching, and persisted settings`,
+      `${name} ${browser.version()} passed offline open, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, structural editing and reverts, Simple profile previews, guarded file switching, keyboard-accessible recovery, and persisted settings`,
     );
   } finally {
     await server.stop();
