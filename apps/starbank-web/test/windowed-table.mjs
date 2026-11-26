@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 const bankRows = 10_000;
 const distantIndex = 9_000;
+const rangeEndIndex = 200;
 const mountedRowLimit = 80;
 const exactValue = "9007199254740993";
 const groupedValue = "9,007,199,254,740,993";
@@ -11,7 +12,9 @@ function syntheticBank() {
     const value = index === 0 ? "001" : String(index);
     return `<Key name="Row ${index}"><Value int="${value}"/></Key>`;
   }).join("");
-  return `<Bank><Section name="Large">${keys}</Section><Section name="Small"><Key name="Small field"><Value fixed="2.50"/></Key></Section></Bank>`;
+  const small =
+    '<Key name="Small field"><Value fixed="2.50"/></Key><Key name="Opaque"><Value future="kept"/></Key><Key name="Last field"><Value fixed="4.50"/></Key>';
+  return `<Bank><Section name="Large">${keys}</Section><Section name="Small">${small}</Section></Bank>`;
 }
 
 export async function verifyWindowedTable(page, chooseBank) {
@@ -56,6 +59,24 @@ export async function verifyWindowedTable(page, chooseBank) {
   assert.equal(await table.getByRole("row").count(), initialRows + 1);
   assert.equal(await table.getByRole("columnheader").count(), 3);
   assert.equal(await first.inputValue(), "001");
+
+  await selection(0).check();
+  await scrollTo(rangeEndIndex);
+  const rangeEnd = selection(rangeEndIndex);
+  await rangeEnd.press("Shift+Space");
+  const rangeEditor = page.getByLabel(
+    `Set value for ${rangeEndIndex + 1} rows`,
+    { exact: true },
+  );
+  await rangeEditor.waitFor();
+  assert.equal(await rangeEnd.isChecked(), true);
+  assert.equal(await selection(rangeEndIndex + 1).isChecked(), false);
+  await rangeEnd.press("Shift+Space");
+  await rangeEditor.waitFor({ state: "hidden" });
+  assert.equal(await rangeEnd.isChecked(), false);
+  await scrollTo(0);
+  await selection(0).waitFor();
+  assert.equal(await selection(0).isChecked(), false);
 
   await first.fill(exactValue);
   await scrollTo(distantIndex);
@@ -156,6 +177,34 @@ export async function verifyWindowedTable(page, chooseBank) {
       .inputValue(),
     "2.50",
   );
+
+  const firstSmall = small.getByRole("checkbox", {
+    name: "Select Small field · Value",
+    exact: true,
+  });
+  const lastSmall = small.getByRole("checkbox", {
+    name: "Select Last field · Value",
+    exact: true,
+  });
+  const untouched = small.getByText("kept", { exact: true });
+  await firstSmall.check();
+  await lastSmall.click({ modifiers: ["Shift"] });
+  const smallEdit = page.getByLabel("Set value for 2 rows", { exact: true });
+  await smallEdit.waitFor();
+  assert.equal(await smallEdit.getAttribute("placeholder"), "Mixed values");
+  await untouched.waitFor();
+  await smallEdit.fill("-1,234.50");
+  await page.getByRole("button", { name: "Stage values", exact: true }).click();
+  await page.getByRole("button", { name: "Apply edits", exact: true }).click();
+  await dirty.waitFor();
+  const smallFields = small.getByRole("textbox");
+  assert.equal(await smallFields.first().inputValue(), "-1,234.50");
+  assert.equal(await smallFields.last().inputValue(), "-1,234.50");
+  await untouched.waitFor();
+  await undo.click();
+  await dirty.waitFor({ state: "hidden" });
+  assert.equal(await smallFields.first().inputValue(), "2.50");
+  assert.equal(await smallFields.last().inputValue(), "4.50");
 
   return { initialRows, scrolledRows };
 }

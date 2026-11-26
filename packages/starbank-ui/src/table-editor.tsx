@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   type EditorRow,
   type EditorSection,
@@ -63,6 +63,7 @@ export function TableEditor({
   const [selectedRows, setSelectedRows] = useState<ReadonlySet<string>>(
     new Set(),
   );
+  const selectionAnchor = useRef<string | undefined>(undefined);
   const [bulkValue, setBulkValue] = useState("");
   const [editing, setEditing] = useState<string>();
   const section = sections.find(({ id }) => id === sectionId) ?? sections[0];
@@ -98,13 +99,22 @@ export function TableEditor({
     );
   }, [query, rowsInScope, sort, unified]);
   const rowsById = useMemo(
-    () => new Map(visibleRows.map(({ row }) => [row.id, row])),
+    () =>
+      new Map(visibleRows.map(({ row }, index) => [row.id, { row, index }])),
     [visibleRows],
   );
-  const selected = Array.from(selectedRows, (id) => rowsById.get(id)).filter(
+  const selected = Array.from(
+    selectedRows,
+    (id) => rowsById.get(id)?.row,
+  ).filter(
     (row): row is EditorRow => row !== undefined && row.editable !== false,
   );
   const sameType = selected.every((row) => row.type === selected[0]?.type);
+  const first = selected[0];
+  const firstValue = first && (values?.get(first.id) ?? first.value);
+  const mixedValues = selected.some(
+    (row) => (values?.get(row.id) ?? row.value) !== firstValue,
+  );
   const hasHiddenDraft =
     query && values?.size
       ? rowsInScope.some(
@@ -135,6 +145,27 @@ export function TableEditor({
     </>
   );
 
+  function selectRow(id: string, checked: boolean, extend: boolean) {
+    const target = rowsById.get(id);
+    if (!target || target.row.editable === false) return;
+    const previousId = selectionAnchor.current;
+    const anchor =
+      extend && previousId !== undefined ? rowsById.get(previousId) : undefined;
+    if (!anchor) selectionAnchor.current = id;
+    const start = Math.min(anchor?.index ?? target.index, target.index);
+    const end = Math.max(anchor?.index ?? target.index, target.index);
+    setSelectedRows((current) => {
+      const next = new Set(current);
+      for (let index = start; index <= end; index += 1) {
+        const row = visibleRows[index]?.row;
+        if (!row || row.editable === false) continue;
+        if (checked) next.add(row.id);
+        else next.delete(row.id);
+      }
+      return next;
+    });
+  }
+
   function renderRow({ row, sectionName }: TableRowProjection, index?: number) {
     const editable = canEdit && row.editable !== false;
     const edited = values?.get(row.id);
@@ -163,14 +194,21 @@ export function TableEditor({
               aria-label={`Select ${name}`}
               data-bank-field={windowed ? "select" : undefined}
               checked={selectedRows.has(row.id)}
+              aria-description="Use Shift with a click or Space to select a range."
               onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                setSelectedRows((current) => {
-                  const next = new Set(current);
-                  if (checked) next.add(row.id);
-                  else next.delete(row.id);
-                  return next;
-                });
+                const gesture = event.nativeEvent;
+                selectRow(
+                  row.id,
+                  event.currentTarget.checked,
+                  gesture instanceof MouseEvent && gesture.shiftKey,
+                );
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== " " || !event.shiftKey) return;
+                event.preventDefault();
+                if (!event.repeat) {
+                  selectRow(row.id, !event.currentTarget.checked, true);
+                }
               }}
             />
           )}
@@ -231,6 +269,7 @@ export function TableEditor({
               aria-current={item.id === section?.id ? "true" : undefined}
               onClick={() => {
                 setSectionId(item.id);
+                selectionAnchor.current = undefined;
                 setSelectedRows(new Set());
                 setBulkValue("");
               }}
@@ -284,6 +323,7 @@ export function TableEditor({
                 <label>
                   Set value for {selected.length} rows
                   <input
+                    placeholder={mixedValues ? "Mixed values" : undefined}
                     value={bulkValue}
                     onChange={(event) =>
                       setBulkValue(event.currentTarget.value)
