@@ -6,6 +6,7 @@ members = [
     "crates/engineering/starbank-source-check",
     "crates/formats/sc2bank",
     "crates/foundation/starbank-core",
+    "crates/platform/starbank-fs",
 ]
 resolver = "3"
 
