@@ -256,6 +256,51 @@ fn dirty_document_requires_explicit_discard_and_failed_open_preserves_identity()
 }
 
 #[test]
+fn explicit_discard_switches_only_after_the_new_bank_opens() {
+	let mut engine = Engine::default();
+	let opened = open(&mut engine, BANK);
+	let edited_bytes = b"<Bank><Section name=\"In progress\"/></Bank>";
+	let dirty = execute(
+		&mut engine,
+		session_request(&opened, json!({"kind": "replace_raw"})),
+		Some(edited_bytes),
+	);
+	assert_eq!(dirty.payload("snapshot")["dirty"], true);
+	let open_next = json!({
+		"schema_version": PROTOCOL_VERSION,
+		"request_id": "next",
+		"command": {"kind": "open", "payload": {"discard_current": true}}
+	});
+	execute(&mut engine, open_next.clone(), Some(b"<Bank>")).assert_error("invalid_document");
+	let restored = session_command(&mut engine, &dirty, "snapshot");
+	assert_eq!(restored.payload("snapshot"), dirty.payload("snapshot"));
+	assert_eq!(
+		session_command(&mut engine, &dirty, "raw").bytes.as_deref(),
+		Some(edited_bytes.as_slice())
+	);
+
+	let mut malformed_option = open_next.clone();
+	malformed_option["command"]["payload"]["discard_current"] = Value::Null;
+	execute(&mut engine, malformed_option, Some(BANK)).assert_error("invalid_request");
+	assert_eq!(
+		session_command(&mut engine, &dirty, "snapshot").revision(),
+		dirty.revision()
+	);
+
+	let replacement = execute(&mut engine, open_next, Some(BANK));
+	assert_eq!(replacement.revision(), "0");
+	assert_ne!(replacement.document(), dirty.document());
+	assert_eq!(replacement.payload("snapshot")["dirty"], false);
+	session_command(&mut engine, &dirty, "raw").assert_error("unknown_document");
+	assert_eq!(
+		session_command(&mut engine, &replacement, "raw")
+			.bytes
+			.as_deref(),
+		Some(BANK)
+	);
+}
+
+#[test]
 fn prepared_bytes_are_separate_and_do_not_clear_dirty_state() {
 	let mut engine = Engine::default();
 	let opened = open(&mut engine, b"<Bank/>");

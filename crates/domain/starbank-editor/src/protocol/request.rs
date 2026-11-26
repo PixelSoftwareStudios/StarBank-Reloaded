@@ -13,7 +13,7 @@ pub(super) struct Request {
 }
 
 pub(super) enum Action {
-	Open(ContextOptions),
+	Open(OpenOptions),
 	InSession(Target, Operation),
 }
 
@@ -32,6 +32,11 @@ pub(super) enum Operation {
 	Reset,
 	Prepare(ContextOptions),
 	Close(CloseOptions),
+}
+
+pub(super) struct OpenOptions {
+	pub(super) context: ContextOptions,
+	pub(super) discard_current: bool,
 }
 
 #[derive(Default)]
@@ -58,6 +63,15 @@ pub(super) struct WireContext {
 pub(super) struct WireEdit {
 	pub(super) id: String,
 	pub(super) value: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOpenOptions<'a> {
+	#[serde(borrow, default, deserialize_with = "present")]
+	context: Option<&'a RawValue>,
+	#[serde(default)]
+	discard_current: bool,
 }
 
 #[derive(Default, Deserialize)]
@@ -165,7 +179,13 @@ fn decode_action(
 		if document_id.is_some() || expected.is_some() {
 			return Err(ProtocolError::InvalidRequest);
 		}
-		return Ok(Action::Open(context_options(payload)?));
+		let options: RawOpenOptions<'_> = optional_payload(payload)?;
+		return Ok(Action::Open(OpenOptions {
+			context: ContextOptions {
+				context: options.context.map(decode_payload).transpose()?,
+			},
+			discard_current: options.discard_current,
+		}));
 	}
 
 	let target = Target {

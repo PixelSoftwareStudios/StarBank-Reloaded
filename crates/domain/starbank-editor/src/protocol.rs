@@ -13,7 +13,7 @@ mod snapshot;
 
 use self::error::ProtocolError;
 use self::reply::{ReplyResult, Scope};
-use self::request::{Action, ContextOptions, Operation, Target, WireEdit};
+use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
 use self::snapshot::{Snapshot, WireSignatureStatus};
 
 pub use self::reply::WireReply;
@@ -81,13 +81,14 @@ impl Engine {
 
 	fn open(
 		&mut self,
-		options: ContextOptions,
+		options: OpenOptions,
 		bytes: Option<&[u8]>,
 	) -> Result<&OpenDocument, ProtocolError> {
-		if self
-			.active
-			.as_ref()
-			.is_some_and(|active| active.session.is_dirty())
+		if !options.discard_current
+			&& self
+				.active
+				.as_ref()
+				.is_some_and(|active| active.session.is_dirty())
 		{
 			return Err(ProtocolError::DirtyDocument);
 		}
@@ -97,7 +98,7 @@ impl Engine {
 			.document_sequence
 			.checked_add(1)
 			.ok_or(ProtocolError::Internal)?;
-		let context = interpret_context(options)?;
+		let context = interpret_context(options.context)?;
 		let session = Session::open(bytes, limits, context)
 			.map_err(|error| ProtocolError::editor(&error, ProtocolError::InvalidDocument))?;
 		self.document_sequence = sequence;
