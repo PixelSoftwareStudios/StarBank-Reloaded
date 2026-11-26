@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import type { EditorRow, EditorSection } from "./editor-model";
+import type { EditorRow, EditorSection } from "starbank-editor";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
 const NUMERIC_GROUP_SIZE = 3;

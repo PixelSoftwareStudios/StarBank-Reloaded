@@ -21,6 +21,7 @@
     "@heroui/react": "3.2.8",
     "@heroui/styles": "3.2.8",
     "@lezer/highlight": "1.2.5",
+    "starbank-editor": "workspace:*",
     "starbank-engine-client": "workspace:*",
     "starbank-platform": "workspace:*",
     "lucide-react": "1.80.0"

@@ -209,15 +209,6 @@ importers:
 
   apps/starbank-desktop:
     dependencies:
-      'starbank-engine-client':
-        specifier: workspace:*
-        version: link:../../packages/starbank-engine-client
-      'starbank-platform':
-        specifier: workspace:*
-        version: link:../../packages/starbank-platform
-      'starbank-ui':
-        specifier: workspace:*
-        version: link:../../packages/starbank-ui
       '@tauri-apps/api':
         specifier: 2.12.5
         version: 2.12.5
@@ -227,6 +218,15 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
+      starbank-engine-client:
+        specifier: workspace:*
+        version: link:../../packages/starbank-engine-client
+      starbank-platform:
+        specifier: workspace:*
+        version: link:../../packages/starbank-platform
+      starbank-ui:
+        specifier: workspace:*
+        version: link:../../packages/starbank-ui
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
@@ -258,21 +258,21 @@ importers:
 
   apps/starbank-web:
     dependencies:
-      'starbank-engine-client':
-        specifier: workspace:*
-        version: link:../../packages/starbank-engine-client
-      'starbank-platform':
-        specifier: workspace:*
-        version: link:../../packages/starbank-platform
-      'starbank-ui':
-        specifier: workspace:*
-        version: link:../../packages/starbank-ui
       react:
         specifier: 'catalog:'
         version: 19.3.1
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
+      starbank-engine-client:
+        specifier: workspace:*
+        version: link:../../packages/starbank-engine-client
+      starbank-platform:
+        specifier: workspace:*
+        version: link:../../packages/starbank-platform
+      starbank-ui:
+        specifier: workspace:*
+        version: link:../../packages/starbank-ui
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
@@ -304,6 +304,25 @@ importers:
       vitest:
         specifier: 5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
+  packages/starbank-editor:
+    dependencies:
+      react:
+        specifier: 'catalog:'
+        version: 19.3.1
+      starbank-engine-client:
+        specifier: workspace:*
+        version: link:../starbank-engine-client
+      zustand:
+        specifier: 5.1.0
+        version: 5.1.0(@types/react@19.3.3)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   packages/starbank-engine-client:
     dependencies:
@@ -354,12 +373,6 @@ importers:
       '@lezer/highlight':
         specifier: 1.2.5
         version: 1.2.5
-      'starbank-engine-client':
-        specifier: workspace:*
-        version: link:../starbank-engine-client
-      'starbank-platform':
-        specifier: workspace:*
-        version: link:../starbank-platform
       lucide-react:
         specifier: 1.80.0
         version: 1.80.0(@types/react@19.3.3)(react@19.3.1)
@@ -369,6 +382,15 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
+      starbank-editor:
+        specifier: workspace:*
+        version: link:../starbank-editor
+      starbank-engine-client:
+        specifier: workspace:*
+        version: link:../starbank-engine-client
+      starbank-platform:
+        specifier: workspace:*
+        version: link:../starbank-platform
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
@@ -1575,6 +1597,24 @@ packages:
     engines: {node: '>=20.11'}
     hasBin: true
 
+  zustand@5.1.0:
+    resolution: {integrity: sha512-ciJZlP48M1PTQbVQq81CGVFxHTLpZNrFjKqwjtCU34AWuXTZT/jrF3p9+fI84Cf1eSCMLapxqBy/SNTfwOBuqA==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
+
 snapshots:
 
   '@adobe/react-spectrum-ui@1.2.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
@@ -2540,3 +2580,9 @@ snapshots:
   w3c-keyname@2.2.8: {}
 
   why-is-node-running@3.2.1: {}
+
+  zustand@5.1.0(@types/react@19.3.3)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1)):
+    optionalDependencies:
+      '@types/react': 19.3.3
+      react: 19.3.1
+      use-sync-external-store: 1.7.0(react@19.3.1)

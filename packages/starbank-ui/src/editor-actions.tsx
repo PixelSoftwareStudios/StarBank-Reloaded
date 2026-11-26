@@ -6,7 +6,7 @@ import type {
   EditorAction,
   EditorActionResult,
   EditorTarget,
-} from "./editor-model";
+} from "starbank-editor";
 
 export type RunEditorAction = (
   action: () => Promise<EditorActionResult>,

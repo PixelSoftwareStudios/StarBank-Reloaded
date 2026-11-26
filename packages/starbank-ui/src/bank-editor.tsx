@@ -6,6 +6,16 @@ import {
   useLayoutEffect,
   useState,
 } from "react";
+import {
+  type BankEditorController,
+  type BankEditorDocument,
+  type EditorProfileField,
+  type EditorProfileInput,
+  type EditorRow,
+  prepareTableDraft,
+  profileStatus,
+  useEditorState,
+} from "starbank-editor";
 import type { EngineDiff } from "starbank-engine-client/protocol";
 import type { AppSettings } from "starbank-platform/settings";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
@@ -17,23 +27,8 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
-import {
-  type BankEditorController,
-  type BankEditorDocument,
-  type EditorDraft,
-  type EditorRow,
-  prepareTableDraft,
-} from "./editor-model";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
-import {
-  type EditorProfileDraft,
-  type EditorProfileField,
-  type EditorProfileInput,
-  profileStatus,
-} from "./simple-profile-model";
 import { TableEditor } from "./table-editor";
-
-type EditorView = "simple" | "table" | "raw";
 
 export type EditorSettings = Pick<
   AppSettings,
@@ -94,9 +89,8 @@ export function BankEditor({
   onOpenSettings?: () => void;
   tools?: ReactNode;
 }) {
-  const [draft, setDraft] = useState<EditorDraft>();
-  const [profileDraft, setProfileDraft] = useState<EditorProfileDraft>();
-  const [view, setView] = useState<EditorView>();
+  const { draft, profileDraft, view, setDraft, setProfileDraft, setView } =
+    useEditorState();
   const profileController = controller.profile;
   const profile =
     profileController?.current.status === "matched"

@@ -8,8 +8,8 @@ import {
   useRef,
   useState,
 } from "react";
+import type { BankEditorController } from "starbank-editor";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
-import type { BankEditorController } from "./editor-model";
 import { EditorPane } from "./editor-pane";
 import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
 import type { ChangeSetting } from "./settings-page";
@@ -172,7 +172,6 @@ export function AppShell({
 }
 
 export { Dropdown } from "@heroui/react/dropdown";
-export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
 export {
   type BankEditorController,
   type BankEditorDocument,
@@ -184,7 +183,8 @@ export {
   type EditorValueEdit,
   normalizeDraft,
   prepareTableDraft,
-} from "./editor-model";
+} from "starbank-editor";
+export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
 export {
   filterMaps,
   type MapFilters,

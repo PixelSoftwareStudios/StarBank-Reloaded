@@ -1,4 +1,5 @@
 import { type ReactNode, useRef, useState } from "react";
+import type { BankEditorController } from "starbank-editor";
 import { BankEditor, type EditorSettings } from "./bank-editor";
 import {
   fileDropHandlers,
@@ -6,7 +7,6 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
-import type { BankEditorController } from "./editor-model";
 
 export function EditorPane({
   name,
