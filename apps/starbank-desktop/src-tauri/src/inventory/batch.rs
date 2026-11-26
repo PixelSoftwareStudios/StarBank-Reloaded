@@ -92,7 +92,7 @@ impl InventoryService {
 #[path = "batch_tests.rs"]
 mod tests;
 
-#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
+#[cfg(test)]
 pub(crate) fn scan_batch_fixture(root: &std::path::Path) -> Result<InventoryBatch, InventoryError> {
 	let service = InventoryService::default();
 	service.scan_with_roots(super::ScanMode::Manual(root.to_owned()), &[])?;
