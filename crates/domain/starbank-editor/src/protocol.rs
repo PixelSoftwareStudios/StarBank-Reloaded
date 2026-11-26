@@ -8,6 +8,7 @@ use crate::{ExportSigning, OccurrenceId, OpeningDiff, Session, ValueChange};
 
 mod diff;
 mod error;
+mod native_restore;
 mod native_save;
 mod reply;
 mod request;
@@ -20,7 +21,10 @@ use self::reply::{ReplyResult, Scope};
 use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
 use self::snapshot::{Snapshot, WireSignatureStatus};
 
-pub use self::native_save::NativeSaveReceipt;
+pub use self::native_restore::{
+	NativeRestoreError, NativeRestoreOutcome, NativeRestorePolicy, NativeRestoreReceipt,
+};
+pub use self::native_save::{NativeActiveTarget, NativeSaveReceipt};
 pub use self::reply::WireReply;
 
 /// Version of the command and response schema.
@@ -107,12 +111,15 @@ impl Engine {
 		let context = interpret_context(options.context)?;
 		let session = Session::open(bytes, limits, context)
 			.map_err(|error| ProtocolError::editor(&error, ProtocolError::InvalidDocument))?;
+		Ok(self.activate_document(sequence, session))
+	}
+
+	fn activate_document(&mut self, sequence: u64, session: Session) -> &OpenDocument {
 		self.document_sequence = sequence;
-		let active = self.active.insert(OpenDocument {
+		self.active.insert(OpenDocument {
 			id: format!("document-{sequence}"),
 			session,
-		});
-		Ok(active)
+		})
 	}
 
 	fn session_command(
