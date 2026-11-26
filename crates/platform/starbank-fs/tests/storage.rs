@@ -320,6 +320,8 @@ fn cooperating_directory_writer_rejects_before_staging() -> io::Result<()> {
 	assert_eq!(error.kind(), ErrorKind::WouldBlock);
 	assert!(!target.exists());
 	fixture.assert_no_pending()?;
+	// A concurrent spawn can retain the descriptor until exec closes it.
+	native::flock(&lock, FlockOperation::Unlock)?;
 	drop(lock);
 	verified(commit(&target, UPDATED, CommitIntent::CreateNew, LIMIT));
 	assert_eq!(fs::read(target)?, UPDATED);
