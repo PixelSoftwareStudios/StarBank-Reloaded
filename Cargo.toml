@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/discovery/starbank-paths",
     "crates/engineering/starbank-source-check",
     "crates/foundation/starbank-core",
 ]
