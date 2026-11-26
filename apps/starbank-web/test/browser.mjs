@@ -92,6 +92,58 @@ async function downloadCopy(page, expected) {
   return dialog;
 }
 
+async function verifyPreferences(page) {
+  await page.getByRole("button", { name: "More…" }).click();
+  const settings = page.getByRole("region", { name: "Settings" });
+  const back = settings.getByRole("button", { name: "Back to editor" });
+  await back.waitFor();
+  await settings.getByLabel("Theme").selectOption("dark");
+  await settings.getByLabel("Density").selectOption("comfortable");
+  await settings.getByLabel("Text size").selectOption("large");
+  await settings.getByLabel("Map list width").press("End");
+  await settings.getByLabel("Table layout").selectOption("unified");
+  await settings.getByLabel("Wrap Raw View lines").check();
+  await settings.getByLabel("Hide Blizzard maps").uncheck();
+  await settings.getByLabel("Auto re-sign banks on save").uncheck();
+  await back.click();
+  assert.equal(
+    await page.getByLabel("Auto re-sign banks on save").isChecked(),
+    false,
+  );
+
+  await page.reload();
+  await page.getByRole("button", { name: "Open Bank…" }).waitFor();
+  const shell = page.locator(".starbank-shell");
+  assert.equal(await shell.getAttribute("data-density"), "comfortable");
+  assert.equal(
+    await page
+      .locator("html")
+      .evaluate((root) => getComputedStyle(root).fontSize),
+    "18px",
+  );
+  assert.equal(
+    await shell.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+    "rgb(20, 21, 24)",
+  );
+  assert.equal(
+    await page
+      .getByRole("separator", { name: "Resize map list" })
+      .getAttribute("aria-valuenow"),
+    "50",
+  );
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await settings.getByLabel("Theme").waitFor();
+  assert.equal(await settings.getByLabel("Theme").inputValue(), "dark");
+  assert.equal(
+    await settings.getByLabel("Hide Blizzard maps").isChecked(),
+    false,
+  );
+  await back.click();
+}
+
 async function verify(name) {
   const browser = await playwright[name].launch({ timeout: 15_000 });
   const server = await startServer();
@@ -115,6 +167,7 @@ async function verify(name) {
     page.on("pageerror", (error) => browserErrors.push(error.message));
     await page.goto(server.origin);
     await page.getByRole("button", { name: "Open Bank…" }).waitFor();
+    await verifyPreferences(page);
     assert(
       server.requests.some(([, path]) => path.endsWith(".wasm")),
       `${name}: WASM was not fetched`,
@@ -133,6 +186,7 @@ async function verify(name) {
     const value = page.getByRole("textbox", { name: "Gold · Value value" });
     await value.waitFor();
     assert.equal(await value.inputValue(), "001");
+    await page.getByRole("columnheader", { name: "Section" }).waitFor();
 
     await value.fill("1,000,000");
     await page.getByRole("button", { name: "Apply edits" }).click();
@@ -140,15 +194,19 @@ async function verify(name) {
       .getByRole("status")
       .filter({ hasText: "Unsaved changes" })
       .waitFor();
-    assert.equal(await value.inputValue(), "1000000");
+    assert.equal(await value.inputValue(), "1,000,000");
     await downloadCopy(page, edited);
     await page.keyboard.press("Escape");
 
     await page.getByRole("tab", { name: "Raw View" }).click();
     const raw = page.locator(".cm-content");
     await raw.waitFor();
+    assert.match(await raw.getAttribute("class"), /cm-lineWrapping/);
     assert.match(await raw.textContent(), /int="1000000"/u);
     await raw.fill("<Bank>");
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Back to editor" }).click();
+    assert.equal(await raw.textContent(), "<Bank>");
     await page.getByRole("button", { name: "Apply XML" }).click();
     await page
       .getByRole("status")
@@ -227,7 +285,7 @@ async function verify(name) {
       requests.slice(assetRequests).every((url) => url.startsWith("blob:")),
     );
     console.log(
-      `${name} ${browser.version()} passed offline open, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, and guarded file switching`,
+      `${name} ${browser.version()} passed offline open, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, guarded file switching, and persisted settings`,
     );
   } finally {
     await server.stop();

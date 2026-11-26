@@ -1,10 +1,12 @@
 import { Tabs } from "@heroui/react/tabs";
+import type { AppSettings } from "@starbank/platform/settings";
 import { lazy, Suspense, useState } from "react";
 import {
   EditorActions,
   fileDropHandlers,
   OpenBankButton,
   type RunEditorAction,
+  SettingsButton,
 } from "./editor-actions";
 import {
   type BankEditorController,
@@ -14,6 +16,11 @@ import {
   prepareTableDraft,
 } from "./editor-model";
 import { TableEditor } from "./table-editor";
+
+export type EditorSettings = Pick<
+  AppSettings,
+  "sectionsLayout" | "wrapRaw" | "groupNumbers"
+>;
 
 let rawEditorModule: Promise<typeof import("./raw-editor")> | undefined;
 
@@ -31,6 +38,8 @@ export function BankEditor({
   notice,
   clearNotice,
   run,
+  settings,
+  onOpenSettings,
 }: {
   controller: BankEditorController;
   document: BankEditorDocument;
@@ -38,6 +47,8 @@ export function BankEditor({
   notice?: string;
   clearNotice: () => void;
   run: RunEditorAction;
+  settings?: EditorSettings;
+  onOpenSettings?: () => void;
 }) {
   const [draft, setDraft] = useState<EditorDraft>();
   const target = { id: document.id, revision: document.revision };
@@ -95,6 +106,7 @@ export function BankEditor({
             disabled={pending || (document.dirty && Boolean(controller.onOpen))}
             run={run}
           />
+          <SettingsButton open={onOpenSettings} />
         </div>
         <h1 title={document.name}>{document.name}</h1>
       </header>
@@ -123,6 +135,8 @@ export function BankEditor({
             invalid={prepared?.invalid}
             canEdit={Boolean(onEditValues) && !busy && !stale && !rawDraft}
             onChange={stageValues}
+            layout={settings?.sectionsLayout}
+            groupNumbers={settings?.groupNumbers}
           />
         </Tabs.Panel>
         <Tabs.Panel id="raw" className="editor-view">
@@ -130,6 +144,7 @@ export function BankEditor({
             <RawEditor
               key={document.revision}
               value={rawDraft?.text ?? document.xml}
+              wrap={settings?.wrapRaw}
               readOnly={
                 !onReplaceXml || busy || stale || tableDraft !== undefined
               }

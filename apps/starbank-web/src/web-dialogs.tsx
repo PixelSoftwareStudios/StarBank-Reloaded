@@ -11,10 +11,12 @@ interface DownloadPreparation {
 
 export function ExportDialog({
   name,
+  initialSign = false,
   prepare,
   dismiss,
 }: {
   name: string;
+  initialSign?: boolean;
   prepare: (
     name: string,
     context?: EngineSigningContext,
@@ -22,7 +24,7 @@ export function ExportDialog({
   dismiss: () => void;
 }) {
   const [filename, setFilename] = useState(name);
-  const [sign, setSign] = useState(false);
+  const [sign, setSign] = useState(initialSign);
   const [author, setAuthor] = useState("");
   const [player, setPlayer] = useState("");
   const [working, setWorking] = useState(false);

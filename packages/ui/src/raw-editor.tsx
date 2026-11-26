@@ -40,15 +40,18 @@ export default function RawEditor({
   value,
   readOnly,
   onChange,
+  wrap = false,
 }: {
   value: string;
   readOnly: boolean;
   onChange: (value: string) => void;
+  wrap?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<EditorView>(null);
   const currentValue = useRef(value);
   const mode = useRef(new Compartment());
+  const wrapping = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
 
   useEffect(() => {
@@ -70,6 +73,7 @@ export default function RawEditor({
         syntaxHighlighting(highlighting),
         EditorView.contentAttributes.of({ "aria-label": "Bank XML" }),
         mode.current.of(editingMode(true)),
+        wrapping.current.of([]),
         EditorView.updateListener.of((update) => {
           if (
             update.docChanged &&
@@ -108,6 +112,14 @@ export default function RawEditor({
       effects: mode.current.reconfigure(editingMode(readOnly)),
     });
   }, [readOnly]);
+
+  useEffect(() => {
+    instance.current?.dispatch({
+      effects: wrapping.current.reconfigure(
+        wrap ? EditorView.lineWrapping : [],
+      ),
+    });
+  }, [wrap]);
 
   return <div className="editor-raw" ref={host} />;
 }

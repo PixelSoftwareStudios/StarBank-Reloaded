@@ -1,6 +1,29 @@
 import { useId, useState } from "react";
 import type { EditorRow, EditorSection } from "./editor-model";
 
+const NUMERIC_GROUP_SIZE = 3;
+
+function groupNumberLexeme(type: string, value: string): string {
+  if (
+    (type !== "int" && type !== "fixed") ||
+    !/^-?[0-9]+(?:\.[0-9]+)?$/.test(value)
+  ) {
+    return value;
+  }
+  const negative = value.startsWith("-");
+  const [integer = "", fraction] = (negative ? value.slice(1) : value).split(
+    ".",
+  );
+  if (integer.length <= NUMERIC_GROUP_SIZE) return value;
+  const groups = [];
+  for (let end = integer.length; end > 0; end -= NUMERIC_GROUP_SIZE) {
+    groups.push(integer.slice(Math.max(0, end - NUMERIC_GROUP_SIZE), end));
+  }
+  const sign = negative ? "-" : "";
+  const decimals = fraction === undefined ? "" : `.${fraction}`;
+  return sign + groups.reverse().join(",") + decimals;
+}
+
 function rowLabel(row: EditorRow) {
   return row.childName ? `${row.name} · ${row.childName}` : row.name;
 }
@@ -11,12 +34,16 @@ export function TableEditor({
   invalid,
   canEdit,
   onChange,
+  layout = "separate",
+  groupNumbers = false,
 }: {
   sections: readonly EditorSection[];
   values?: ReadonlyMap<string, string>;
   invalid?: ReadonlySet<string>;
   canEdit: boolean;
   onChange: (rows: readonly EditorRow[], value: string) => void;
+  layout?: "separate" | "unified";
+  groupNumbers?: boolean;
 }) {
   const instructionsId = useId();
   const [sectionId, setSectionId] = useState<string>();
@@ -24,32 +51,39 @@ export function TableEditor({
     new Set(),
   );
   const [bulkValue, setBulkValue] = useState("");
+  const [editing, setEditing] = useState<string>();
   const section = sections.find(({ id }) => id === sectionId) ?? sections[0];
-  const selected =
-    section?.rows.filter(
-      (row) => selectedRows.has(row.id) && row.editable !== false,
-    ) ?? [];
+  const unified = layout === "unified";
+  const visible = unified ? sections : section ? [section] : [];
+  const visibleRows = visible.flatMap((item) =>
+    item.rows.map((row) => ({ row, sectionName: item.name })),
+  );
+  const selected = visibleRows
+    .map(({ row }) => row)
+    .filter((row) => selectedRows.has(row.id) && row.editable !== false);
   const sameType = selected.every((row) => row.type === selected[0]?.type);
 
   return (
-    <div className="editor-table-layout">
-      <nav className="editor-sections" aria-label="Bank sections">
-        <h2>Sections</h2>
-        {sections.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={item.id === section?.id ? "true" : undefined}
-            onClick={() => {
-              setSectionId(item.id);
-              setSelectedRows(new Set());
-              setBulkValue("");
-            }}
-          >
-            {item.name || "Unnamed section"}
-          </button>
-        ))}
-      </nav>
+    <div className="editor-table-layout" data-layout={layout}>
+      {!unified && (
+        <nav className="editor-sections" aria-label="Bank sections">
+          <h2>Sections</h2>
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={item.id === section?.id ? "true" : undefined}
+              onClick={() => {
+                setSectionId(item.id);
+                setSelectedRows(new Set());
+                setBulkValue("");
+              }}
+            >
+              {item.name || "Unnamed section"}
+            </button>
+          ))}
+        </nav>
+      )}
       <div className="editor-table-scroll">
         {!section ? (
           <p className="empty-message">No sections found.</p>
@@ -80,25 +114,40 @@ export function TableEditor({
                 )}
               </div>
             )}
-            {section.rows.length === 0 ? (
-              <p className="empty-message">No values in this section.</p>
+            {visibleRows.length === 0 ? (
+              <p className="empty-message">
+                {unified ? "No values found." : "No values in this section."}
+              </p>
             ) : (
-              <table aria-label={section.name || "Unnamed section"}>
+              <table
+                aria-label={
+                  unified
+                    ? "All bank values"
+                    : section.name || "Unnamed section"
+                }
+              >
                 <thead>
                   <tr>
+                    {unified && <th scope="col">Section</th>}
                     <th scope="col">Name</th>
                     <th scope="col">Type</th>
                     <th scope="col">Value</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {section.rows.map((row) => {
+                  {visibleRows.map(({ row, sectionName }) => {
                     const editable = canEdit && row.editable !== false;
-                    const value = values?.get(row.id) ?? row.value;
+                    const edited = values?.get(row.id);
+                    const value = edited ?? row.value;
+                    const shownValue =
+                      groupNumbers && edited === undefined && row.id !== editing
+                        ? groupNumberLexeme(row.type, value)
+                        : value;
                     const invalidValue = invalid?.has(row.id) ?? false;
                     const name = rowLabel(row);
                     return (
                       <tr key={row.id}>
+                        {unified && <td>{sectionName || "Unnamed section"}</td>}
                         <th scope="row">
                           {editable && (
                             <input
@@ -132,13 +181,15 @@ export function TableEditor({
                                 invalidValue ? instructionsId : undefined
                               }
                               readOnly={!editable}
-                              value={value}
+                              value={shownValue}
+                              onFocus={() => setEditing(row.id)}
+                              onBlur={() => setEditing(undefined)}
                               onChange={(event) =>
                                 onChange([row], event.currentTarget.value)
                               }
                             />
                           ) : (
-                            <span>{value}</span>
+                            <span>{shownValue}</span>
                           )}
                         </td>
                       </tr>

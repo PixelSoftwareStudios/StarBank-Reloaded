@@ -10,6 +10,7 @@ import {
   type EditorAction,
   type EditorTarget,
   preloadRawEditor,
+  preloadSettingsPage,
 } from "@starbank/ui";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,10 +18,18 @@ import {
   createBankSession,
   readPreparedXml,
 } from "./bank-session";
+import { useBrowserSettings } from "./use-browser-settings";
 import { ClipboardDialog, ExportDialog } from "./web-dialogs";
 import "./web-dialogs.css";
 
 export function StarBankWeb() {
+  const preferences = useBrowserSettings();
+
+  useEffect(() => {
+    const attributes = globalThis.document.documentElement.dataset;
+    attributes.starbankTheme = preferences.settings.theme;
+    attributes.starbankTextSize = preferences.settings.textSize;
+  }, [preferences.settings.theme, preferences.settings.textSize]);
   const session = useRef<BrowserBankSession>(null);
   const [document, setDocument] = useState<BankEditorDocument>();
   const [status, setStatus] = useState("Loading the bank engine…");
@@ -32,7 +41,11 @@ export function StarBankWeb() {
     let mounted = true;
     try {
       session.current = createBankSession();
-      void Promise.all([session.current.ready(), preloadRawEditor()]).then(
+      void Promise.all([
+        session.current.ready(),
+        preloadRawEditor(),
+        preloadSettingsPage(),
+      ]).then(
         () => {
           if (mounted) {
             setReady(true);
@@ -165,10 +178,15 @@ export function StarBankWeb() {
 
   return (
     <>
-      <AppShell name="StarBank Web" editor={controller} />
+      <AppShell
+        name="StarBank Web"
+        editor={controller}
+        preferences={preferences}
+      />
       {showExport && document && (
         <ExportDialog
           name={document.name}
+          initialSign={preferences.settings.autoResignOnSave}
           prepare={exportCopy}
           dismiss={() => setShowExport(false)}
         />

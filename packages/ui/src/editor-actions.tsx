@@ -1,4 +1,5 @@
 import { Dropdown } from "@heroui/react/dropdown";
+import { Settings } from "lucide-react";
 import { type DragEvent, useRef } from "react";
 import type {
   BankEditorController,
@@ -204,4 +205,18 @@ export function EditorActions({
       )}
     </div>
   );
+}
+
+export function SettingsButton({ open }: { open?: () => void }) {
+  return open ? (
+    <button
+      className="editor-button"
+      type="button"
+      aria-label="Settings"
+      title="Settings"
+      onClick={open}
+    >
+      <Settings aria-hidden="true" className="settings-icon" />
+    </button>
+  ) : null;
 }

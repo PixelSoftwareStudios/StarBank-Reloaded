@@ -24,7 +24,16 @@ export type MapInventory =
     };
 
 export interface MapOptions {
-  autoResign?: { enabled: boolean; onChange: (enabled: boolean) => void };
+  autoResign?: {
+    enabled: boolean;
+    disabled?: boolean;
+    onChange: (enabled: boolean) => void;
+  };
+  filters?: {
+    values: Readonly<MapFilters>;
+    disabled?: boolean;
+    onChange: (key: keyof MapFilters, enabled: boolean) => void;
+  };
   onOpenSettings?: () => void;
 }
 
@@ -58,7 +67,13 @@ export function MapSidebar({
 }) {
   const titleId = useId();
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [localFilters, setLocalFilters] = useState(INITIAL_FILTERS);
+  const filters = options?.filters?.values ?? localFilters;
+
+  function changeFilter(key: keyof MapFilters, value: boolean) {
+    if (options?.filters) options.filters.onChange(key, value);
+    else setLocalFilters((current) => ({ ...current, [key]: value }));
+  }
   const maps =
     inventory.status === "ready"
       ? filterMaps(inventory.maps, query, filters)
@@ -126,14 +141,10 @@ export function MapSidebar({
             <input
               type="checkbox"
               checked={filters.hideBlizzardMaps}
-              disabled={!ready}
-              onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                setFilters((current) => ({
-                  ...current,
-                  hideBlizzardMaps: checked,
-                }));
-              }}
+              disabled={!ready || options?.filters?.disabled}
+              onChange={(event) =>
+                changeFilter("hideBlizzardMaps", event.currentTarget.checked)
+              }
             />
             Hide Blizzard maps
           </label>
@@ -141,14 +152,13 @@ export function MapSidebar({
             <input
               type="checkbox"
               checked={filters.hideMapsWithoutBanks}
-              disabled={!ready}
-              onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                setFilters((current) => ({
-                  ...current,
-                  hideMapsWithoutBanks: checked,
-                }));
-              }}
+              disabled={!ready || options?.filters?.disabled}
+              onChange={(event) =>
+                changeFilter(
+                  "hideMapsWithoutBanks",
+                  event.currentTarget.checked,
+                )
+              }
             />
             Hide maps without bank files
           </label>
@@ -157,6 +167,7 @@ export function MapSidebar({
               <input
                 type="checkbox"
                 checked={autoResign.enabled}
+                disabled={autoResign.disabled}
                 onChange={(event) =>
                   autoResign.onChange(event.currentTarget.checked)
                 }

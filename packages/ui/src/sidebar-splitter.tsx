@@ -1,58 +1,61 @@
+import { MAP_PANE_WIDTH } from "@starbank/platform/settings";
 import { useRef } from "react";
 
-export const DEFAULT_MAP_PANE_WIDTH = 28;
-const MIN_MAP_PANE_WIDTH = 20;
-const MAX_MAP_PANE_WIDTH = 50;
 const KEYBOARD_STEP = 2;
 
 interface DragStart {
   x: number;
   percent: number;
   containerWidth: number;
+  preview?: number;
 }
 
 export function SidebarSplitter({
   controls,
+  disabled = false,
   percent,
   onResize,
 }: {
   controls: string;
+  disabled?: boolean;
   percent: number;
-  onResize: (percent: number) => void;
+  onResize: (percent: number, commit: boolean) => void;
 }) {
   const drag = useRef<DragStart | null>(null);
 
-  function updateWidth(width: number) {
+  function boundedWidth(width: number) {
     const bounded = Math.min(
-      MAX_MAP_PANE_WIDTH,
-      Math.max(MIN_MAP_PANE_WIDTH, width),
+      MAP_PANE_WIDTH.max,
+      Math.max(MAP_PANE_WIDTH.min, width),
     );
-    onResize(Math.round(bounded * 10) / 10);
+    return Math.round(bounded * 10) / 10;
   }
 
   return (
     <hr
       className="sidebar-splitter"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
       aria-orientation="vertical"
       aria-label="Resize map list"
       aria-controls={controls}
-      aria-valuemin={MIN_MAP_PANE_WIDTH}
-      aria-valuemax={MAX_MAP_PANE_WIDTH}
+      aria-valuemin={MAP_PANE_WIDTH.min}
+      aria-valuemax={MAP_PANE_WIDTH.max}
       aria-valuenow={percent}
       onKeyDown={(event) => {
+        if (disabled) return;
         switch (event.key) {
           case "ArrowLeft":
-            updateWidth(percent - KEYBOARD_STEP);
+            onResize(boundedWidth(percent - KEYBOARD_STEP), true);
             break;
           case "ArrowRight":
-            updateWidth(percent + KEYBOARD_STEP);
+            onResize(boundedWidth(percent + KEYBOARD_STEP), true);
             break;
           case "Home":
-            updateWidth(MIN_MAP_PANE_WIDTH);
+            onResize(MAP_PANE_WIDTH.min, true);
             break;
           case "End":
-            updateWidth(MAX_MAP_PANE_WIDTH);
+            onResize(MAP_PANE_WIDTH.max, true);
             break;
           default:
             return;
@@ -63,7 +66,13 @@ export function SidebarSplitter({
         const handle = event.currentTarget;
         const containerWidth =
           handle.parentElement?.getBoundingClientRect().width;
-        if (!event.isPrimary || event.button !== 0 || !containerWidth) return;
+        if (
+          disabled ||
+          !event.isPrimary ||
+          event.button !== 0 ||
+          !containerWidth
+        )
+          return;
         handle.setPointerCapture(event.pointerId);
         drag.current = { x: event.clientX, percent, containerWidth };
       }}
@@ -74,11 +83,15 @@ export function SidebarSplitter({
         )
           return;
         const { x, percent: initialPercent, containerWidth } = drag.current;
-        updateWidth(
+        const width = boundedWidth(
           initialPercent + ((event.clientX - x) / containerWidth) * 100,
         );
+        drag.current.preview = width;
+        onResize(width, false);
       }}
       onLostPointerCapture={() => {
+        const finalWidth = drag.current?.preview;
+        if (finalWidth !== undefined) onResize(finalWidth, true);
         drag.current = null;
       }}
     />
