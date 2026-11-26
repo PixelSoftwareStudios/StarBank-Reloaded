@@ -52,4 +52,4 @@ Three paired runs used distinct optimized executables and alternated their run o
 
 ## Open measurements
 
-Browser startup and interaction latency have a separate local Chromium baseline on synthetic inputs. Desktop startup, process-tree idle and peak memory, real SC2 corpora, cross-platform measurements, and approved performance budgets remain open. [Browser benchmark](BROWSER_PERFORMANCE.md)
+Browser startup and interaction latency have a separate local Chromium baseline. The macOS sample measures startup, idle CPU and memory for the native app process on synthetic banks. Whole-app resource attribution including WebKit helpers, real SC2 corpora, cross-platform measurements, and approved performance budgets remain open. [Browser benchmark](BROWSER_PERFORMANCE.md) · [macOS app-host benchmark](../../apps/starbank-desktop/verification/native-performance/NATIVE_PERFORMANCE.md)
