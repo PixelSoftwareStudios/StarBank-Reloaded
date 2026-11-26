@@ -7,6 +7,12 @@ import type {
   EditorActionResult,
   EditorTarget,
 } from "starbank-editor";
+import {
+  REDO_SHORTCUT,
+  SAVE_SHORTCUT,
+  UNDO_SHORTCUT,
+  useEditorShortcuts,
+} from "./keyboard-shortcuts";
 
 export type RunEditorAction = (
   action: () => Promise<EditorActionResult>,
@@ -103,6 +109,17 @@ export function EditorActions({
   disabled: boolean;
   run: RunEditorAction;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const { onSave, onSaveAs, onExport, onReset, onUndo, onRedo } = controller;
+  const save = onSave ?? onSaveAs ?? onExport;
+  useEditorShortcuts(root, {
+    disabled,
+    target,
+    save,
+    undo: onUndo,
+    redo: onRedo,
+    run,
+  });
   const actions: Action[] = [
     { label: "Save", action: controller.onSave },
     { label: "Save As…", action: controller.onSaveAs },
@@ -119,15 +136,15 @@ export function EditorActions({
   const secondary = controller.onSave
     ? [{ label: "Save (Overwrite)", action: controller.onSave }, ...remaining]
     : remaining;
-  const { onReset, onUndo, onRedo } = controller;
 
   return (
-    <div className="editor-file-actions">
+    <div className="editor-file-actions" ref={root}>
       {onUndo && (
         <button
           className="editor-button"
           type="button"
           title="Undo last bank change"
+          aria-keyshortcuts={UNDO_SHORTCUT}
           disabled={disabled}
           onClick={() => run(() => onUndo(target))}
         >
@@ -139,6 +156,7 @@ export function EditorActions({
           className="editor-button"
           type="button"
           title="Redo last reverted bank change"
+          aria-keyshortcuts={REDO_SHORTCUT}
           disabled={disabled}
           onClick={() => run(() => onRedo(target))}
         >
@@ -169,6 +187,9 @@ export function EditorActions({
             className="editor-button editor-primary"
             type="button"
             title={primary.label}
+            aria-keyshortcuts={
+              primary.action === save ? SAVE_SHORTCUT : undefined
+            }
             disabled={disabled}
             onClick={() => run(() => primary.action(target))}
           >

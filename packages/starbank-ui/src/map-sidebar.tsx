@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   BankBrowser,
   type BankBrowserModel,
@@ -6,6 +6,7 @@ import {
   InventoryActions,
   type InventoryControls,
 } from "./inventory-browser";
+import { SEARCH_SHORTCUT, useMapSearchShortcut } from "./keyboard-shortcuts";
 import { MapArchiveDate } from "./map-context";
 
 const MAP_PAGE_SIZE = 80;
@@ -92,6 +93,8 @@ export function MapSidebar({
   options?: MapOptions;
 }) {
   const titleId = useId();
+  const search = useRef<HTMLInputElement>(null);
+  useMapSearchShortcut(search);
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(MAP_PAGE_SIZE);
   const [bankScope, setBankScope] = useState<"selected" | "all" | "unmatched">(
@@ -161,6 +164,8 @@ export function MapSidebar({
         <label className="map-search">
           <span className="sr-only">Search maps</span>
           <input
+            ref={search}
+            aria-keyshortcuts={ready ? SEARCH_SHORTCUT : undefined}
             type="search"
             value={query}
             onChange={(event) => {

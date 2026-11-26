@@ -84,8 +84,9 @@ async function startServer() {
   };
 }
 
-async function downloadCopy(page, expected) {
-  await page.getByRole("button", { name: "Save As…" }).click();
+async function downloadCopy(page, expected, shortcut) {
+  if (shortcut) await page.keyboard.press(shortcut);
+  else await page.getByRole("button", { name: "Save As…" }).click();
   const dialog = page.getByRole("dialog", { name: "Save a bank copy" });
   await dialog.getByRole("button", { name: "Prepare download" }).click();
   const download = page.waitForEvent("download");
@@ -357,7 +358,7 @@ async function verify(name) {
       .filter({ hasText: "Unsaved changes" })
       .waitFor();
     assert.equal(await value.inputValue(), "1,000,000");
-    await downloadCopy(page, edited);
+    await downloadCopy(page, edited, "Control+s");
     await page.keyboard.press("Escape");
 
     await page.getByRole("tab", { name: "Raw View" }).click();
@@ -366,6 +367,11 @@ async function verify(name) {
     assert.match(await raw.getAttribute("class"), /cm-lineWrapping/);
     assert.match(await raw.textContent(), /int="1000000"/u);
     await raw.fill("<Bank>");
+    await page.keyboard.press("Meta+s");
+    assert.equal(
+      await page.getByRole("dialog", { name: "Save a bank copy" }).count(),
+      0,
+    );
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByRole("button", { name: "Back to editor" }).click();
     assert.equal(await raw.textContent(), "<Bank>");
@@ -380,12 +386,14 @@ async function verify(name) {
     assert.equal(await raw.textContent(), "<Bank>");
     await raw.fill(rawEdited);
     await page.getByRole("button", { name: "Apply XML" }).click();
-    await page.getByRole("button", { name: "Undo" }).click();
+    await page.getByRole("button", { name: "Undo" }).waitFor();
+    await page.getByRole("tab", { name: "Raw View" }).focus();
+    await page.keyboard.press("Meta+z");
     await raw.filter({ hasText: "<!-- synthetic -->" }).waitFor();
-    await page.getByRole("button", { name: "Redo" }).click();
+    await page.keyboard.press("Control+Shift+z");
     await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
 
-    let dialog = await downloadCopy(page, rawEdited);
+    let dialog = await downloadCopy(page, rawEdited, "Meta+s");
 
     await dialog.getByRole("button", { name: "Back" }).click();
     await dialog.getByLabel("Re-sign this copy").check();
