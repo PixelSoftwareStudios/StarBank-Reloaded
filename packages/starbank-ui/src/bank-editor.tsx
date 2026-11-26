@@ -461,6 +461,7 @@ export function BankEditor({
         <div className="editor-status" role="status">
           {busy ? "Working…" : status}
           {document.signatureStatus && <span>{document.signatureStatus}</span>}
+          {controller.backupStatus && <span>{controller.backupStatus}</span>}
         </div>
         <EditorActions
           controller={controller}

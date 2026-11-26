@@ -110,13 +110,15 @@
 .inventory-map-author,
 .inventory-bank-name,
 .inventory-bank-scope,
-.inventory-bank-match {
+.inventory-bank-match,
+.inventory-bank-backup {
   display: block;
 }
 
 .inventory-map-author,
 .inventory-bank-scope,
-.inventory-bank-match {
+.inventory-bank-match,
+.inventory-bank-backup {
   color: var(--shell-muted);
   font-size: 0.8125rem;
 }

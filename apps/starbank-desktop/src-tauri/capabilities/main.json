@@ -24,6 +24,7 @@
     "allow-save-active-bank",
     "allow-save-bank-as",
     "allow-list-active-backups",
+    "allow-active-backup-status",
     "allow-restore-active-bank",
     "allow-create-batch-backup",
     "allow-cancel-batch-backup",

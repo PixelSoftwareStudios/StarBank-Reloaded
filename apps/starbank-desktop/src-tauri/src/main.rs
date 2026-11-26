@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod backup;
+mod backup_status;
 mod batch_backup;
 mod close_guard;
 mod commands;

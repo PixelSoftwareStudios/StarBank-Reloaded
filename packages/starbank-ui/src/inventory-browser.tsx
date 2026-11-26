@@ -15,6 +15,7 @@ export interface BankListItem {
 export interface BankBrowserModel {
   banks: readonly BankListItem[];
   selectedBankId?: string | null;
+  activeBackupStatus?: string;
   onOpenBank: (bankId: string) => void;
   disabled?: boolean;
 }
@@ -266,6 +267,11 @@ function BankList({
               <span className="inventory-bank-name">{bank.name}</span>
               <BankMatchLabel count={bank.mapIds.length} />
               <BankScopeLabel bank={bank} />
+              {model.selectedBankId === bank.id && model.activeBackupStatus && (
+                <span className="inventory-bank-backup">
+                  {model.activeBackupStatus}
+                </span>
+              )}
             </button>
           </li>
         ))}

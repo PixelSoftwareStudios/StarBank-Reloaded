@@ -111,7 +111,7 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 	starbank_fs::check_replace_scope(&selected.path).map_err(write_rejected)?;
 	let source = backup_source(&selected.path).map_err(write_rejected)?;
 	let managed = backup_folder(app, false)?;
-	let catalog = catalog(&mut session)?;
+	let mut catalog = fresh_catalog()?;
 	let mut rejected_metadata = 0;
 	for placement in [
 		BackupPlacement::Adjacent,
@@ -332,10 +332,18 @@ fn publish_restore(
 	)
 }
 
+pub(crate) fn fresh_catalog() -> Result<NativeBackupCatalog, CommandError> {
+	Ok(NativeBackupCatalog::new(catalog_limit()?))
+}
+
+fn catalog_limit() -> Result<NonZeroUsize, CommandError> {
+	NonZeroUsize::new(max_attachment_bytes()).ok_or(CommandError::Unavailable)
+}
+
 pub(crate) fn catalog(
 	session: &mut DesktopSession,
 ) -> Result<&mut NativeBackupCatalog, CommandError> {
-	let limit = NonZeroUsize::new(max_attachment_bytes()).ok_or(CommandError::Unavailable)?;
+	let limit = catalog_limit()?;
 	Ok(session
 		.backups
 		.get_or_insert_with(|| NativeBackupCatalog::new(limit)))

@@ -22,6 +22,7 @@ import type {
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
 import { BackupPicker } from "./backup-picker";
+import { useActiveBackupStatus } from "./backup-status";
 import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
 import { resignExternalBank } from "./external-sign";
 import {
@@ -71,6 +72,7 @@ function DesktopApp() {
   const [hasDraft, setHasDraft] = useState(false);
   const [nativeNotice, setNativeNotice] = useState<string>();
   const [selectedBankId, setSelectedBankId] = useState<string>();
+  const [backupGeneration, setBackupGeneration] = useState(0);
   const [busy, setBusy] = useState(false);
   const [exportAvailable, setExportAvailable] = useState(false);
   const [revealAvailable, setRevealAvailable] = useState(false);
@@ -84,6 +86,10 @@ function DesktopApp() {
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
   const { theme, textSize } = preferences.settings;
+  const backupStatus = useActiveBackupStatus(
+    document?.projection,
+    backupGeneration,
+  );
 
   const closeGuard = useNativeCloseGuard({
     busy,
@@ -310,6 +316,16 @@ function DesktopApp() {
     inventory.status === "ready"
       ? inventory.maps.find(({ id }) => id === inventory.selectedMapId)
       : undefined;
+  const inventoryWithBackupStatus =
+    inventory.status === "ready" && inventory.bankBrowser
+      ? {
+          ...inventory,
+          bankBrowser: {
+            ...inventory.bankBrowser,
+            activeBackupStatus: backupStatus,
+          },
+        }
+      : inventory;
 
   function save(target: EditorTarget, mode: "overwrite" | "backup" | "new") {
     return action(async () => {
@@ -369,6 +385,7 @@ function DesktopApp() {
     document: document?.projection,
     busy: busy || closeGuard.pending,
     status: nativeNotice,
+    backupStatus,
     onOpen: () => openFrom(pickBank),
     onDraftChange: closeGuard.reportDraft,
     profile: {
@@ -534,7 +551,7 @@ function DesktopApp() {
       <AppShell
         name={APP_NAME}
         editor={controller}
-        inventory={inventory}
+        inventory={inventoryWithBackupStatus}
         preferences={preferences}
         breadcrumbAvailable
         tools={
@@ -571,12 +588,17 @@ function DesktopApp() {
                     }
             }
             onStart={(request) =>
-              exclusive(() =>
-                invoke<BatchBackupReport | null>("create_batch_backup", {
-                  scope: request.scope,
-                  placement: request.placement,
-                }),
-              )
+              exclusive(async () => {
+                const report = await invoke<BatchBackupReport | null>(
+                  "create_batch_backup",
+                  {
+                    scope: request.scope,
+                    placement: request.placement,
+                  },
+                );
+                if (report?.created) setBackupGeneration((value) => value + 1);
+                return report;
+              })
             }
             onCancel={() => invoke<void>("cancel_batch_backup")}
           />

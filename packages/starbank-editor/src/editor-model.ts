@@ -63,6 +63,7 @@ export interface BankEditorController {
   document?: BankEditorDocument;
   busy?: boolean;
   status?: string;
+  backupStatus?: string;
   onOpen?: () => Promise<EditorActionResult>;
   onReveal?: EditorAction;
   onOpenFile?: (file: File) => Promise<EditorActionResult>;

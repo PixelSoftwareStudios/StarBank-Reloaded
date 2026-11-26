@@ -96,6 +96,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::save::save_active_bank,
 			crate::save::save_bank_as,
 			crate::backup::list_active_backups,
+			crate::backup_status::active_backup_status,
 			crate::backup::restore_active_bank,
 			crate::batch_backup::create_batch_backup,
 			crate::batch_backup::cancel_batch_backup,
