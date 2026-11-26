@@ -14,15 +14,17 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-StarBank Web opens local banks, edits Table and Raw views, and exports an exact or re-signed copy. After the app and its editor worker have loaded, these operations work offline.
+StarBank Web opens individual banks or a local bank list from selected files and folders. It edits Table and Raw views and offers Simple View for matching local profiles. Structural edits, diffs, targeted reverts, and exact or re-signed downloads work offline after the editor finishes loading.
 
 Run the Tauri desktop development host or the command-line editor from the same checkout.
 
 ```sh
-pnpm --filter @starbank/desktop run dev
+pnpm --filter starbank-desktop run dev
 cargo run --locked -p starbank-cli -- --help
 ```
 
-The desktop host opens local banks in the shared editor and supports create-only export on macOS and Linux. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing and backups. See the [CLI guide](apps/starbank-cli/README.md) and [verified platform scope](docs/verification/IMPLEMENTATION.md).
+The desktop app opens local banks and browses banks from an authorized SC2 folder. Verified overwrite and restore are available on qualified macOS APFS targets. macOS and Linux support create-only exports and confirmation-gated batch backups. Windows storage supports reads. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing, backups and read-only map metadata inspection. See the [CLI guide](apps/starbank-cli/README.md) and [verified platform scope](docs/verification/IMPLEMENTATION.md).
+
+`just --list` lists the local test, build, and packaging recipes.
 
 New code licensing remains pending provenance review. The archived Go prototype retains its original [license notice](original/LICENSE).

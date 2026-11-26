@@ -20,3 +20,11 @@ Rust/Tauri migration accepted. Select exact dependency releases after checking o
 | Verification | cargo-nextest, rstest, proptest, insta, cargo-fuzz, criterion, Miri, Loom/Shuttle, Kani, TLA+/TLC, Lean/hax/Aeneas as scoped; Vitest, Playwright, actual native UI/filesystem tests |
 
 No automatic updater, analytics/telemetry, authentication, cloud sync, database server, embedded HTTP server or runtime map scripting. Cache file format can be versioned JSON initially; SQLite only if measured scale justifies it, not a requirement. Test framework memory and dependency size rather than assert HeroUI or Tauri is automatically lighter than Fyne. Browser static hosting via Cloudflare Pages candidate; no uploaded user banks.
+
+## Resolved frontend
+
+Both apps use the same React, TypeScript, Vite, Tailwind 4, HeroUI, Lucide, Valibot and CodeMirror frontend. The private workspace packages are `starbank-ui`, `starbank-editor`, `starbank-engine-client` and `starbank-platform`. Their exact dependencies are recorded in the pnpm lockfile.
+
+`starbank-editor` uses Zustand 5.1.0 to hold the active view and pending drafts per open document. Bank values and revisions remain authoritative in the Rust engine. React Number Format 5.4.5 groups ordinary numeric strings for display. A linear formatter retains the existing grouping for padded or long lexemes. Edit normalization and validation preserve exact digit strings. [Editor package](../packages/starbank-editor/package.json) · [Zustand store API](https://zustand.docs.pmnd.rs/reference/apis/create-store) · [React Number Format string API](https://s-yadav.github.io/react-number-format/docs/numeric_format/#numericformatter-numstring-string-props-numericformatprops--string)
+
+HeroUI's pinned Table uses React Aria table primitives. The shared bank editor uses native table elements and windowed rows to keep exact text inputs, focus and stable-ID bulk selections. The measured 10,000-value synthetic workflow exercised keyboard navigation and bulk edits across row windows. [Table implementation](../packages/starbank-ui/src/table-editor.tsx) · [Verification](verification/IMPLEMENTATION.md)
