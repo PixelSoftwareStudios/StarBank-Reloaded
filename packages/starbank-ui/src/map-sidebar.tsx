@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 import {
+  type AccountScopeSelection,
   BankBrowser,
   type BankBrowserModel,
   type BankFilter,
@@ -87,10 +88,12 @@ export function MapSidebar({
   id,
   inventory,
   options,
+  accountScope,
 }: {
   id: string;
   inventory: MapInventory;
   options?: MapOptions;
+  accountScope: AccountScopeSelection;
 }) {
   const titleId = useId();
   const search = useRef<HTMLInputElement>(null);
@@ -100,7 +103,6 @@ export function MapSidebar({
   const [bankScope, setBankScope] = useState<"selected" | "all" | "unmatched">(
     "selected",
   );
-  const [selectedAccount, setSelectedAccount] = useState("");
   const [localFilters, setLocalFilters] = useState(INITIAL_FILTERS);
   const filters = options?.filters?.values ?? localFilters;
   const ready = inventory.status === "ready";
@@ -262,8 +264,7 @@ export function MapSidebar({
                 ? undefined
                 : availableMaps?.find(({ id }) => id === selectedMapId)?.name
             }
-            selectedAccount={selectedAccount}
-            onAccountChange={setSelectedAccount}
+            accountScope={accountScope}
             onFilterChange={setBankScope}
           />
         )}

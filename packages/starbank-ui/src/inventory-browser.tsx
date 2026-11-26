@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const BANK_PAGE_SIZE = 80;
 
@@ -33,6 +33,77 @@ export interface InventoryControls {
 }
 
 const ALL_ACCOUNTS = "";
+
+interface BankScopeChoice {
+  readonly key: string;
+  readonly label: string;
+}
+
+export interface AccountScopeSelection {
+  readonly choices: readonly BankScopeChoice[];
+  readonly selected: string;
+  readonly select: (key: string) => void;
+}
+
+export function resolveBankAccountScope(
+  choices: readonly BankScopeChoice[],
+  requested: string,
+): string {
+  return choices.length > 1 && choices.some(({ key }) => key === requested)
+    ? requested
+    : ALL_ACCOUNTS;
+}
+
+/** Keep scope during transient scans and forget scopes missing from the next ready inventory. */
+export function useBankAccountScope(
+  banks: readonly BankListItem[] | undefined,
+): AccountScopeSelection {
+  const [requested, setRequested] = useState(ALL_ACCOUNTS);
+  const choices = useMemo(
+    () => (banks ? bankScopeChoices(banks) : []),
+    [banks],
+  );
+  const selected = resolveBankAccountScope(choices, requested);
+
+  useEffect(() => {
+    if (banks !== undefined && requested !== selected) setRequested(selected);
+  }, [banks, requested, selected]);
+
+  return {
+    choices,
+    selected,
+    select: (key) => setRequested(resolveBankAccountScope(choices, key)),
+  };
+}
+
+export function AccountScopePicker({
+  scope,
+  variant,
+}: {
+  scope: AccountScopeSelection;
+  variant: "sidebar" | "settings";
+}) {
+  if (scope.choices.length <= 1) return null;
+  const sidebar = variant === "sidebar";
+  return (
+    <label className={sidebar ? "inventory-account" : "settings-page-choice"}>
+      <span className={sidebar ? "sr-only" : undefined}>
+        {sidebar ? "Bank account or player" : "Account"}
+      </span>
+      <select
+        value={scope.selected}
+        onChange={(event) => scope.select(event.currentTarget.value)}
+      >
+        <option value={ALL_ACCOUNTS}>All accounts</option>
+        {scope.choices.map(({ key, label }) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function scopeKey(bank: BankListItem) {
   if (bank.scopeId) return `scope:${bank.scopeId}`;
@@ -151,43 +222,22 @@ export function BankBrowser({
   model,
   filter,
   currentMapName,
-  selectedAccount,
-  onAccountChange,
+  accountScope,
   onFilterChange,
 }: {
   model: BankBrowserModel;
   filter: BankFilter;
   currentMapName?: string;
-  selectedAccount: string;
-  onAccountChange: (scope: string) => void;
+  accountScope: AccountScopeSelection;
   onFilterChange: (filter: "all" | "unmatched") => void;
 }) {
   const heading = "Banks";
-  const choices = useMemo(() => bankScopeChoices(model.banks), [model.banks]);
-  const account =
-    choices.length > 1 && choices.some(({ key }) => key === selectedAccount)
-      ? selectedAccount
-      : ALL_ACCOUNTS;
+  const account = accountScope.selected;
   return (
     <section className="inventory-banks" aria-label={heading}>
       <div className="inventory-bank-heading">
         <h3 className="text-sm font-semibold">{heading}</h3>
-        {choices.length > 1 && (
-          <label className="inventory-account">
-            <span className="sr-only">Bank account or player</span>
-            <select
-              value={account}
-              onChange={(event) => onAccountChange(event.currentTarget.value)}
-            >
-              <option value={ALL_ACCOUNTS}>All accounts</option>
-              {choices.map(({ key, label }) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <AccountScopePicker scope={accountScope} variant="sidebar" />
       </div>
       <fieldset className="inventory-bank-filters">
         <legend className="sr-only">Bank file filters</legend>

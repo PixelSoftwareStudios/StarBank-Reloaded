@@ -11,6 +11,7 @@ import {
 import type { BankEditorController } from "starbank-editor";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 import { EditorPane } from "./editor-pane";
+import { type BankListItem, useBankAccountScope } from "./inventory-browser";
 import { resolveMapContext } from "./map-context";
 import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
 import type { ChangeSetting } from "./settings-page";
@@ -37,6 +38,7 @@ const SettingsPage = lazy(async () => ({
 }));
 
 const NO_INVENTORY: MapInventory = { status: "unavailable" };
+const NO_BANKS: readonly BankListItem[] = [];
 
 export function AppShell({
   name,
@@ -58,6 +60,11 @@ export function AppShell({
   breadcrumbAvailable?: boolean;
 }) {
   const mapPaneId = useId();
+  const accountScope = useBankAccountScope(
+    inventory.status === "ready"
+      ? (inventory.bankBrowser?.banks ?? NO_BANKS)
+      : undefined,
+  );
   const [mapPaneWidth, setMapPaneWidth] = useState<number>(
     MAP_PANE_WIDTH.initial,
   );
@@ -141,6 +148,7 @@ export function AppShell({
               <SettingsPage
                 settings={preferences.settings}
                 inventory={inventory}
+                accountScope={accountScope}
                 onChange={preferences.change}
                 onBack={() => setSettingsOpen(false)}
                 issue={preferences.issue}
@@ -174,6 +182,7 @@ export function AppShell({
         id={mapPaneId}
         inventory={inventory}
         options={effectiveOptions}
+        accountScope={accountScope}
       />
     </div>
   );

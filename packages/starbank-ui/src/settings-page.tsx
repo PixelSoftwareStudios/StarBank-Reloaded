@@ -1,6 +1,10 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
-import { InventoryActions } from "./inventory-browser";
+import {
+  AccountScopePicker,
+  type AccountScopeSelection,
+  InventoryActions,
+} from "./inventory-browser";
 import type { MapInventory } from "./map-sidebar";
 
 export type SettingsKey = Exclude<keyof AppSettings, "version">;
@@ -33,6 +37,7 @@ export interface SettingsPageProps {
   readonly onBack: () => void;
   readonly discovery?: SettingsDiscoveryControls;
   readonly inventory?: MapInventory;
+  readonly accountScope?: AccountScopeSelection;
   readonly backupAvailable?: boolean;
   readonly issue?: string;
   readonly readOnly?: boolean;
@@ -77,6 +82,7 @@ export function SettingsPage({
   onBack,
   discovery,
   inventory,
+  accountScope,
   backupAvailable = false,
   issue,
   readOnly = false,
@@ -112,6 +118,9 @@ export function SettingsPage({
       {!discovery && inventory?.controls && (
         <Group title="Bank discovery">
           <InventoryDiscoveryFields inventory={inventory} />
+          {accountScope && (
+            <AccountScopePicker scope={accountScope} variant="settings" />
+          )}
         </Group>
       )}
 

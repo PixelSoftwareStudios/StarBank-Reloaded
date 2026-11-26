@@ -5,6 +5,7 @@ import {
   type BankListItem,
   bankScopeChoices,
   filterBanks,
+  resolveBankAccountScope,
 } from "../../../packages/starbank-ui/src/inventory-browser";
 
 const maps = [
@@ -226,6 +227,20 @@ describe("bank scopes and archive dates", () => {
     expect(
       filterBanks(scopedBanks, { kind: "map", mapId: "alpha" }, "scope:one"),
     ).toEqual([scopedBanks[0]]);
+  });
+
+  it("drops a missing opaque account key without confusing a matching display label", () => {
+    const choices = bankScopeChoices(scopedBanks);
+    expect(resolveBankAccountScope(choices, "scope:two")).toBe("scope:two");
+    expect(resolveBankAccountScope(choices, "1-S2-1-42 (2)")).toBe("");
+
+    const next = bankScopeChoices([
+      scopedBanks[0],
+      { ...scopedBanks[1], id: "three", scopeId: "three" },
+    ]);
+    expect(resolveBankAccountScope(next, "scope:two")).toBe("");
+    expect(resolveBankAccountScope(next, "scope:one")).toBe("scope:one");
+    expect(resolveBankAccountScope(next.slice(0, 1), "scope:one")).toBe("");
   });
 
   it("offers the account selector only with multiple known scopes", () => {
