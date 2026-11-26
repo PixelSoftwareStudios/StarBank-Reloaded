@@ -14,6 +14,7 @@ export function ExportDialog({
   name,
   initialSign = false,
   prepare,
+  prepareBackup,
   dismiss,
 }: {
   name: string;
@@ -22,6 +23,7 @@ export function ExportDialog({
     name: string,
     context?: EngineSigningContext,
   ) => Promise<DownloadPreparation>;
+  prepareBackup: () => Promise<DownloadPreparation>;
   dismiss: () => void;
 }) {
   const [filename, setFilename] = useState(name);
@@ -39,16 +41,13 @@ export function ExportDialog({
     return () => prepared.download.release();
   }, [prepared]);
 
-  async function prepareDownload(): Promise<void> {
+  async function prepareCopy(
+    makeDownload: () => Promise<DownloadPreparation>,
+  ): Promise<void> {
     setWorking(true);
     setError("");
     try {
-      const stem = bankFilenameStem(filename);
-      if (!stem) {
-        throw new Error("Choose a filename ending in .SC2Bank.");
-      }
-      const context = sign ? { author, player, bank_name: stem } : undefined;
-      setPrepared(await prepare(filename, context));
+      setPrepared(await makeDownload());
     } catch (failure) {
       setError(
         failure instanceof Error
@@ -58,6 +57,13 @@ export function ExportDialog({
     } finally {
       setWorking(false);
     }
+  }
+
+  async function prepareEditedCopy(): Promise<DownloadPreparation> {
+    const stem = bankFilenameStem(filename);
+    if (!stem) throw new Error("Choose a filename ending in .SC2Bank.");
+    const context = sign ? { author, player, bank_name: stem } : undefined;
+    return prepare(filename, context);
   }
 
   return (
@@ -90,7 +96,7 @@ export function ExportDialog({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!working) void prepareDownload();
+            if (!working) void prepareCopy(prepareEditedCopy);
           }}
         >
           <fieldset disabled={working} className="web-dialog-fields">
@@ -140,6 +146,14 @@ export function ExportDialog({
               onClick={dismiss}
             >
               Cancel
+            </button>
+            <button
+              className="editor-button"
+              type="button"
+              disabled={working}
+              onClick={() => void prepareCopy(prepareBackup)}
+            >
+              Prepare opening backup
             </button>
             <button
               className="editor-button editor-primary"

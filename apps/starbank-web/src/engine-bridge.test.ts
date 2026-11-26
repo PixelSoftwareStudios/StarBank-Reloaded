@@ -3,7 +3,11 @@ import {
   decodeEngineReply,
   engineRequest,
 } from "starbank-engine-client/protocol";
-import { prepareBankDownload, readBankFile } from "starbank-platform/browser";
+import {
+  prepareBankDownload,
+  prepareOpeningBankBackup,
+  readBankFile,
+} from "starbank-platform/browser";
 import { describe, expect, test, vi } from "vitest";
 
 const BANK_LIMIT = 16;
@@ -150,6 +154,22 @@ describe("local file adapter and protocol", () => {
       ).toEqual(new Uint8Array([0xef, 0xbb, 0xbf, 0x0a]));
     } finally {
       download.release();
+    }
+  });
+
+  test("packages an opening backup without decoding source bytes", async () => {
+    const source = Uint8Array.from([0xfe, 0xff, 0x00, 0x3c, 0x00, 0x42]);
+    const backup = prepareOpeningBankBackup(
+      source.buffer,
+      "Training.SC2BANK",
+      new Date("2026-11-26T22:31:05Z"),
+    );
+    try {
+      expect(backup.name).toBe("Training_20261126_223105.sc2bank.bak");
+      const downloaded = await (await fetch(backup.href)).arrayBuffer();
+      expect(new Uint8Array(downloaded)).toEqual(source);
+    } finally {
+      backup.release();
     }
   });
 

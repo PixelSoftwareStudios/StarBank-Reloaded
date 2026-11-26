@@ -97,6 +97,27 @@ async function downloadCopy(page, expected, shortcut) {
   return dialog;
 }
 
+async function downloadOpeningBackup(page, expected) {
+  await page.getByRole("button", { name: "Save As…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Save a bank copy" });
+  await dialog.getByLabel("Re-sign this copy").check();
+  await dialog.getByRole("button", { name: "Prepare opening backup" }).click();
+  await dialog
+    .getByRole("status")
+    .filter({ hasText: "exact file bytes" })
+    .waitFor();
+  const pending = page.waitForEvent("download");
+  await dialog.getByRole("link", { name: /\.sc2bank\.bak$/ }).click();
+  const backup = await pending;
+  assert.match(backup.suggestedFilename(), /_\d{8}_\d{6}\.sc2bank\.bak$/);
+  assert.deepEqual(await readFile(await backup.path()), Buffer.from(expected));
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Unsaved changes" })
+    .waitFor();
+}
+
 async function verifyPreferences(page) {
   await page.getByRole("button", { name: "More…" }).click();
   const settings = page.getByRole("region", { name: "Settings" });
@@ -358,6 +379,7 @@ async function verify(name) {
       .filter({ hasText: "Unsaved changes" })
       .waitFor();
     assert.equal(await value.inputValue(), "1,000,000");
+    await downloadOpeningBackup(page, initial);
     await downloadCopy(page, edited, "Control+s");
     await page.keyboard.press("Escape");
 
@@ -449,11 +471,29 @@ async function verify(name) {
     assert.equal(await value.inputValue(), "002");
     await verifyStructuralEditing(page, value);
     await verifySimpleView(page, chooseBank);
-    await chooseBank(
-      "Replacement.SC2Bank",
-      initial.replace('int="001"', 'int="002"'),
-    );
+    const utf16Opening = initial
+      .replace('version="1.0"?>', 'version="1.0" encoding="UTF-16"?>')
+      .replace('int="001"', 'int="002"');
+    const utf16 = (xml) => Buffer.from(`\uFEFF${xml}`, "utf16le");
+    await chooseBank("Replacement.SC2Bank", utf16(utf16Opening));
     await page.getByRole("heading", { name: "Replacement.SC2Bank" }).waitFor();
+    await value.fill("003");
+    await page.getByRole("button", { name: "Apply edits" }).click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Unsaved changes" })
+      .waitFor();
+    await page.getByRole("tab", { name: "Raw View" }).click();
+    await raw.filter({ hasText: /int="003"/ }).waitFor();
+    const editedUtf16Xml = utf16Opening
+      .replaceAll("\r\n", "")
+      .replace('int="002"', 'int="004"');
+    await raw.fill(editedUtf16Xml);
+    await page.getByRole("button", { name: "Apply XML" }).click();
+    await page
+      .getByRole("button", { name: "Apply XML" })
+      .waitFor({ state: "hidden" });
+    await downloadOpeningBackup(page, utf16(utf16Opening));
 
     await page.evaluate(() =>
       globalThis.dispatchEvent(new Event("starbank-test-stop-worker")),
@@ -487,7 +527,7 @@ async function verify(name) {
     const recovery = await pendingRecovery;
     assert.deepEqual(
       await readFile(await recovery.path()),
-      Buffer.from(initial.replace('int="001"', 'int="002"')),
+      utf16(editedUtf16Xml),
     );
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
@@ -499,7 +539,7 @@ async function verify(name) {
       requests.slice(assetRequests).every((url) => url.startsWith("blob:")),
     );
     console.log(
-      `${name} ${browser.version()} passed offline single, multiple and folder import, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, structural editing and reverts, Simple profile previews, guarded file switching, keyboard-accessible recovery, and persisted settings`,
+      `${name} ${browser.version()} passed offline single, multiple and folder import, table/XML edits, undo/redo, exact, signed, and opening backup downloads, clipboard fallback, structural editing and reverts, Simple profile previews, guarded file switching, keyboard-accessible recovery, and persisted settings`,
     );
   } finally {
     await server.stop();

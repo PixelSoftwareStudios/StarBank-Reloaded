@@ -10,6 +10,7 @@ import {
 } from "starbank-platform/bank-encoding";
 import {
   prepareBankDownload,
+  prepareOpeningBankBackup,
   writeBankClipboard,
 } from "starbank-platform/browser";
 import {
@@ -257,6 +258,16 @@ export function StarBankWeb() {
     return (target) => apply(target, { kind });
   }
 
+  async function exportOpeningBackup(target: EditorTarget) {
+    const bank = activeDocument(target);
+    const bytes = await bankSession().openingBytes(target);
+    return {
+      download: prepareOpeningBankBackup(bytes, bank.name),
+      message:
+        "This backup contains the exact file bytes from when the bank was opened.",
+    };
+  }
+
   async function exportCopy(name: string, context?: EngineSigningContext) {
     if (!document) throw new Error("Open a bank to prepare a download.");
     try {
@@ -317,6 +328,9 @@ export function StarBankWeb() {
           initialSign={preferences.settings.autoResignOnSave}
           prepare={(name, context) =>
             runBankAction(() => exportCopy(name, context))
+          }
+          prepareBackup={() =>
+            runBankAction(() => exportOpeningBackup(document))
           }
           dismiss={() => setShowExport(false)}
         />

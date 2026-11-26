@@ -52,6 +52,20 @@ export function prepareBankDownload(
   return { href, name, release: () => URL.revokeObjectURL(href) };
 }
 
+/** Packages the exact opening bytes as a timestamped backup download. */
+export function prepareOpeningBankBackup(
+  bytes: ArrayBuffer,
+  sourceName: string,
+  now = new Date(),
+): BankDownload {
+  const stem = sourceName.replace(/\.(?:sc2bank|xml)$/i, "");
+  if (!stem) throw new Error("The opening bank does not have a usable name.");
+  const [date, time] = now.toISOString().split("T");
+  const day = date.replaceAll("-", "");
+  const clock = time.split(".")[0].replaceAll(":", "");
+  return prepareBankDownload(bytes, `${stem}_${day}_${clock}.sc2bank.bak`);
+}
+
 /** Calls the clipboard API during the user gesture even when an engine response is pending. */
 export async function writeBankClipboard(
   text: string | Promise<string>,

@@ -122,6 +122,21 @@ export class BrowserBankSession {
     );
   }
 
+  async openingBytes(target: EditorTarget): Promise<ArrayBuffer> {
+    const { reply, bytes } = await this.#dispatch(
+      { kind: "opening_raw" },
+      this.#target(target),
+    );
+    if (
+      reply.result.kind !== "raw" ||
+      bytes === undefined ||
+      reply.revision !== target.revision
+    ) {
+      throw new Error("The bank engine did not return the opening backup.");
+    }
+    return bytes;
+  }
+
   async diff(target: EditorTarget): Promise<EngineDiff> {
     const { reply } = await this.#dispatch(
       { kind: "diff" },
