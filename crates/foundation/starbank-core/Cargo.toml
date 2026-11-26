@@ -1,0 +1,10 @@
+[package]
+name = "starbank-core"
+description = "Shared invariants for the StarBank editor and its adapters"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
