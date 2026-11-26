@@ -249,3 +249,55 @@ fn delayed_acknowledgement_cannot_replace_same_revision_signing_context() {
 	assert_eq!(session.signature_status(), SignatureStatus::Valid);
 	assert!(!session.is_dirty());
 }
+
+#[test]
+fn preserving_a_signature_for_save_as_uses_only_the_destination_context() {
+	let mut session = open();
+	let source = SigningContext::new("1-S2-1-111", "1-S2-1-222", "Source").unwrap();
+	let destination = SigningContext::new("1-S2-1-111", "1-S2-1-222", "Destination").unwrap();
+	let signed = session
+		.prepare(Revision::INITIAL, ExportSigning::Sign(&source))
+		.unwrap();
+	let signed_bytes = signed.bytes().to_vec();
+	let revision = session.acknowledge_verified_active_save(signed).unwrap();
+	assert_eq!(session.signature_status(), SignatureStatus::Valid);
+
+	let preview = session
+		.prepare(revision, ExportSigning::PreserveFor(Some(&destination)))
+		.unwrap();
+	assert_eq!(preview.bytes(), signed_bytes);
+	assert_eq!(preview.signature_status(), SignatureStatus::Invalid);
+	assert_eq!(session.signature_status(), SignatureStatus::Valid);
+	drop(preview);
+
+	let unknown = session
+		.prepare(revision, ExportSigning::PreserveFor(None))
+		.unwrap();
+	assert_eq!(unknown.bytes(), signed_bytes);
+	assert_eq!(unknown.signature_status(), SignatureStatus::MissingContext);
+	assert_eq!(session.signature_status(), SignatureStatus::Valid);
+
+	let known = session
+		.prepare(revision, ExportSigning::PreserveFor(Some(&destination)))
+		.unwrap();
+	assert_eq!(
+		session.acknowledge_verified_active_save(known).unwrap(),
+		revision
+	);
+	assert_eq!(session.signature_status(), SignatureStatus::Invalid);
+	assert!(matches!(
+		session.acknowledge_verified_active_save(unknown),
+		Err(EditorError::StaleSaveAcknowledgement)
+	));
+
+	let unknown = session
+		.prepare(revision, ExportSigning::PreserveFor(None))
+		.unwrap();
+	assert_eq!(
+		session.acknowledge_verified_active_save(unknown).unwrap(),
+		revision
+	);
+	assert_eq!(session.signature_status(), SignatureStatus::MissingContext);
+	assert_eq!(session.document().source(), signed_bytes);
+	assert!(!session.is_dirty());
+}

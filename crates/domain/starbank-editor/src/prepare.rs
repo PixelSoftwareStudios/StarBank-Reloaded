@@ -12,8 +12,12 @@ use crate::{EditorError, Session};
 /// Signature policy for preparing exact output bytes.
 #[derive(Clone, Copy, Debug)]
 pub enum ExportSigning<'context> {
-	/// Keep the stored signature and report its verification status.
+	/// Keep the stored signature and check it against the active source context.
 	Preserve,
+	/// Keep the stored signature and check it against the intended destination.
+	///
+	/// A missing destination context deliberately leaves the signature unverified.
+	PreserveFor(Option<&'context SigningContext>),
 	/// Sign and verify against the intended destination context.
 	Sign(&'context SigningContext),
 }
@@ -76,13 +80,18 @@ impl Session {
 		policy: ExportSigning<'_>,
 	) -> Result<PreparedExport, EditorError> {
 		self.require_revision(expected)?;
-		let (bytes, signature, context, signed_document) = match policy {
-			ExportSigning::Preserve => {
+		let context = match policy {
+			ExportSigning::Preserve => self.context.as_ref(),
+			ExportSigning::PreserveFor(context) => context,
+			ExportSigning::Sign(context) => Some(context),
+		};
+		let (bytes, signature, signed_document) = match policy {
+			ExportSigning::Preserve | ExportSigning::PreserveFor(_) => {
 				let bytes =
 					serialize(&self.document, &[], self.limits).map_err(EditorError::Serialize)?;
 				let checked = parse(&bytes, self.limits).map_err(EditorError::Parse)?;
-				let status = verify_signature(&checked, self.context.as_ref());
-				(bytes.into(), status, self.context.clone(), None)
+				let status = verify_signature(&checked, context);
+				(bytes.into(), status, None)
 			}
 			ExportSigning::Sign(context) => {
 				let checked =
@@ -90,7 +99,6 @@ impl Session {
 				(
 					checked.source().into(),
 					SignatureStatus::Valid,
-					Some(context.clone()),
 					Some(checked),
 				)
 			}
@@ -101,7 +109,7 @@ impl Session {
 			sequence: self.save_order.issue()?,
 			signature,
 			token: self.token.clone(),
-			context,
+			context: context.cloned(),
 			signed_document,
 		})
 	}
