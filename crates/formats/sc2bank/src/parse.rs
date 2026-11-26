@@ -217,16 +217,20 @@ fn project_section(
 				*has_unprojected_bank_nodes |= is_significant(element);
 			}
 		}
+		let (name, name_source_range) = project_name(source, child);
 		keys.push(Key {
 			id: KeyId(child.id().get()),
-			name: decoded_attribute(child, NAME),
+			name,
+			name_source_range,
 			source_range: child.range(),
 			values,
 		});
 	}
+	let (name, name_source_range) = project_name(source, section);
 	Section {
 		id: SectionId(section.id().get()),
-		name: decoded_attribute(section, NAME),
+		name,
+		name_source_range,
 		source_range: section.range(),
 		keys,
 	}
@@ -273,6 +277,8 @@ fn project_type_attribute(
 		attribute_value_range(source, attribute.range()).ok_or(OpaqueReason::InvalidSourceSpan)?;
 	Ok(TypedAttribute {
 		kind: ValueKind::from_name(attribute.name()),
+		name_source_range: attribute.range().start
+			..attribute.range().start + attribute.name().len(),
 		value: attribute.value().to_owned(),
 		source_range,
 	})
@@ -294,6 +300,16 @@ fn attribute_value_range(source: &str, range: Range<usize>) -> Option<Range<usiz
 	let start = range.end.checked_sub(quoted.len())?.checked_add(1)?;
 	let end = range.end.checked_sub(1)?;
 	source.get(start..end).map(|_| start..end)
+}
+
+fn project_name(source: &str, node: Node<'_, '_>) -> (Option<String>, Option<Range<usize>>) {
+	let Some(attribute) = unqualified_attribute(node, NAME) else {
+		return (None, None);
+	};
+	(
+		Some(attribute.value().to_owned()),
+		attribute_value_range(source, attribute.range()),
+	)
 }
 
 fn decoded_attribute(node: Node<'_, '_>, name: &str) -> Option<String> {

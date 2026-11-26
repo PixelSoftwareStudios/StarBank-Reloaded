@@ -105,7 +105,7 @@ pub fn serialize(
 	Ok(output.into_bytes())
 }
 
-fn source_quote(source: &str, range: &Range<usize>) -> Result<char, SerializeError> {
+pub(crate) fn source_quote(source: &str, range: &Range<usize>) -> Result<char, SerializeError> {
 	let quote_start = range
 		.start
 		.checked_sub(1)
@@ -173,7 +173,7 @@ fn replace(
 	Ok(output)
 }
 
-fn escape(character: char, quote: char) -> Option<&'static str> {
+pub(crate) fn escape(character: char, quote: char) -> Option<&'static str> {
 	match character {
 		'&' => Some("&amp;"),
 		'<' => Some("&lt;"),

@@ -101,6 +101,7 @@ impl StoredSignature {
 pub struct Section {
 	pub(crate) id: SectionId,
 	pub(crate) name: Option<String>,
+	pub(crate) name_source_range: Option<Range<usize>>,
 	pub(crate) source_range: Range<usize>,
 	pub(crate) keys: Vec<Key>,
 }
@@ -132,6 +133,7 @@ impl Section {
 pub struct Key {
 	pub(crate) id: KeyId,
 	pub(crate) name: Option<String>,
+	pub(crate) name_source_range: Option<Range<usize>>,
 	pub(crate) source_range: Range<usize>,
 	pub(crate) values: Vec<ValueNode>,
 }
@@ -220,6 +222,7 @@ pub enum OpaqueReason {
 #[derive(Clone, Debug)]
 pub struct TypedAttribute {
 	pub(crate) kind: ValueKind,
+	pub(crate) name_source_range: Range<usize>,
 	pub(crate) value: String,
 	pub(crate) source_range: Range<usize>,
 }
