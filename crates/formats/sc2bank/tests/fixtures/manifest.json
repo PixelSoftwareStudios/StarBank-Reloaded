@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "id": "ordinary",
+      "path": "ordinary.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 252,
+      "sha256": "fac788adb6bcf808733a37249011edc988cc487c70554cfdbdf48d8a1f2d5cb7",
+      "acceptance": [
+        "AT-FMT-01",
+        "AT-EDIT-02"
+      ]
+    },
+    {
+      "id": "opaque-utf8-bom",
+      "path": "opaque-utf8-bom.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 486,
+      "sha256": "5b2dc26733c27abeb5f4d9b4054ae0a8f94aee6d173081cec5784a9e7c903a02",
+      "acceptance": [
+        "AT-FMT-02",
+        "AT-FMT-03"
+      ]
+    },
+    {
+      "id": "ordinary-utf16le",
+      "path": "ordinary-utf16le.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 292,
+      "sha256": "75b9b554e1358e8eeb96732986e479fc98ec93d796ef38efa5650b6c5510415a",
+      "acceptance": [
+        "AT-FMT-03"
+      ]
+    },
+    {
+      "id": "ambiguous-type",
+      "path": "ambiguous-type.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 102,
+      "sha256": "a7e323fb029f57b059cc6d4964f3a47f5f96dfc3307765f43092b9ed05359744",
+      "acceptance": [
+        "AT-FMT-03",
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "duplicate-signature",
+      "path": "duplicate-signature.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 148,
+      "sha256": "a2c4bfc8f54c5da3d7d6ff3f4db6b2fafd08e45e1cb5692078abc59bc9c7f724",
+      "acceptance": [
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "truncated",
+      "path": "truncated.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 67,
+      "sha256": "bfec22a5b6cd06966fcf076ada297016bc25567d3fd2d4405d0570c24b8801cc",
+      "acceptance": [
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "trailing",
+      "path": "trailing.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 24,
+      "sha256": "ec8a69f6f14f84beea82540288bac014c2ac29aa782dd5fc2c89db46bd5f87c7",
+      "acceptance": [
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "dtd",
+      "path": "dtd.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 35,
+      "sha256": "bf78af3056eb612a3e231b9e18d4ceb2b311db071fc88819a8d726f660c3f661",
+      "acceptance": [
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "surrogate-reference",
+      "path": "surrogate-reference.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against BANK_FORMAT.md and SIGNATURE_SPEC.md, no imported source or game bytes",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 100,
+      "sha256": "26de1935869e8166a8c1c336f54550c5b27c07566166a3e5a856721f5e5c5185",
+      "acceptance": [
+        "AT-FMT-04"
+      ]
+    },
+    {
+      "id": "attribute-whitespace",
+      "path": "attribute-whitespace.sc2bank",
+      "kind": "synthetic",
+      "origin": "Newly authored against XML 1.0 \u00a73.3.3 and BANK_FORMAT.md",
+      "provenance": "WP-02 fixture spike, 2026-11-26",
+      "permission": "Original test data, intended for the project fixture policy",
+      "bytes": 117,
+      "sha256": "d20cc615dea2eb738c944c5bff814f1f7a28c44c929de11491f3463476f233b7",
+      "acceptance": [
+        "AT-FMT-03",
+        "AT-SIG-01"
+      ],
+      "expectation": {
+        "decoded_string": "a b  c\td\ne\rf",
+        "unchanged_export": "byte_identical"
+      }
+    }
+  ]
+}

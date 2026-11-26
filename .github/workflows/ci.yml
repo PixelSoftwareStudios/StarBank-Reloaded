@@ -60,8 +60,8 @@ jobs:
           persist-credentials: false
       - run: rustup show
       # Keep the package lists explicit when adding portable crates.
-      - run: cargo build --locked --target wasm32-unknown-unknown -p starbank-core
-      - run: cargo clippy --locked --target wasm32-unknown-unknown -p starbank-core -- -D warnings
+      - run: cargo build --locked --target wasm32-unknown-unknown -p starbank-core -p sc2bank
+      - run: cargo clippy --locked --target wasm32-unknown-unknown -p starbank-core -p sc2bank -- -D warnings
 
   frontend:
     name: Frontend checks

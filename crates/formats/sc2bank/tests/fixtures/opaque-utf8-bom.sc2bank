@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?fixture before?>
+<!-- retained -->
+<Bank version='01' xmlns:x="urn:starbank-fixture" x:extra='yes'>
+<Section name="Repeated"><Key name="Same"><Value int="0007"/></Key><Key name="Same"><Nested string='élan &amp; &#x41;'/><Unknown future="a &lt; b"/></Key><Key name="Empty"/><x:Other><![CDATA[untouched & <opaque>]]></x:Other></Section>
+<Section name="Repeated"><Key name="Same"><Value string=''/></Key></Section>
+</Bank><!-- after -->

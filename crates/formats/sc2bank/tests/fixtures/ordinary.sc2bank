@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Bank version="1"><Section name="Fixture"><Key name="Count"><Value int="9007199254740993"/></Key><Key name="Rate"><Value fixed="-0.1250"/></Key><Key name="Label"><Value string="A &amp; B"/></Key></Section></Bank>

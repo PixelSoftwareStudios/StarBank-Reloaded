@@ -2,6 +2,7 @@
 members = [
     "crates/discovery/starbank-paths",
     "crates/engineering/starbank-source-check",
+    "crates/formats/sc2bank",
     "crates/foundation/starbank-core",
 ]
 resolver = "3"
@@ -11,6 +12,11 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.100.0"
 publish = false
+
+[workspace.dependencies]
+# Bank XML
+quick-xml = { version = "=0.42.0", default-features = false }
+roxmltree = "=0.21.2"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
