@@ -12,6 +12,7 @@ type PreferenceKey = Exclude<keyof AppSettings, "version">;
 interface SettingsSnapshot {
   settings: AppSettings;
   legacyRootPending: boolean;
+  automaticBackupAvailable: boolean;
 }
 
 const ISSUE_MESSAGES: Record<SettingsIssue, string> = {
@@ -39,7 +40,9 @@ function decodeSnapshot(response: unknown): SettingsSnapshot {
     response === null ||
     !("settings" in response) ||
     !("legacyRootPending" in response) ||
-    typeof response.legacyRootPending !== "boolean"
+    typeof response.legacyRootPending !== "boolean" ||
+    !("automaticBackupAvailable" in response) ||
+    typeof response.automaticBackupAvailable !== "boolean"
   ) {
     throw new Error("Invalid native settings response.");
   }
@@ -49,6 +52,7 @@ function decodeSnapshot(response: unknown): SettingsSnapshot {
   return {
     settings: decoded.settings,
     legacyRootPending: response.legacyRootPending,
+    automaticBackupAvailable: response.automaticBackupAvailable,
   };
 }
 
@@ -132,5 +136,6 @@ export function useDesktopSettings() {
     issue: issue === undefined ? undefined : ISSUE_MESSAGES[issue],
     recover: canRecover(readIssue) ? recover : undefined,
     legacyRootPending: snapshot?.legacyRootPending ?? false,
+    automaticBackupAvailable: snapshot?.automaticBackupAvailable ?? false,
   };
 }

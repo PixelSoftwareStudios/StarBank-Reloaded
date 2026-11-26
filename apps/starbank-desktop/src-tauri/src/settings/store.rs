@@ -32,12 +32,9 @@ impl SettingsStore {
 		if let Some(saved) = self.read_saved()? {
 			return Ok(self.snapshot(saved));
 		}
-		Ok(self
-			.read_legacy()?
-			.map_or_else(default_snapshot, |legacy| SettingsSnapshot {
-				settings: legacy.settings,
-				legacy_root_pending: legacy.root.is_some(),
-			}))
+		Ok(self.read_legacy()?.map_or_else(default_snapshot, |legacy| {
+			SettingsSnapshot::new(legacy.settings, legacy.root.is_some())
+		}))
 	}
 
 	pub(super) fn load_or_migrate(&self) -> Result<SettingsSnapshot, SettingsIssue> {
@@ -103,10 +100,7 @@ impl SettingsStore {
 	}
 
 	fn snapshot(&self, settings: AppSettings) -> SettingsSnapshot {
-		SettingsSnapshot {
-			settings,
-			legacy_root_pending: matches!(self.legacy_root_override(), Ok(Some(_))),
-		}
+		SettingsSnapshot::new(settings, matches!(self.legacy_root_override(), Ok(Some(_))))
 	}
 
 	fn read_saved(&self) -> Result<Option<AppSettings>, SettingsIssue> {
@@ -248,10 +242,7 @@ impl SettingsStore {
 }
 
 fn default_snapshot() -> SettingsSnapshot {
-	SettingsSnapshot {
-		settings: AppSettings::default(),
-		legacy_root_pending: false,
-	}
+	SettingsSnapshot::new(AppSettings::default(), false)
 }
 
 fn read_optional(path: &Path) -> Result<Option<FileSnapshot>, SettingsIssue> {

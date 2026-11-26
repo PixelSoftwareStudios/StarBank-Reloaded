@@ -49,6 +49,10 @@ fn first_load_returns_defaults_without_creating_a_file() -> Result<(), Box<dyn E
 	let first = sandbox.store().load_or_migrate()?;
 	assert_eq!(first.settings, AppSettings::default());
 	assert!(!first.legacy_root_pending);
+	assert_eq!(
+		serde_json::to_value(&first)?["automaticBackupAvailable"],
+		cfg!(target_os = "macos"),
+	);
 	assert!(!sandbox.app.exists());
 	Ok(())
 }
@@ -126,6 +130,7 @@ fn independent_updates_read_back_through_new_store_instances() -> Result<(), Box
 		serde_json::to_value(sandbox.store().load()?)?["settings"]["automaticBackup"],
 		"every-overwrite",
 	);
+	assert!(!fs::read_to_string(sandbox.current())?.contains("automaticBackupAvailable"));
 	assert_eq!(
 		sandbox.store().recover(),
 		Err(SettingsIssue::SettingsChanged)

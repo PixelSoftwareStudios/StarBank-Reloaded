@@ -22,6 +22,7 @@ interface PreferencesController {
   issue?: string;
   recover?: () => void;
   readOnly?: boolean;
+  automaticBackupAvailable?: boolean;
 }
 
 let settingsPage: Promise<typeof import("./settings-page")> | undefined;
@@ -145,6 +146,7 @@ export function AppShell({
                 issue={preferences.issue}
                 onRecover={preferences.recover}
                 readOnly={preferences.readOnly}
+                backupAvailable={preferences.automaticBackupAvailable}
                 breadcrumbAvailable={breadcrumbAvailable}
                 focusOnMount
               />

@@ -24,6 +24,18 @@ const SETTINGS_FILE_NAME: &str = "settings.json";
 pub(crate) struct SettingsSnapshot {
 	settings: schema::AppSettings,
 	legacy_root_pending: bool,
+	automatic_backup_available: bool,
+}
+
+impl SettingsSnapshot {
+	fn new(settings: schema::AppSettings, legacy_root_pending: bool) -> Self {
+		Self {
+			settings,
+			legacy_root_pending,
+			// Individual overwrite targets still require verified native storage.
+			automatic_backup_available: cfg!(target_os = "macos"),
+		}
+	}
 }
 
 /// Desktop save policy read from the same preferences as the Settings screen.
