@@ -20,6 +20,7 @@ import type {
   EditorActionResult,
   EditorRow,
   EditorTarget,
+  SettingsPlatformInfo,
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
 import { BackupPicker } from "./backup-picker";
@@ -57,6 +58,8 @@ import { openInventoryBank, useInventory } from "./use-inventory";
 import { useNativeCloseGuard } from "./use-native-close-guard";
 import "starbank-ui/styles.css";
 import "starbank-ui/settings.css";
+
+declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 
 const APP_NAME = "StarBank Reloaded";
 
@@ -551,6 +554,7 @@ function DesktopApp() {
   return (
     <>
       <AppShell
+        platformInfo={__STARBANK_PLATFORM_INFO__}
         name={APP_NAME}
         editor={controller}
         inventory={inventoryWithBackupStatus}

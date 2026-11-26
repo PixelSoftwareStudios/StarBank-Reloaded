@@ -21,6 +21,7 @@ import {
   type EditorTarget,
   preloadEditorTools,
   preloadSettingsPage,
+  type SettingsPlatformInfo,
 } from "starbank-ui";
 import {
   type BankEditCommand,
@@ -32,6 +33,8 @@ import { LocalBankLibrary } from "./local-bank-library";
 import { useBrowserSettings } from "./use-browser-settings";
 import { ClipboardDialog, ExportDialog } from "./web-dialogs";
 import "./web-dialogs.css";
+
+declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 
 export function StarBankWeb() {
   const preferences = useBrowserSettings();
@@ -305,6 +308,7 @@ export function StarBankWeb() {
   return (
     <>
       <AppShell
+        platformInfo={__STARBANK_PLATFORM_INFO__}
         name="StarBank Web"
         editor={controller}
         preferences={preferences}

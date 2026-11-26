@@ -257,3 +257,37 @@ test("settings present archive progress with cancellation when preferences are r
   expect(settings).toContain("2 of 5 map archives inspected");
   expect(settings).toContain('<button type="button">Cancel scan</button>');
 });
+
+test.each([
+  ["web", "Web browser", "Saving downloads a new bank copy."],
+  ["macos", "macOS", "Saving requires local APFS."],
+  ["linux", "Linux", "Overwrite is unavailable in this Linux build."],
+  [
+    "windows",
+    "Windows",
+    "Disk save and file export are unavailable in this Windows build.",
+  ],
+  [
+    "desktop",
+    "Desktop",
+    "Disk save and file export are unavailable on this platform.",
+  ],
+] as const)(
+  "settings describes the %s build without file paths",
+  (platform, platformName, storage) => {
+    const noChange = () => undefined;
+    const markup = renderToStaticMarkup(
+      <SettingsPage
+        settings={defaultSettings()}
+        onBack={noChange}
+        onChange={noChange}
+        readOnly
+        platformInfo={{ version: "1.2.3", platform }}
+      />,
+    );
+    expect(markup).toContain("<legend>Advanced</legend>");
+    expect(markup).toContain("<dt>Version</dt><dd>1.2.3</dd>");
+    expect(markup).toContain(`<dt>Platform</dt><dd>${platformName}</dd>`);
+    expect(markup).toContain(storage);
+  },
+);

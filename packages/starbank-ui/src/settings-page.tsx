@@ -6,6 +6,10 @@ import {
   InventoryActions,
 } from "./inventory-browser";
 import type { MapInventory } from "./map-sidebar";
+import {
+  SettingsPlatformDetails,
+  type SettingsPlatformInfo,
+} from "./settings-platform";
 
 export type SettingsKey = Exclude<keyof AppSettings, "version">;
 export type ChangeSetting = <Key extends SettingsKey>(
@@ -44,6 +48,7 @@ export interface SettingsPageProps {
   readonly focusOnMount?: boolean;
   readonly breadcrumbAvailable?: boolean;
   readonly onRecover?: () => void;
+  readonly platformInfo?: SettingsPlatformInfo;
 }
 
 type Choice<Value extends string> = readonly [value: Value, label: string];
@@ -89,6 +94,7 @@ export function SettingsPage({
   focusOnMount = false,
   breadcrumbAvailable = false,
   onRecover,
+  platformInfo,
 }: SettingsPageProps) {
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -236,6 +242,11 @@ export function SettingsPage({
           </>
         )}
       </Group>
+      {platformInfo && (
+        <Group title="Advanced">
+          <SettingsPlatformDetails info={platformInfo} />
+        </Group>
+      )}
     </section>
   );
 }

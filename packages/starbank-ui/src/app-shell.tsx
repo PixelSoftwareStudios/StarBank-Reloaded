@@ -15,6 +15,7 @@ import { type BankListItem, useBankAccountScope } from "./inventory-browser";
 import { resolveMapContext } from "./map-context";
 import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
 import type { ChangeSetting } from "./settings-page";
+import type { SettingsPlatformInfo } from "./settings-platform";
 import { SidebarSplitter } from "./sidebar-splitter";
 
 interface PreferencesController {
@@ -49,6 +50,7 @@ export function AppShell({
   workspaceAccessory,
   tools,
   breadcrumbAvailable,
+  platformInfo,
 }: {
   name: string;
   inventory?: MapInventory;
@@ -58,6 +60,7 @@ export function AppShell({
   workspaceAccessory?: ReactNode;
   tools?: ReactNode;
   breadcrumbAvailable?: boolean;
+  platformInfo?: SettingsPlatformInfo;
 }) {
   const mapPaneId = useId();
   const accountScope = useBankAccountScope(
@@ -157,6 +160,7 @@ export function AppShell({
                 backupAvailable={preferences.automaticBackupAvailable}
                 breadcrumbAvailable={breadcrumbAvailable}
                 focusOnMount
+                platformInfo={platformInfo}
               />
             </Suspense>
           </div>
@@ -209,3 +213,5 @@ export {
   type MapListItem,
   type MapOptions,
 } from "./map-sidebar";
+
+export type { SettingsPlatformInfo } from "./settings-platform";
