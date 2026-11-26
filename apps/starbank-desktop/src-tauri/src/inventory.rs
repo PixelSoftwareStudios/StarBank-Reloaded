@@ -15,7 +15,7 @@ mod scan;
 pub(crate) use authority::BankAuthority;
 use authority::is_native_disk_path;
 use batch::MapMembers;
-#[cfg(test)]
+#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 pub(crate) use batch::scan_batch_fixture;
 pub(crate) use batch::{InventoryBatch, InventoryBatchMember};
 use projection::OpaqueIds;
