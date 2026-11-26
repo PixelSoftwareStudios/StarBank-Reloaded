@@ -47,6 +47,7 @@ import {
 } from "./transport";
 import { useDesktopSettings } from "./use-desktop-settings";
 import { openInventoryBank, useInventory } from "./use-inventory";
+import { useNativeCloseGuard } from "./use-native-close-guard";
 import "@starbank/ui/styles.css";
 
 const APP_NAME = "StarBank Reloaded";
@@ -80,6 +81,23 @@ function DesktopApp() {
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
   const { theme, textSize } = preferences.settings;
+
+  const closeGuard = useNativeCloseGuard({
+    busy,
+    onDraft: setHasDraft,
+    onNotice: setNativeNotice,
+    save:
+      document && (overwriteAvailable || exportAvailable)
+        ? async () => {
+            const result = await save(
+              document.projection,
+              overwriteAvailable ? "overwrite" : "new",
+            );
+            if (result.message) setNativeNotice(result.message);
+            return result.ok && result.message !== undefined;
+          }
+        : undefined,
+  });
 
   useEffect(() => {
     window.document.documentElement.dataset.starbankTheme = theme;
@@ -265,7 +283,7 @@ function DesktopApp() {
 
   const inventory = useInventory({
     selectedBankId,
-    disabled: busy || hasDraft,
+    disabled: busy || hasDraft || closeGuard.pending,
     onOpenBank: (id) => {
       void openFrom((control) => openInventoryBank(id, control), id).then(
         (result) => setNativeNotice(result.message),
@@ -332,10 +350,10 @@ function DesktopApp() {
 
   const controller: BankEditorController = {
     document: document?.projection,
-    busy,
+    busy: busy || closeGuard.pending,
     status: nativeNotice,
     onOpen: () => openFrom(pickBank),
-    onDraftChange: setHasDraft,
+    onDraftChange: closeGuard.reportDraft,
     profile: {
       current: profile ?? { status: "unloaded" },
       requireAuthor: profile?.status === "missing_context",

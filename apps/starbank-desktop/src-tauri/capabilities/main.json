@@ -4,6 +4,8 @@
   "local": true,
   "webviews": ["main"],
   "permissions": [
+    "allow-confirm-window-close",
+    "allow-complete-window-close",
     "allow-open-bank",
     "allow-dispatch-bank",
     "allow-export-bank-copy",

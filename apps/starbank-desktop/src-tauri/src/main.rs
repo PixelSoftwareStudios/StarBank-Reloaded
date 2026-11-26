@@ -3,6 +3,7 @@
 
 mod backup;
 mod batch_backup;
+mod close_guard;
 mod commands;
 mod desktop;
 mod export;

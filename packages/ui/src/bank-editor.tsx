@@ -1,7 +1,7 @@
 import { Tabs } from "@heroui/react/tabs";
 import type { EngineDiff } from "@starbank/engine-client/protocol";
 import type { AppSettings } from "@starbank/platform/settings";
-import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useLayoutEffect, useState } from "react";
 import { BankRevealButton } from "./bank-reveal-button";
 import {
   EditorActions,
@@ -121,7 +121,9 @@ export function BankEditor({
   } = controller;
   const hasDraft = draft !== undefined || profileDraft !== undefined;
   const pending = busy || hasDraft;
-  useEffect(() => onDraftChange?.(hasDraft), [hasDraft, onDraftChange]);
+  useLayoutEffect(() => {
+    onDraftChange?.(draft !== undefined || profileDraft !== undefined);
+  }, [draft, profileDraft, onDraftChange]);
 
   const staleProfile =
     profileDraft !== undefined &&

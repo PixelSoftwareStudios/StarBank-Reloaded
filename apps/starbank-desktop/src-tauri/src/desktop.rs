@@ -5,6 +5,7 @@ use tauri::{
 
 use crate::{
 	batch_backup::BatchBackupService,
+	close_guard::{self, DesktopCloseGuard},
 	commands::DesktopEngine,
 	inventory::InventoryService,
 	open_requests::{self, OpenRequests},
@@ -19,8 +20,12 @@ const INVENTORY_ROOT: &str = "inventory-root.json";
 
 pub(crate) fn run() -> tauri::Result<()> {
 	let current_dir = std::env::current_dir().ok();
-	tauri::Builder::default()
+	let builder = tauri::Builder::default();
+	#[cfg(target_os = "macos")]
+	let builder = builder.menu(close_guard::menu);
+	builder
 		.manage(DesktopEngine::default())
+		.manage(DesktopCloseGuard::default())
 		.manage(BatchBackupService::default())
 		.manage(OpenRequests::from_args(
 			current_dir.as_deref(),
@@ -70,6 +75,8 @@ pub(crate) fn run() -> tauri::Result<()> {
 			}
 		})
 		.invoke_handler(tauri::generate_handler![
+			close_guard::confirm_window_close,
+			close_guard::complete_window_close,
 			crate::commands::open_bank,
 			crate::commands::dispatch_bank,
 			crate::export::export_bank_copy,
@@ -101,8 +108,9 @@ pub(crate) fn run() -> tauri::Result<()> {
 	Ok(())
 }
 
-#[cfg(target_os = "macos")]
 fn on_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
+	close_guard::handle_event(app, &event);
+	#[cfg(target_os = "macos")]
 	if let tauri::RunEvent::Opened { urls } = event {
 		open_requests::enqueue(
 			app,
@@ -110,9 +118,6 @@ fn on_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
 		);
 	}
 }
-
-#[cfg(not(target_os = "macos"))]
-fn on_run_event(_app: &tauri::AppHandle, _event: tauri::RunEvent) {}
 
 fn is_local_webview(url: &Url, development_origin: Option<&Url>) -> bool {
 	let packaged = match (url.scheme(), url.host_str()) {
