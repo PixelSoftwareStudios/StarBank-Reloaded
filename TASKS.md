@@ -31,15 +31,15 @@ Depends on: 02.
 
 Depends on: 03.
 
-- [x] Implement signature computation and read-only verification. Compare synthetic vectors with the pinned v2.0 signer. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
-- [ ] Verify game-generated digests and complete context UI and prepared re-sign/export for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
+- [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Compare synthetic vectors with the pinned v2.0 signer.
+- [ ] Verify game-generated digests and complete automatic and explicit re-sign flows for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-05 — Editor transactions and validation
 
 Depends on: 03,04.
 
-- [ ] Stable IDs, numeric lexemes, bulk transaction, raw draft, undo/reset/diff and conflict protocol.
+- [x] Implement stable IDs, exact numeric lexemes, atomic edits, structural edits, validated Raw replacement, history and opening-snapshot diff/revert in the shared engine.
 - [ ] Implement and verify: REQ-EDIT-01, REQ-EDIT-02, REQ-EDIT-03, REQ-EDIT-04, REQ-EDIT-05, REQ-EDIT-06, REQ-EDIT-07.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -47,7 +47,8 @@ Depends on: 03,04.
 
 Depends on: 05.
 
-- [ ] Versioned schema, migration, fixture-backed Simple View mapping and dependent validation.
+- [x] Implement versioned schema, compatible legacy migration, explicit identity matching and exact atomic dependent edits in the engine.
+- [ ] Wire Simple View and qualify actual game profiles and identity evidence.
 - [ ] Implement and verify: REQ-PROF-01, REQ-PROF-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -55,7 +56,8 @@ Depends on: 05.
 
 Depends on: 04,05.
 
-- [ ] Verified prepare/commit, Windows/macOS tests, explicit outcomes, backup restore; license-safe maintained library selection.
+- [x] Implement checked preparation, exclusive creation, verified local APFS replacement, backup snapshots and reversible restore policy.
+- [ ] Qualify Windows writes, Linux replacement, interrupted-save recovery and the full application save and backup flow.
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -71,7 +73,8 @@ Depends on: 02.
 
 Depends on: 02.
 
-- [ ] Evaluate candidates against SC2/StormLib, native read/write capability, no runtime tampering; unsupported map tool remains explicit.
+- [x] Implement bounded read-only metadata inspection for supported MPQ V1/V2/V4 layouts and test synthetic StormLib fixtures.
+- [ ] Qualify the real SC2 corpus and authorized repair and export behavior.
 - [ ] Implement and verify: REQ-MPQ-01, REQ-MPQ-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -79,7 +82,8 @@ Depends on: 02.
 
 Depends on: 08,09.
 
-- [ ] Incremental metadata, real grouping, bounded workers and cancellation, map filters/status.
+- [x] Implement bounded and cancellable metadata indexing, incremental cache and ambiguity-preserving association. Verify synthetic archives and cache failures.
+- [ ] Connect map selection, filters and metadata status to the native application and test real cache layouts.
 - [ ] Implement and verify: REQ-MAP-02, REQ-MAP-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -95,7 +99,8 @@ Depends on: 02,08.
 
 Depends on: 05,06,07,10,11.
 
-- [ ] Bind all views to engine, exact formatted inputs, raw CodeMirror, same-value bulk, backup and save controls.
+- [x] Implement controlled Table and CodeMirror Raw views, same-value bulk editing, draft safeguards and callback-driven file actions.
+- [ ] Finish all live platform bindings, Simple View, and backup and save flows.
 - [ ] Implement and verify: REQ-UI-05, REQ-UI-06, REQ-UI-07, REQ-UI-08.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -103,7 +108,8 @@ Depends on: 05,06,07,10,11.
 
 Depends on: 11,12.
 
-- [ ] Settings page, legacy migration, capability-aware native tools/permissions, safe switching.
+- [x] Implement versioned browser preferences, legacy decoding and the shared settings page. Preserve in-flight drafts across settings navigation.
+- [ ] Complete native preference persistence, root authorization and remaining platform settings.
 - [ ] Implement and verify: REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -111,7 +117,8 @@ Depends on: 11,12.
 
 Depends on: 03,04,05,06,11,12.
 
-- [ ] WASM worker, browser adapter, local-only static site; no need for native discovery/MPQ.
+- [x] Wire the browser to the shared WASM engine and verify offline local editing, guarded switching, copy fallback and downloads in Chromium, Firefox and WebKit.
+- [ ] Complete live profile and structural editing controls, optional writable file handles, and static deployment verification.
 - [ ] Implement and verify: REQ-WEB-01, REQ-WEB-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -119,7 +126,8 @@ Depends on: 03,04,05,06,11,12.
 
 Depends on: 05,07,08.
 
-- [ ] Typed commands, JSON, dry-run, no implicit overwrite; docs and conformance.
+- [x] Implement typed local bank commands, versioned JSON, exact patch selectors, dry-run, guarded effects, backup and restore, and the CLI skill.
+- [ ] Finish map inspection and cross-adapter and native Windows runtime conformance.
 - [ ] Implement and verify: REQ-CLI-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -127,7 +135,8 @@ Depends on: 05,07,08.
 
 Depends on: 12,13,14,15.
 
-- [ ] Real Windows/macOS install/open flow; release licensing cleared; Linux support documented.
+- [x] Build and launch the Tauri host on macOS and link the tested Linux arm64 executable.
+- [ ] Verify signed packages and file associations, real Windows and macOS install/open flows, release licensing and Linux packaging.
 - [ ] Implement and verify: REQ-DIST-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
