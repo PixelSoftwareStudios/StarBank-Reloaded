@@ -23,7 +23,8 @@ pub use lexeme::{LexemeError, is_value_editable, normalize_value};
 pub use prepare::{ExportSigning, PreparedExport};
 pub use profile::{ProfileEdit, ProfileEvidence, ProfileSessionError, ProfileValueChange};
 pub use protocol::{
-	Engine, MAX_CONTROL_BYTES, MAX_OPERATIONS, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
+	Engine, MAX_CONTROL_BYTES, MAX_OPERATIONS, NativeSaveReceipt, PROTOCOL_VERSION, WireReply,
+	max_attachment_bytes,
 };
 pub use raw::RawNumberKind;
 pub use session::{Session, ValueChange};

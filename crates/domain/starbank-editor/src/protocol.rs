@@ -8,6 +8,7 @@ use crate::{ExportSigning, OccurrenceId, OpeningDiff, Session, ValueChange};
 
 mod diff;
 mod error;
+mod native_save;
 mod reply;
 mod request;
 mod snapshot;
@@ -19,6 +20,7 @@ use self::reply::{ReplyResult, Scope};
 use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
 use self::snapshot::{Snapshot, WireSignatureStatus};
 
+pub use self::native_save::NativeSaveReceipt;
 pub use self::reply::WireReply;
 
 /// Version of the command and response schema.

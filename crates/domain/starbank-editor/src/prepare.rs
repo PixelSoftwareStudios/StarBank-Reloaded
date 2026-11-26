@@ -120,16 +120,7 @@ impl Session {
 		&mut self,
 		mut prepared: PreparedExport,
 	) -> Result<Revision, EditorError> {
-		if !Arc::ptr_eq(&self.token, &prepared.token) {
-			return Err(EditorError::WrongSession);
-		}
-		if self
-			.save_order
-			.acknowledged
-			.is_some_and(|sequence| prepared.sequence <= sequence)
-		{
-			return Err(EditorError::StaleSaveAcknowledgement);
-		}
+		self.require_unacknowledged_active_save(&prepared)?;
 		let revision = if prepared.revision == self.revision()
 			&& let Some(document) = prepared.signed_document.take()
 			&& document.source() != self.document.source()
@@ -142,5 +133,38 @@ impl Session {
 		self.saved_checkpoint(prepared.bytes);
 		self.save_order.acknowledged = Some(prepared.sequence);
 		Ok(revision)
+	}
+
+	pub(crate) fn validate_current_active_save(
+		&self,
+		prepared: &PreparedExport,
+	) -> Result<(), EditorError> {
+		self.require_unacknowledged_active_save(prepared)?;
+		self.require_revision(prepared.revision)?;
+		if prepared
+			.signed_document
+			.as_ref()
+			.is_some_and(|document| document.source() != self.document.source())
+		{
+			let _ = self.next_revision()?;
+		}
+		Ok(())
+	}
+
+	fn require_unacknowledged_active_save(
+		&self,
+		prepared: &PreparedExport,
+	) -> Result<(), EditorError> {
+		if !Arc::ptr_eq(&self.token, &prepared.token) {
+			return Err(EditorError::WrongSession);
+		}
+		if self
+			.save_order
+			.acknowledged
+			.is_some_and(|sequence| prepared.sequence <= sequence)
+		{
+			return Err(EditorError::StaleSaveAcknowledgement);
+		}
+		Ok(())
 	}
 }
