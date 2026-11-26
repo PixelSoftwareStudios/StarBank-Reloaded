@@ -103,6 +103,7 @@ jobs:
       - run: pnpm test
       - run: pnpm --filter @starbank/web exec playwright install --with-deps chromium firefox webkit
       - run: pnpm --filter @starbank/web test:browser
+      - run: pnpm --filter @starbank/web exec node test/breadcrumbs.mjs chromium firefox webkit
 
   desktop:
     name: Native desktop on ${{ matrix.os }}
