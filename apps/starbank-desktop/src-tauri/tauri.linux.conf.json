@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "starbank-reloaded",
+  "bundle": {
+    "category": "Utility",
+    "shortDescription": "Local StarCraft II bank file editor",
+    "longDescription": "Inspect and edit bank files in table and XML views, keep backups, and verify bank signatures locally.",
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "desktopTemplate": "linux/starbank.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "linux/starbank.desktop"
+      }
+    }
+  }
+}
