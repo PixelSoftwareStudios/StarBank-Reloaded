@@ -1,0 +1,3 @@
+# Preserve the archive and test fixture bytes across checkouts.
+/original/** -text
+/crates/**/tests/fixtures/** -text

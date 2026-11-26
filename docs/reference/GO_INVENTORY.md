@@ -35,4 +35,5 @@ The lossless format and signature gaps map to REQ-FMT-01 through REQ-FMT-04 and 
 - Before the move, `GOWORK=off GOTOOLCHAIN=local GOPROXY=off go test -count=1 ./...` passed on Go 1.27.0 for macOS arm64.
 - From `original/`, `GOWORK=off GOTOOLCHAIN=local GOPROXY=off go test -mod=readonly -count=1 ./...` passed. `go build -mod=readonly -o <temp-path> ./cmd/starbank` compiled the GUI with the same environment. The linker reported a duplicate `-lobjc` warning.
 - The staged archive matched all 41 pre-move hashes. A disposable copy of the supplied pack, with the recovered ignored dump, passed its original validator for 42 snapshot entries. The imported validator checks the live archive and verifies the ignored dump when present.
+- A clean checkout with `core.autocrlf=true` initially converted 40 archived files. The repository's path-scoped Git attributes preserve the archive bytes, and the validator passes with that checkout setting and the local dump absent.
 - The declared minimum Go 1.25.1, GUI runtime behavior and Windows builds remain unverified. For archived development, start in `original/` before running `air` or a platform recipe in its `justfile`.
