@@ -1,3 +1,9 @@
+import type {
+  EngineDiff,
+  EngineRevertTarget,
+  EngineStructureChange,
+} from "@starbank/engine-client/protocol";
+
 export interface EditorTarget {
   id: string;
   revision: string;
@@ -7,14 +13,21 @@ export interface EditorRow {
   id: string;
   name: string;
   childName?: string;
+  keyId?: string;
   type: string;
   value: string;
   editable?: boolean;
 }
 
+export interface EditorKey {
+  id: string;
+  name: string;
+}
+
 export interface EditorSection {
   id: string;
   name: string;
+  keys?: readonly EditorKey[];
   rows: readonly EditorRow[];
 }
 
@@ -35,6 +48,10 @@ export type EditorActionResult =
   | { ok: true; message?: string }
   | { ok: false; message: string };
 
+export type EditorDiffResult =
+  | { ok: true; diff: EngineDiff; message?: string }
+  | { ok: false; message: string };
+
 export type EditorAction = (
   target: EditorTarget,
 ) => Promise<EditorActionResult>;
@@ -53,8 +70,21 @@ export interface BankEditorController {
     target: EditorTarget,
     xml: string,
   ) => Promise<EditorActionResult>;
+  onDraftChange?: (hasDraft: boolean) => void;
+  onStructure?: (
+    target: EditorTarget,
+    change: EngineStructureChange,
+  ) => Promise<EditorActionResult>;
+  onDiff?: (target: EditorTarget) => Promise<EditorDiffResult>;
+  onRevert?: (
+    target: EditorTarget,
+    selection: EngineRevertTarget,
+  ) => Promise<EditorActionResult>;
   onSave?: EditorAction;
   onSaveAs?: EditorAction;
+  onSaveWithBackup?: EditorAction;
+  onRestore?: EditorAction;
+  onResign?: EditorAction;
   onExport?: EditorAction;
   onCopy?: EditorAction;
   onReset?: EditorAction;

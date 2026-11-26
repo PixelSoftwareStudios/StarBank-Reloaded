@@ -1,6 +1,7 @@
 import { Tabs } from "@heroui/react/tabs";
+import type { EngineDiff } from "@starbank/engine-client/protocol";
 import type { AppSettings } from "@starbank/platform/settings";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   EditorActions,
   fileDropHandlers,
@@ -30,6 +31,8 @@ export function preloadRawEditor() {
 }
 
 const RawEditor = lazy(preloadRawEditor);
+const StructureEditor = lazy(() => import("./structure-editor"));
+const EditorDiff = lazy(() => import("./editor-diff"));
 
 export function BankEditor({
   controller,
@@ -51,6 +54,11 @@ export function BankEditor({
   onOpenSettings?: () => void;
 }) {
   const [draft, setDraft] = useState<EditorDraft>();
+  const [structure, setStructure] = useState<{
+    revision: string;
+    sectionId?: string;
+  }>();
+  const [diff, setDiff] = useState<{ revision: string; value: EngineDiff }>();
   const target = { id: document.id, revision: document.revision };
   const tableDraft = draft?.kind === "table" ? draft : undefined;
   const rawDraft = draft?.kind === "raw" ? draft : undefined;
@@ -58,8 +66,17 @@ export function BankEditor({
     ? prepareTableDraft(document.sections, tableDraft.values)
     : undefined;
   const stale = draft !== undefined && draft.revision !== document.revision;
-  const { onEditValues, onReplaceXml } = controller;
-  const pending = busy || draft !== undefined;
+  const {
+    onEditValues,
+    onReplaceXml,
+    onDraftChange,
+    onStructure,
+    onDiff,
+    onRevert,
+  } = controller;
+  const hasDraft = draft !== undefined;
+  const pending = busy || hasDraft;
+  useEffect(() => onDraftChange?.(hasDraft), [hasDraft, onDraftChange]);
 
   function stageValues(rows: readonly EditorRow[], value: string) {
     setDraft((current) => {
@@ -103,7 +120,7 @@ export function BankEditor({
         <div className="editor-open-actions">
           <OpenBankButton
             controller={controller}
-            disabled={pending || (document.dirty && Boolean(controller.onOpen))}
+            disabled={pending}
             run={run}
           />
           <SettingsButton open={onOpenSettings} />
@@ -137,6 +154,25 @@ export function BankEditor({
             onChange={stageValues}
             layout={settings?.sectionsLayout}
             groupNumbers={settings?.groupNumbers}
+            actionsDisabled={pending}
+            onOpenStructure={
+              onStructure &&
+              ((sectionId) => {
+                clearNotice();
+                setStructure({ revision: document.revision, sectionId });
+              })
+            }
+            onOpenDiff={
+              onDiff &&
+              (() => {
+                run(async () => {
+                  const result = await onDiff(target);
+                  if (result.ok)
+                    setDiff({ revision: target.revision, value: result.diff });
+                  return result;
+                });
+              })
+            }
           />
         </Tabs.Panel>
         <Tabs.Panel id="raw" className="editor-view">
@@ -159,6 +195,40 @@ export function BankEditor({
           </Suspense>
         </Tabs.Panel>
       </Tabs>
+
+      <Suspense fallback={null}>
+        {onStructure && structure?.revision === document.revision && (
+          <StructureEditor
+            sections={document.sections}
+            initialSection={structure.sectionId}
+            busy={busy}
+            notice={notice}
+            onApply={(change) =>
+              run(
+                () => onStructure(target, change),
+                () => setStructure(undefined),
+              )
+            }
+            onDismiss={() => setStructure(undefined)}
+          />
+        )}
+        {diff?.revision === document.revision && (
+          <EditorDiff
+            diff={diff.value}
+            busy={busy}
+            notice={notice}
+            onRevert={
+              onRevert &&
+              ((selection) =>
+                run(
+                  () => onRevert(target, selection),
+                  () => setDiff(undefined),
+                ))
+            }
+            onDismiss={() => setDiff(undefined)}
+          />
+        )}
+      </Suspense>
 
       {draft && (
         <div className="editor-draft-actions">

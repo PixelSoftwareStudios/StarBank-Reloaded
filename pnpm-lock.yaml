@@ -351,6 +351,9 @@ importers:
       '@lezer/highlight':
         specifier: 1.2.5
         version: 1.2.5
+      '@starbank/engine-client':
+        specifier: workspace:*
+        version: link:../engine-client
       '@starbank/platform':
         specifier: workspace:*
         version: link:../platform

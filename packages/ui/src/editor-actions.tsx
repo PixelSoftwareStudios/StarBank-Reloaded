@@ -73,11 +73,7 @@ export function OpenBankButton({
       )}
       <button
         className="editor-button"
-        title={
-          controller.document?.dirty && onOpen
-            ? "Save or reset the current bank before opening another"
-            : "Open a local bank file"
-        }
+        title="Open a local bank file"
         type="button"
         disabled={disabled}
         onClick={() => {
@@ -110,13 +106,19 @@ export function EditorActions({
   const actions: Action[] = [
     { label: "Save", action: controller.onSave },
     { label: "Save As…", action: controller.onSaveAs },
+    { label: "Save w/ Backup", action: controller.onSaveWithBackup },
+    { label: "Restore Backup…", action: controller.onRestore },
+    { label: "Re-sign Bank", action: controller.onResign },
     { label: "Export copy…", action: controller.onExport },
     { label: "Copy bank XML", action: controller.onCopy },
   ];
   const available = actions.flatMap(({ label, action }) =>
     action ? [{ label, action }] : [],
   );
-  const [primary, ...secondary] = available;
+  const [primary, ...remaining] = available;
+  const secondary = controller.onSave
+    ? [{ label: "Save (Overwrite)", action: controller.onSave }, ...remaining]
+    : remaining;
   const { onReset, onUndo, onRedo } = controller;
 
   return (

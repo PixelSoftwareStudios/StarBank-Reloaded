@@ -36,6 +36,9 @@ export function TableEditor({
   onChange,
   layout = "separate",
   groupNumbers = false,
+  actionsDisabled,
+  onOpenStructure,
+  onOpenDiff,
 }: {
   sections: readonly EditorSection[];
   values?: ReadonlyMap<string, string>;
@@ -44,6 +47,9 @@ export function TableEditor({
   onChange: (rows: readonly EditorRow[], value: string) => void;
   layout?: "separate" | "unified";
   groupNumbers?: boolean;
+  actionsDisabled?: boolean;
+  onOpenStructure?: (sectionId?: string) => void;
+  onOpenDiff?: () => void;
 }) {
   const instructionsId = useId();
   const [sectionId, setSectionId] = useState<string>();
@@ -85,6 +91,30 @@ export function TableEditor({
         </nav>
       )}
       <div className="editor-table-scroll">
+        {(onOpenStructure || onOpenDiff) && (
+          <div className="editor-table-actions">
+            {onOpenStructure && (
+              <button
+                className="editor-button"
+                type="button"
+                disabled={actionsDisabled}
+                onClick={() => onOpenStructure(section?.id)}
+              >
+                Edit structure…
+              </button>
+            )}
+            {onOpenDiff && (
+              <button
+                className="editor-button"
+                type="button"
+                disabled={actionsDisabled}
+                onClick={onOpenDiff}
+              >
+                Changes…
+              </button>
+            )}
+          </div>
+        )}
         {!section ? (
           <p className="empty-message">No sections found.</p>
         ) : (

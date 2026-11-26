@@ -13,6 +13,51 @@ export interface EngineValueEdit {
   readonly value: string;
 }
 
+export const STRUCTURED_VALUE_KINDS = [
+  "int",
+  "fixed",
+  "string",
+  "text",
+] as const;
+export type EngineStructuredValueKind = (typeof STRUCTURED_VALUE_KINDS)[number];
+
+export type EngineStructureChange =
+  | { readonly kind: "add_section"; readonly name: string }
+  | {
+      readonly kind: "remove_section" | "remove_key" | "remove_value";
+      readonly id: string;
+    }
+  | {
+      readonly kind: "rename_section" | "rename_key" | "rename_value";
+      readonly id: string;
+      readonly name: string;
+    }
+  | {
+      readonly kind: "add_key";
+      readonly section_id: string;
+      readonly name: string;
+    }
+  | {
+      readonly kind: "add_value";
+      readonly key_id: string;
+      readonly name: string;
+      readonly value_kind: EngineStructuredValueKind;
+      readonly value: string;
+    }
+  | {
+      readonly kind: "set_value_type";
+      readonly id: string;
+      readonly value_kind: EngineStructuredValueKind;
+      readonly value: string;
+    };
+
+const occurrenceKind = v.picklist(["section", "key", "value"]);
+
+export interface EngineRevertTarget {
+  readonly kind: v.InferOutput<typeof occurrenceKind>;
+  readonly id: string;
+}
+
 export type EngineCommand =
   | {
       readonly kind: "open";
@@ -28,6 +73,9 @@ export type EngineCommand =
       readonly kind: "set_values";
       readonly payload: { readonly edits: readonly EngineValueEdit[] };
     }
+  | { readonly kind: "structure"; readonly payload: EngineStructureChange }
+  | { readonly kind: "diff" }
+  | { readonly kind: "revert"; readonly payload: EngineRevertTarget }
   | { readonly kind: "undo" }
   | { readonly kind: "redo" }
   | { readonly kind: "reset" }
@@ -91,10 +139,40 @@ const engineSnapshot = v.object({
 
 export type EngineSnapshot = v.InferOutput<typeof engineSnapshot>;
 
+const diffOccurrence = v.object({
+  parent: v.nullable(v.string()),
+  name: v.nullable(v.string()),
+  value: v.nullable(v.object({ kind: v.string(), text: v.string() })),
+});
+
+const diffChange = v.variant("kind", [
+  v.object({ kind: v.literal("added"), payload: diffOccurrence }),
+  v.object({ kind: v.literal("removed"), payload: diffOccurrence }),
+  v.object({
+    kind: v.literal("changed"),
+    payload: v.object({ before: diffOccurrence, after: diffOccurrence }),
+  }),
+]);
+
+const engineOccurrenceDiff = v.object({
+  id: v.string(),
+  kind: occurrenceKind,
+  change: diffChange,
+});
+
+const engineDiff = v.object({
+  source_changed: v.boolean(),
+  changes: v.array(engineOccurrenceDiff),
+});
+
+export type EngineDiff = v.InferOutput<typeof engineDiff>;
+export type EngineOccurrenceDiff = v.InferOutput<typeof engineOccurrenceDiff>;
+
 const emptyPayload = v.object({});
 const resultSchema = v.variant("kind", [
   v.object({ kind: v.literal("snapshot"), payload: engineSnapshot }),
   v.object({ kind: v.literal("raw"), payload: emptyPayload }),
+  v.object({ kind: v.literal("diff"), payload: engineDiff }),
   v.object({
     kind: v.literal("prepared"),
     payload: v.object({ signature_status: signatureStatus }),
