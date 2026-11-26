@@ -13,6 +13,35 @@ use super::darwin;
 use super::destination::{Destination, ObservedFile, digest};
 use super::stage::Stage;
 
+/// Checks the current native replacement scope without staging or publishing bytes.
+///
+/// Availability can change after the check. Callers must still obtain a verified commit
+/// against their captured fingerprint.
+///
+/// # Errors
+///
+/// Rejects unsupported filesystems, unsafe targets or unsupported metadata.
+#[cfg(target_os = "macos")]
+pub fn check_replace_scope(path: &Path) -> Result<(), StorageError> {
+	let destination = Destination::open(path)?;
+	darwin::require_local_apfs(&destination.dir)?;
+	let file = destination.open_file(&destination.name, OFlags::RDWR)?;
+	let observed = super::destination::observe(&file)?;
+	darwin::require_writable_metadata(&file)?;
+	destination.ensure_file_bound(&destination.name, &observed)?;
+	destination.ensure_bound()
+}
+
+/// Checks native replacement availability.
+///
+/// # Errors
+///
+/// Linux requires a qualified overwrite adapter before replacement is available.
+#[cfg(target_os = "linux")]
+pub fn check_replace_scope(_path: &Path) -> Result<(), StorageError> {
+	Err(StorageError::Unsupported("Linux overwrite is unavailable"))
+}
+
 /// Publishes previously validated local bytes under the caller's explicit intent.
 ///
 /// macOS publication is restricted to local APFS. Linux supports exclusive creation when the

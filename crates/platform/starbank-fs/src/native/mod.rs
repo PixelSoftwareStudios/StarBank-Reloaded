@@ -4,6 +4,6 @@ mod darwin;
 mod destination;
 mod stage;
 
-pub use commit::commit;
+pub use commit::{check_replace_scope, commit};
 pub use destination::read_snapshot;
 pub(crate) use destination::{FileIdentity, ObservedFile};

@@ -19,6 +19,15 @@ pub fn read_snapshot(_path: &Path, _max_bytes: usize) -> Result<FileSnapshot, St
 	Err(StorageError::Unsupported(UNSUPPORTED_PLATFORM))
 }
 
+/// Checks native replacement availability.
+///
+/// # Errors
+///
+/// Always returns an unsupported-platform error.
+pub fn check_replace_scope(_path: &Path) -> Result<(), StorageError> {
+	Err(StorageError::Unsupported(UNSUPPORTED_PLATFORM))
+}
+
 /// Rejects the commit before opening a file on this platform.
 pub fn commit(
 	_path: &Path,

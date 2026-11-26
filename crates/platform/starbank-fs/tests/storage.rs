@@ -6,7 +6,8 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 
 use starbank_fs::{
-	CommitIntent, CommitOutcome, CommitReceipt, StorageError, commit, read_snapshot,
+	CommitIntent, CommitOutcome, CommitReceipt, StorageError, check_replace_scope, commit,
+	read_snapshot,
 };
 use tempfile::TempDir;
 
@@ -149,6 +150,44 @@ fn rejects_hardlinks_and_ambiguous_path_syntax() -> io::Result<()> {
 			StorageError::UnsafePath(_)
 		));
 	}
+	assert_eq!(fs::read(path)?, ORIGINAL);
+	fixture.assert_no_pending()
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn replacement_preflight_is_read_only_and_refuses_unsupported_targets() -> io::Result<()> {
+	let fixture = Fixture::new()?;
+	let path = fixture.file();
+	fs::write(&path, ORIGINAL)?;
+	let before = read_snapshot(&path, LIMIT).expect("initial fingerprint");
+	check_replace_scope(&path).expect("writable local APFS target");
+	let after = read_snapshot(&path, LIMIT).expect("unchanged fingerprint");
+	assert_eq!(after.fingerprint(), before.fingerprint());
+	assert_eq!(after.bytes(), ORIGINAL);
+	fixture.assert_no_pending()?;
+
+	fs::set_permissions(&path, fs::Permissions::from_mode(0o400))?;
+	assert!(check_replace_scope(&path).is_err());
+	let link = fixture.path.join("Alias.SC2Bank");
+	symlink(&path, &link)?;
+	assert!(matches!(
+		check_replace_scope(&link),
+		Err(StorageError::UnsafePath(_))
+	));
+	Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn replacement_preflight_reports_linux_as_unsupported() -> io::Result<()> {
+	let fixture = Fixture::new()?;
+	let path = fixture.file();
+	fs::write(&path, ORIGINAL)?;
+	assert!(matches!(
+		check_replace_scope(&path),
+		Err(StorageError::Unsupported(_))
+	));
 	assert_eq!(fs::read(path)?, ORIGINAL);
 	fixture.assert_no_pending()
 }

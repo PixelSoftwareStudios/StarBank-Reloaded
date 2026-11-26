@@ -27,14 +27,14 @@ pub use contract::{
 	RecoveryArtifact, StorageError,
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-pub use native::{commit, read_snapshot};
+pub use native::{check_replace_scope, commit, read_snapshot};
 #[cfg(not(target_family = "wasm"))]
 pub use starbank_backup::{
 	BackupHealth, BackupId, BackupPlacement, BackupRecord, BackupStatus, BankSource,
 };
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-pub use unsupported::commit;
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 pub use unsupported::read_snapshot;
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub use unsupported::{check_replace_scope, commit};
 #[cfg(windows)]
 pub use windows::read_snapshot;
