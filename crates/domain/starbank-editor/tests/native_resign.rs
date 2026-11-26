@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use starbank_core::Revision;
-use starbank_editor::{EditorError, Engine, PROTOCOL_VERSION};
-use starbank_signature::SigningContext;
+use starbank_editor::{EditorError, Engine, ExportSigning, PROTOCOL_VERSION};
+use starbank_signature::{SignatureStatus, SigningContext};
 
 const ORIGINAL: &[u8] =
 	br#"<Bank><Section name="Score"><Key name="Points"><Value int="0042"/></Key></Section></Bank>"#;
@@ -56,6 +56,76 @@ fn resign_is_undoable_and_keeps_the_saved_checkpoint() {
 			.expect("opening bytes"),
 		ORIGINAL
 	);
+}
+
+#[test]
+fn external_context_is_scoped_to_checks_and_edits() {
+	let (mut engine, document_id) = open();
+	let intended =
+		SigningContext::new("1-S2-1-111", "1-S2-1-222", "Stats").expect("manual context");
+	let other = SigningContext::new("1-S2-1-111", "1-S2-1-222", "Renamed").expect("manual context");
+	assert_eq!(
+		engine
+			.preview_native_active_signature(&document_id, Revision::INITIAL, &intended)
+			.expect("external signature check"),
+		SignatureStatus::Unsigned,
+	);
+	assert!(matches!(
+		engine.preview_native_active_signature("unknown", Revision::INITIAL, &intended),
+		Err(EditorError::WrongSession)
+	));
+	assert!(
+		!engine.native_active_target().expect("active bank").dirty,
+		"checking must not change the document",
+	);
+	assert_eq!(
+		command(&mut engine, &document_id, Revision::INITIAL, "raw")
+			.1
+			.as_deref(),
+		Some(ORIGINAL)
+	);
+
+	let signed = engine
+		.resign_native_active_for_manual_context(&document_id, Revision::INITIAL, &intended)
+		.expect("sign the bank in memory");
+	assert_eq!(Some(signed), Revision::INITIAL.checked_next());
+	assert!(matches!(
+		engine.preview_native_active_signature(&document_id, Revision::INITIAL, &intended),
+		Err(EditorError::StaleRevision { .. })
+	));
+	assert!(matches!(
+		engine.resign_native_active_for_manual_context(&document_id, Revision::INITIAL, &intended),
+		Err(EditorError::StaleRevision { .. })
+	));
+	assert_eq!(
+		engine
+			.preview_native_active_signature(&document_id, signed, &intended)
+			.expect("check intended context"),
+		SignatureStatus::Valid,
+	);
+	assert_eq!(
+		engine
+			.preview_native_active_signature(&document_id, signed, &other)
+			.expect("check another context"),
+		SignatureStatus::Invalid,
+	);
+
+	let snapshot = command(&mut engine, &document_id, signed, "snapshot").0;
+	assert_eq!(
+		snapshot["result"]["payload"]["signature_status"],
+		"missing_context"
+	);
+	assert_eq!(snapshot["result"]["payload"]["dirty"], true);
+	assert_eq!(snapshot["result"]["payload"]["can_undo"], true);
+	for signing in [ExportSigning::Preserve, ExportSigning::PreserveFor(None)] {
+		let prepared = engine
+			.prepare_native_active_save(&document_id, signed, signing)
+			.expect("prepare without a destination context");
+		assert_eq!(prepared.signature_status(), SignatureStatus::MissingContext);
+	}
+	let undone = command(&mut engine, &document_id, signed, "undo").0;
+	assert_eq!(undone["result"]["payload"]["dirty"], false);
+	assert_eq!(undone["result"]["payload"]["signature_status"], "unsigned");
 }
 
 fn open() -> (Engine, String) {
