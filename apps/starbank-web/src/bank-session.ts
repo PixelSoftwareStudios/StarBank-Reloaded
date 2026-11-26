@@ -1,4 +1,4 @@
-import { EngineWorkerClient } from "@starbank/engine-client";
+import { type EngineInfo, EngineWorkerClient } from "@starbank/engine-client";
 import {
   decodeEngineReply,
   type EngineCommand,
@@ -67,8 +67,8 @@ export class BrowserBankSession {
 
   constructor(private readonly client: EngineWorkerClient) {}
 
-  async ready(): Promise<void> {
-    await this.client.ready();
+  ready(): Promise<EngineInfo> {
+    return this.client.ready();
   }
 
   close(): void {
@@ -77,7 +77,14 @@ export class BrowserBankSession {
 
   async open(file: File, discardCurrent = false): Promise<BankEditorDocument> {
     const { maxBankBytes } = await this.client.ready();
-    const { bytes, name } = await readBankFile(file, maxBankBytes);
+    const { bytes, name } = await readBankFile(file, maxBankBytes).catch(
+      (error: unknown) => {
+        if (error instanceof RangeError) throw error;
+        throw new Error(
+          "The bank file could not be read. Select it again and retry.",
+        );
+      },
+    );
     const command: EngineCommand = {
       kind: "open",
       payload: discardCurrent ? { discard_current: true } : undefined,

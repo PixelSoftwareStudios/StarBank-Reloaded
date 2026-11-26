@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  simulateUnavailableBank,
+  verifyLocalImports,
+} from "./local-bank-library.mjs";
 
 const playwright = await import(
   process.env.STARBANK_TEST_PLAYWRIGHT_MODULE ?? "playwright"
@@ -287,6 +291,7 @@ async function verify(name) {
   const server = await startServer();
   try {
     const context = await browser.newContext({ acceptDownloads: true });
+    await simulateUnavailableBank(context);
     await context.addInitScript(() => {
       const BrowserWorker = globalThis.Worker;
       globalThis.Worker = class extends BrowserWorker {
@@ -338,6 +343,7 @@ async function verify(name) {
         buffer: Buffer.from(xml),
       });
     };
+    await verifyLocalImports(page, initial);
     await chooseBank(documentName, initial);
     const value = page.getByRole("textbox", { name: "Gold · Value value" });
     await value.waitFor();
@@ -485,7 +491,7 @@ async function verify(name) {
       requests.slice(assetRequests).every((url) => url.startsWith("blob:")),
     );
     console.log(
-      `${name} ${browser.version()} passed offline open, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, structural editing and reverts, Simple profile previews, guarded file switching, keyboard-accessible recovery, and persisted settings`,
+      `${name} ${browser.version()} passed offline single, multiple and folder import, table/XML edits, undo/redo, exact and signed downloads, clipboard fallback, structural editing and reverts, Simple profile previews, guarded file switching, keyboard-accessible recovery, and persisted settings`,
     );
   } finally {
     await server.stop();

@@ -1,0 +1,48 @@
+.local-bank-library {
+  padding: 0.45rem 1rem;
+  border-block-end: 1px solid var(--shell-divider);
+  background: var(--map-pane-bg);
+}
+
+.local-bank-library summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.local-bank-library-body {
+  display: grid;
+  gap: 0.5rem;
+  padding-block: 0.5rem 0.2rem;
+  font-size: 0.875rem;
+}
+
+.local-bank-library-body p {
+  color: var(--shell-muted);
+}
+
+.local-bank-actions,
+.local-bank-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.local-bank-list {
+  max-block-size: 10rem;
+  padding: 0.15rem;
+  overflow: auto;
+}
+
+.local-bank-list > li {
+  max-inline-size: 100%;
+}
+
+.local-bank-list .editor-button {
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
+.local-bank-list [aria-current="true"] {
+  background: var(--map-selected-bg);
+}
