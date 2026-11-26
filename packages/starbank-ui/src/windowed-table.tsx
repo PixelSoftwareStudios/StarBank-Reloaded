@@ -33,6 +33,7 @@ type RowRenderer = (entry: TableRowProjection, index: number) => ReactElement;
 
 interface WindowedTableProps {
   rows: readonly TableRowProjection[];
+  viewKey: string;
   label: string;
   columns: number;
   header: ReactNode;
@@ -46,6 +47,7 @@ function range(start: number, end: number): number[] {
 
 export function WindowedTable({
   rows,
+  viewKey,
   label,
   columns,
   header,
@@ -99,6 +101,11 @@ export function WindowedTable({
     observer.observe(head);
     return () => observer.disconnect();
   }, [refresh]);
+
+  useLayoutEffect(() => {
+    if (viewport.current) viewport.current.scrollTop = 0;
+    refresh();
+  }, [refresh, viewKey]);
 
   const first = Math.min(position.first, Math.max(0, rows.length - 1));
   const start = Math.max(0, first - OVERSCAN_ROWS);

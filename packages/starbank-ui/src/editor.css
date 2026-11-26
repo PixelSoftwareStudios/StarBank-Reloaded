@@ -529,3 +529,37 @@
   padding: 0;
   border: 0;
 }
+
+.editor-section-filter {
+  width: 100%;
+  margin-block-end: 0.25rem;
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--map-field-bg);
+}
+
+.editor-table-actions input[type="search"] {
+  flex: 1 1 8rem;
+  width: auto;
+}
+
+.editor-name-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 0.2rem;
+  text-align: start;
+}
+
+.editor-name-sort svg {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.editor-section-filter:focus-visible,
+.editor-name-sort:focus-visible {
+  outline: 2px solid var(--map-focus);
+  outline-offset: -2px;
+}

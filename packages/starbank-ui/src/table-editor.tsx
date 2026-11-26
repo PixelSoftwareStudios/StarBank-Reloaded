@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
   type EditorRow,
@@ -7,6 +8,25 @@ import {
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
 const WINDOW_THRESHOLD = 150;
+const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
+
+type SortOrder = "source" | "ascending" | "descending";
+
+const nextSort: Record<SortOrder, SortOrder> = {
+  source: "ascending",
+  ascending: "descending",
+  descending: "source",
+};
+
+const sortAction: Record<SortOrder, string> = {
+  source: "Sort by name ascending",
+  ascending: "Sort by name descending",
+  descending: "Restore source order",
+};
+
+function filterText(value: string) {
+  return value.trim().toLowerCase();
+}
 
 function rowLabel(row: EditorRow) {
   return row.childName ? `${row.name} · ${row.childName}` : row.name;
@@ -37,6 +57,9 @@ export function TableEditor({
 }) {
   const instructionsId = useId();
   const [sectionId, setSectionId] = useState<string>();
+  const [sectionQuery, setSectionQuery] = useState("");
+  const [rowQuery, setRowQuery] = useState("");
+  const [sort, setSort] = useState<SortOrder>("source");
   const [selectedRows, setSelectedRows] = useState<ReadonlySet<string>>(
     new Set(),
   );
@@ -44,12 +67,36 @@ export function TableEditor({
   const [editing, setEditing] = useState<string>();
   const section = sections.find(({ id }) => id === sectionId) ?? sections[0];
   const unified = layout === "unified";
-  const visibleRows = useMemo(() => {
+  const query = filterText(rowQuery);
+  const sectionFilter = sections.length > 1 ? filterText(sectionQuery) : "";
+  const filteredSections = useMemo(
+    () =>
+      sections.filter((item) =>
+        item.name.toLowerCase().includes(sectionFilter),
+      ),
+    [sectionFilter, sections],
+  );
+  const rowsInScope = useMemo(() => {
     const visible = unified ? sections : section ? [section] : [];
     return visible.flatMap((item) =>
       item.rows.map((row) => ({ row, sectionName: item.name })),
     );
   }, [section, sections, unified]);
+  const visibleRows = useMemo(() => {
+    const matches = query
+      ? rowsInScope.filter(
+          ({ row, sectionName }) =>
+            rowLabel(row).toLowerCase().includes(query) ||
+            (unified && sectionName.toLowerCase().includes(query)),
+        )
+      : rowsInScope;
+    if (sort === "source") return matches;
+    return [...matches].sort(({ row: a }, { row: b }) =>
+      sort === "ascending"
+        ? nameOrder.compare(a.name, b.name)
+        : nameOrder.compare(b.name, a.name),
+    );
+  }, [query, rowsInScope, sort, unified]);
   const rowsById = useMemo(
     () => new Map(visibleRows.map(({ row }) => [row.id, row])),
     [visibleRows],
@@ -58,6 +105,12 @@ export function TableEditor({
     (row): row is EditorRow => row !== undefined && row.editable !== false,
   );
   const sameType = selected.every((row) => row.type === selected[0]?.type);
+  const hasHiddenDraft =
+    query && values?.size
+      ? rowsInScope.some(
+          ({ row }) => values.has(row.id) && !rowsById.has(row.id),
+        )
+      : false;
   const windowed = visibleRows.length > WINDOW_THRESHOLD;
   const label = unified
     ? "All bank values"
@@ -65,7 +118,18 @@ export function TableEditor({
   const header = (
     <>
       {unified && <th scope="col">Section</th>}
-      <th scope="col">Name</th>
+      <th scope="col" aria-sort={sort === "source" ? undefined : sort}>
+        <button
+          className="editor-name-sort"
+          type="button"
+          title={sortAction[sort]}
+          onClick={() => setSort(nextSort[sort])}
+        >
+          Name
+          {sort === "ascending" && <ChevronUp aria-hidden="true" />}
+          {sort === "descending" && <ChevronDown aria-hidden="true" />}
+        </button>
+      </th>
       <th scope="col">Type</th>
       <th scope="col">Value</th>
     </>
@@ -145,7 +209,22 @@ export function TableEditor({
       {!unified && (
         <nav className="editor-sections" aria-label="Bank sections">
           <h2>Sections</h2>
-          {sections.map((item) => (
+          {sections.length > 1 && (
+            <input
+              aria-label="Filter sections by name"
+              className="editor-section-filter"
+              type="search"
+              placeholder="Filter…"
+              value={sectionQuery}
+              onChange={(event) => setSectionQuery(event.currentTarget.value)}
+            />
+          )}
+          {filteredSections.length === 0 && sectionFilter && (
+            <p className="empty-message" role="status">
+              No matching sections.
+            </p>
+          )}
+          {filteredSections.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -162,8 +241,18 @@ export function TableEditor({
         </nav>
       )}
       <div className="editor-table-scroll">
-        {(onOpenStructure || onOpenDiff) && (
+        {(onOpenStructure || onOpenDiff || section) && (
           <div className="editor-table-actions">
+            {section && (
+              <input
+                aria-label="Filter rows by name"
+                data-table-filter-search
+                type="search"
+                placeholder="Filter names…"
+                value={rowQuery}
+                onChange={(event) => setRowQuery(event.currentTarget.value)}
+              />
+            )}
             {onOpenStructure && (
               <button
                 className="editor-button"
@@ -216,13 +305,18 @@ export function TableEditor({
               </div>
             )}
             {visibleRows.length === 0 ? (
-              <p className="empty-message">
-                {unified ? "No values found." : "No values in this section."}
+              <p className="empty-message" role={query ? "status" : undefined}>
+                {query
+                  ? "No matching rows."
+                  : unified
+                    ? "No values found."
+                    : "No values in this section."}
               </p>
             ) : windowed ? (
               <WindowedTable
                 key={unified ? "all-sections" : section.id}
                 rows={visibleRows}
+                viewKey={`${sort}:${query}`}
                 header={header}
                 columns={unified ? 4 : 3}
                 label={label}
@@ -238,6 +332,11 @@ export function TableEditor({
               </table>
             )}
           </>
+        )}
+        {hasHiddenDraft && (
+          <p className="empty-message" role="status">
+            The row filter hides some staged edits.
+          </p>
         )}
         {invalid && invalid.size > 0 && (
           <p id={instructionsId} className="editor-error" role="status">
