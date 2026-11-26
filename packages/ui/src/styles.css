@@ -5,6 +5,13 @@
 @import "@heroui/styles/base" layer(base);
 @import "@heroui/styles/components/separator.css" layer(components);
 
+@import "@heroui/styles/components/dropdown.css" layer(components);
+@import "@heroui/styles/components/menu.css" layer(components);
+@import "@heroui/styles/components/menu-item.css" layer(components);
+@import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/tabs.css" layer(components);
+@import "./editor.css";
+
 @source "./";
 
 :root {
