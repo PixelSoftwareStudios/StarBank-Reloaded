@@ -15,7 +15,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { useEffect, useRef } from "react";
+import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 
 const externalUpdate = Annotation.define<boolean>();
 const highlighting = HighlightStyle.define([
@@ -36,12 +36,18 @@ function editingMode(readOnly: boolean) {
   return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)];
 }
 
+export interface RawEditorHandle {
+  focus: () => void;
+}
+
 export default function RawEditor({
+  ref,
   value,
   readOnly,
   onChange,
   wrap = false,
 }: {
+  ref?: Ref<RawEditorHandle>;
   value: string;
   readOnly: boolean;
   onChange: (value: string) => void;
@@ -53,6 +59,12 @@ export default function RawEditor({
   const mode = useRef(new Compartment());
   const wrapping = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
+
+  useImperativeHandle(
+    ref,
+    () => ({ focus: () => instance.current?.focus() }),
+    [],
+  );
 
   useEffect(() => {
     onChangeRef.current = onChange;

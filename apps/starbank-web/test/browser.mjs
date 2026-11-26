@@ -445,12 +445,47 @@ async function verify(name) {
       .first()
       .waitFor();
     assert.equal(await raw.textContent(), "<Bank>");
-    await raw.fill(rawEdited);
-    await page.getByRole("button", { name: "Apply XML" }).click();
-    await page
-      .getByRole("button", { name: "Apply XML" })
-      .waitFor({ state: "hidden" });
-    await page.getByRole("tab", { name: "Raw View" }).focus();
+
+    const tableTab = page.getByRole("tab", { name: "Table View" });
+    const rawTab = page.getByRole("tab", { name: "Raw View" });
+    const rawDecision = page.getByRole("dialog", {
+      name: "Raw draft could not be applied",
+    });
+    await tableTab.click();
+    await rawDecision
+      .getByText("The bank XML could not be opened safely.")
+      .waitFor();
+    await page.keyboard.press("Escape");
+    await rawDecision.waitFor({ state: "hidden" });
+    assert.equal(await raw.textContent(), "<Bank>");
+    assert.equal(await rawTab.getAttribute("aria-selected"), "true");
+
+    await tableTab.press("Enter");
+    await rawDecision.getByRole("button", { name: "Repair XML" }).click();
+    await rawDecision.waitFor({ state: "hidden" });
+    await page.waitForFunction(() =>
+      document.activeElement?.matches(".cm-content"),
+    );
+    assert.equal(await raw.textContent(), "<Bank>");
+
+    await tableTab.click();
+    await rawDecision
+      .getByRole("button", { name: "Discard and switch" })
+      .click();
+    await rawDecision.waitFor({ state: "hidden" });
+    await value.waitFor();
+    assert.equal(await value.inputValue(), "1,000,000");
+
+    await rawTab.click();
+    await raw.filter({ hasText: "<!-- synthetic -->" }).waitFor();
+    await raw.press("ControlOrMeta+a");
+    await page.keyboard.insertText(rawEdited);
+    await tableTab.click();
+    await value.waitFor();
+    assert.equal(await tableTab.getAttribute("aria-selected"), "true");
+    await rawTab.click();
+    await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
+    await rawTab.focus();
     await page.keyboard.press("Meta+z");
     await raw.filter({ hasText: "<!-- synthetic -->" }).waitFor();
     await page.keyboard.press("Control+Shift+z");

@@ -4,6 +4,7 @@ import {
   type ReactNode,
   Suspense,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -28,6 +29,8 @@ import {
   SettingsButton,
 } from "./editor-actions";
 import { type MapContext, MapContextDetails } from "./map-context";
+import { RawDraftDialog } from "./raw-draft-dialog";
+import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
 import { TableEditor } from "./table-editor";
 
@@ -108,6 +111,11 @@ export function BankEditor({
     sectionId?: string;
   }>();
   const [diff, setDiff] = useState<{ revision: string; value: EngineDiff }>();
+  const [rawSwitch, setRawSwitch] = useState<{
+    nextView: "table" | "simple";
+    message: string;
+  }>();
+  const rawEditor = useRef<RawEditorHandle>(null);
   const target = { id: document.id, revision: document.revision };
   const tableDraft = draft?.kind === "table" ? draft : undefined;
   const rawDraft = draft?.kind === "raw" ? draft : undefined;
@@ -199,15 +207,58 @@ export function BankEditor({
     });
   }
 
+  function applyRaw(nextView?: "table" | "simple") {
+    if (!rawDraft || !onReplaceXml || busy || stale) return;
+    run(
+      async () => {
+        const result = await onReplaceXml(target, rawDraft.text).catch(
+          (error: unknown) => ({
+            ok: false as const,
+            message:
+              error instanceof Error
+                ? error.message
+                : "The Raw draft could not be applied.",
+          }),
+        );
+        if (!result.ok && nextView) {
+          setRawSwitch({ nextView, message: result.message });
+        }
+        return result;
+      },
+      () => {
+        setDraft(undefined);
+        if (nextView) setView(nextView);
+      },
+    );
+  }
+
   function apply() {
     const clearDraft = () => setDraft(undefined);
     if (busy || stale) return;
-    if (rawDraft && onReplaceXml) {
-      run(() => onReplaceXml(target, rawDraft.text), clearDraft);
+    if (rawDraft) {
+      applyRaw();
     } else if (prepared && prepared.invalid.size === 0 && onEditValues) {
       if (prepared.edits.length > 0)
         run(() => onEditValues(target, prepared.edits), clearDraft);
       else clearDraft();
+    }
+  }
+
+  function selectView(nextView: "simple" | "table" | "raw") {
+    if (selectedView === "raw" && nextView !== "raw" && rawDraft) {
+      if (busy) return;
+      if (stale || !onReplaceXml) {
+        setRawSwitch({
+          nextView,
+          message: stale
+            ? "The bank changed while you were editing this draft."
+            : "The Raw draft cannot currently be applied.",
+        });
+      } else {
+        applyRaw(nextView);
+      }
+    } else {
+      setView(nextView);
     }
   }
 
@@ -268,9 +319,10 @@ export function BankEditor({
       <Tabs
         className="editor-views"
         selectedKey={selectedView}
+        keyboardActivation={rawDraft ? "manual" : "automatic"}
         onSelectionChange={(key) => {
           if (key === "simple" || key === "table" || key === "raw")
-            setView(key);
+            selectView(key);
         }}
         variant="secondary"
       >
@@ -342,6 +394,7 @@ export function BankEditor({
           <Suspense fallback={<p role="status">Loading XML editor…</p>}>
             <RawEditor
               key={document.revision}
+              ref={rawEditor}
               value={rawDraft?.text ?? document.xml}
               wrap={settings?.wrapRaw}
               readOnly={
@@ -362,6 +415,22 @@ export function BankEditor({
           </Suspense>
         </Tabs.Panel>
       </Tabs>
+
+      {rawSwitch && (
+        <RawDraftDialog
+          message={rawSwitch.message}
+          repairable={Boolean(onReplaceXml) && !stale}
+          onDecision={(decision) => {
+            if (decision === "discard") {
+              setDraft(undefined);
+              clearNotice();
+              setView(rawSwitch.nextView);
+            }
+            setRawSwitch(undefined);
+            if (decision === "repair") rawEditor.current?.focus();
+          }}
+        />
+      )}
 
       <Suspense fallback={null}>
         {onStructure && structure?.revision === document.revision && (
