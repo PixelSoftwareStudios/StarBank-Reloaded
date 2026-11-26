@@ -40,6 +40,7 @@ function Fixture() {
   return (
     <AppShell
       name="StarBank Reloaded"
+      breadcrumbAvailable
       preferences={{ settings, change }}
       editor={{
         document,
