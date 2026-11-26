@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 use sc2bank::{Limits, parse};
 use serde::Serialize;
 use starbank_editor::{ExportSigning, Session};
-use starbank_fs::{CommitIntent, CommitOutcome, Fingerprint, commit};
+use starbank_fs::{
+	BackupPlacement, CommitIntent, CommitOutcome, Fingerprint, NativeBackupPolicy, backup_source,
+	commit,
+};
 
 use crate::{
 	args::{BankArgs, DestinationArgs, OptionalSigningArgs},
@@ -180,13 +183,20 @@ fn publish(
 		)
 	})?;
 	if let Some(preference) = target.overwrite {
-		let effect = backup::overwrite(path, expected, bytes, preference, limits)?;
+		let source = backup_source(path)?;
+		let policy = match preference {
+			BackupPreference::Automatic => {
+				NativeBackupPolicy::FirstInSession(BackupPlacement::Adjacent)
+			}
+			BackupPreference::Requested => NativeBackupPolicy::Explicit,
+		};
+		let effect = backup::catalog(limits)?.overwrite(&source, expected, bytes, policy)?;
 		report.backup = effect
 			.backup
-			.as_deref()
-			.map(|path| path.to_string_lossy().into_owned());
+			.as_ref()
+			.map(|id| id.path().to_string_lossy().into_owned());
 		return apply_effect(effect.commit, report).map_err(|failure| match effect.backup {
-			Some(path) => failure.with_backup_path(&path),
+			Some(id) => failure.with_backup_path(id.path()),
 			None => failure,
 		});
 	}

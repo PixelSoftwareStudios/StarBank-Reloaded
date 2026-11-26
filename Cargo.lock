@@ -3349,7 +3349,6 @@ dependencies = [
  "starbank-paths",
  "starbank-signature",
  "tempfile",
- "time",
 ]
 
 [[package]]
@@ -3391,10 +3390,16 @@ version = "0.1.0"
 dependencies = [
  "cap-primitives",
  "getrandom 0.4.3",
+ "hex",
  "libc",
  "rustix",
+ "serde",
+ "serde_json",
  "sha2 0.11.1",
+ "starbank-backup",
+ "starbank-paths",
  "tempfile",
+ "time",
  "windows-sys 0.61.2",
 ]
 

@@ -1,21 +1,20 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
 use sc2bank::{Limits, parse};
 use serde::Serialize;
-use starbank_backup::{BackupHealth, BackupRecord, BackupRequest, BankSource};
-use starbank_fs::{CommitOutcome, read_snapshot};
+use starbank_fs::{
+	BackupHealth, BackupPlacement, BackupReasonCode, BackupRecord, BackupVerification, BankSource,
+	CommitOutcome, backup_source as bank_source, read_snapshot,
+};
 
 use crate::{
 	args::BackupCommand,
-	backup::{self, NativeStorage, bank_source, catalog, timestamp},
-	backup_metadata::{Metadata, Reason, is_candidate, sidecar_path},
+	backup::catalog,
 	bank::SHA256_BYTES,
 	discovery::DisplayPath,
 	failure::{ErrorCode, Failure, Status},
 	output::{self, CommandName},
 };
-
-const MAX_ADJACENT_ENTRIES: usize = 10_000;
 
 pub(crate) fn run(command: BackupCommand, json: bool) -> Result<Status, Failure> {
 	match command {
@@ -39,34 +38,12 @@ pub(crate) fn run(command: BackupCommand, json: bool) -> Result<Status, Failure>
 fn list(source: &BankSource, verify: bool, json: bool) -> Result<Status, Failure> {
 	let limits = Limits::default();
 	let mut catalog = catalog(limits)?;
-	let mut rejected_metadata = 0usize;
-	let directory = source.path().parent().ok_or_else(invalid_backup_path)?;
-	for (index, entry) in fs::read_dir(directory)?.enumerate() {
-		if index == MAX_ADJACENT_ENTRIES {
-			return Err(Failure::new(
-				Status::Validation,
-				ErrorCode::InputLimit,
-				"The backup directory contains too many entries.",
-			));
-		}
-		let path = entry?.path();
-		if !is_candidate(&path, source) {
-			continue;
-		}
-		let Ok(record) = Metadata::read(source, &path) else {
-			rejected_metadata += 1;
-			continue;
-		};
-		let id = record.id().clone();
-		if catalog.import(record).is_err() {
-			rejected_metadata += 1;
-			continue;
-		}
-		if verify {
-			// The catalog records missing and failed integrity checks in the returned health.
-			let _ = catalog.verify(&mut NativeStorage, &id);
-		}
-	}
+	let verification = if verify {
+		BackupVerification::Verify
+	} else {
+		BackupVerification::Recorded
+	};
+	let rejected_metadata = catalog.load(source, BackupPlacement::Adjacent, verification)?;
 	let report = Listing {
 		backups: catalog
 			.history(source)
@@ -94,11 +71,7 @@ fn list(source: &BankSource, verify: bool, json: bool) -> Result<Status, Failure
 
 fn create(source: &BankSource, json: bool) -> Result<Status, Failure> {
 	let mut catalog = catalog(Limits::default())?;
-	let id = catalog.create(
-		&mut NativeStorage,
-		source,
-		BackupRequest::adjacent(timestamp()?),
-	)?;
+	let id = catalog.create(source, BackupPlacement::Adjacent)?;
 	let (record, health) = catalog.get(&id).ok_or_else(invalid_backup_path)?;
 	let report = RecordReport::new(record, health);
 	output::report(json, CommandName::BackupCreate, &report, |out| {
@@ -134,27 +107,14 @@ fn restore(
 	if path.parent() != source.path().parent() {
 		return Err(invalid_backup_path());
 	}
-	let record = Metadata::read(source, &sidecar_path(path))?;
-	let id = record.id().clone();
-	let integrity = record.integrity();
-	if id.path() != path {
-		return Err(invalid_backup_path());
-	}
 	let mut catalog = catalog(limits)?;
-	catalog.import(record).map_err(|_| invalid_backup_path())?;
-	catalog.verify(&mut NativeStorage, &id)?;
-	let selected = read_snapshot(path, limits.document_bytes)?;
-	if selected.fingerprint().sha256() != &integrity.sha256
-		|| selected.bytes().len() != integrity.byte_length
-	{
-		return Err(invalid_backup_path());
-	}
-	parse(selected.bytes(), limits)?;
+	let prepared = catalog.prepare_restore(source, current, path, BackupPlacement::Adjacent)?;
+	parse(prepared.selected().bytes(), limits)?;
 
 	let mut report = RestoreReport {
 		snapshot: DisplayPath::new(path),
 		before_sha256: hex::encode(confirmed),
-		after_sha256: hex::encode(selected.fingerprint().sha256()),
+		after_sha256: hex::encode(prepared.selected().fingerprint().sha256()),
 		reversal_backup: None,
 		recovery: None,
 		outcome: RestoreOutcome::Prepared,
@@ -162,17 +122,10 @@ fn restore(
 	let status = if dry_run {
 		Status::Success
 	} else {
-		backup::allow_live_replacement()?;
-		let outcome = catalog.restore(
-			&mut NativeStorage,
-			&id,
-			source,
-			current.fingerprint(),
-			BackupRequest::adjacent(timestamp()?),
-		)?;
+		let outcome = catalog.restore(prepared, BackupPlacement::Adjacent)?;
 		let reversal = outcome.backup.map(|backup| backup.path().to_owned());
 		report.reversal_backup = reversal.as_ref().map(display);
-		match backup::commit_outcome(outcome.commit) {
+		match outcome.commit {
 			CommitOutcome::CommittedVerified(receipt) => {
 				report.outcome = RestoreOutcome::CommittedVerified;
 				report.recovery = receipt.recovery().map(|artifact| display(artifact.path()));
@@ -235,7 +188,7 @@ struct RecordReport<'backup> {
 	path: DisplayPath<'backup>,
 	timestamp_utc: String,
 	sequence: u16,
-	reason: Reason,
+	reason: BackupReasonCode,
 	byte_length: usize,
 	sha256: String,
 	health: Health,
@@ -248,7 +201,7 @@ impl<'backup> RecordReport<'backup> {
 			path: DisplayPath::new(record.id().path()),
 			timestamp_utc: record.timestamp().to_string(),
 			sequence: record.sequence(),
-			reason: Reason::from(record.reason()),
+			reason: BackupReasonCode::from(record.reason()),
 			byte_length: integrity.byte_length,
 			sha256: hex::encode(integrity.sha256),
 			health: match health {

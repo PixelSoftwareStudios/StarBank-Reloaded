@@ -6,7 +6,6 @@ mod app;
 mod args;
 mod backup;
 mod backup_command;
-mod backup_metadata;
 mod bank;
 mod diff;
 mod discovery;
