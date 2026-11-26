@@ -21,7 +21,12 @@ import { AppShell } from "@starbank/ui";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BackupPicker } from "./backup-picker";
+import {
+  type ManualSigningPrompt,
+  ManualSigningSheet,
+} from "./manual-signing-sheet";
 import { OpenRequests, openRequestedBank } from "./open-requests";
+import { resignOpenBank } from "./resign-bank";
 import type { ActiveBankTarget, BackupChoices } from "./transport";
 import {
   canExportBank,
@@ -33,7 +38,6 @@ import {
   exportBankCopy,
   listActiveBackups,
   pickBank,
-  resignActiveBank,
   restoreActiveBank,
   revealActiveBank,
   saveActiveBank,
@@ -69,6 +73,7 @@ function DesktopApp() {
     choices: BackupChoices;
     select: (id?: number) => void;
   }>();
+  const [signingPrompt, setSigningPrompt] = useState<ManualSigningPrompt>();
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
@@ -409,15 +414,16 @@ function DesktopApp() {
           })
       : undefined,
     onResign: (target) =>
-      action(async () => {
-        const native = activeTarget(target);
-        const result = await resignActiveBank(native);
-        await adopt(
-          result.name,
-          decodeEngineReply(result.control, native.requestId),
-        );
-        return { ok: true, message: "Re-signed the bank in the editor." };
-      }),
+      action(() =>
+        resignOpenBank({
+          document: document?.projection,
+          target,
+          activeTarget,
+          adopt,
+          setPrompt: setSigningPrompt,
+          errorMessage: messageFor,
+        }),
+      ),
     onExport: exportAvailable
       ? (target) =>
           action(async () => {
@@ -488,6 +494,7 @@ function DesktopApp() {
           />
         }
       />
+      {signingPrompt ? <ManualSigningSheet {...signingPrompt} /> : null}
       {backupPrompt ? (
         <BackupPicker
           choices={backupPrompt.choices}

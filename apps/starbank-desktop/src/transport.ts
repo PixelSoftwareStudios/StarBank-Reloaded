@@ -1,3 +1,7 @@
+import type {
+  EngineSignatureStatus,
+  EngineSigningContext,
+} from "@starbank/engine-client/protocol";
 import { invoke } from "@tauri-apps/api/core";
 
 const HEADER_BYTES = 5;
@@ -23,8 +27,27 @@ export function pickBank(control: string): Promise<FileDialogReply | null> {
   return invoke<FileDialogReply | null>("open_bank", { control });
 }
 
-export function resignActiveBank(target: ActiveBankTarget) {
-  return invoke<FileDialogReply>("resign_active_bank", { target });
+export type ManualResignAction = {
+  readonly kind: "check" | "apply";
+  readonly context: EngineSigningContext;
+};
+
+type ResignReply =
+  | { readonly kind: "manual_context_required" }
+  | {
+      readonly kind: "checked";
+      readonly payload: Exclude<EngineSignatureStatus, "missing_context">;
+    }
+  | { readonly kind: "signed"; readonly payload: FileDialogReply };
+
+export function resignActiveBank(
+  target: ActiveBankTarget,
+  manual?: ManualResignAction,
+): Promise<ResignReply> {
+  return invoke<ResignReply>("resign_active_bank", {
+    target,
+    manual: manual ?? null,
+  });
 }
 
 export function canExportBank(): Promise<boolean> {
