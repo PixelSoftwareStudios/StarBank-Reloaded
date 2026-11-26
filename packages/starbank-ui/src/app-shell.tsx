@@ -11,6 +11,7 @@ import {
 import type { BankEditorController } from "starbank-editor";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 import { EditorPane } from "./editor-pane";
+import { resolveMapContext } from "./map-context";
 import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
 import type { ChangeSetting } from "./settings-page";
 import { SidebarSplitter } from "./sidebar-splitter";
@@ -117,6 +118,10 @@ export function AppShell({
               settings={settings}
               onOpenSettings={onOpenSettings}
               tools={tools}
+              mapContext={resolveMapContext(
+                inventory,
+                Boolean(editor.document),
+              )}
             />
           ) : (
             <div className="editor-welcome">

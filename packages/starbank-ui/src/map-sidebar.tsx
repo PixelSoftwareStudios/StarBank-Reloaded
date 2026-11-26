@@ -6,11 +6,9 @@ import {
   InventoryActions,
   type InventoryControls,
 } from "./inventory-browser";
+import { MapArchiveDate } from "./map-context";
 
 const MAP_PAGE_SIZE = 80;
-const MODIFIED_DATE = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-});
 
 export interface MapListItem {
   id: string;
@@ -19,22 +17,6 @@ export interface MapListItem {
   hasBankFiles: boolean;
   author?: string | null;
   modifiedAtMillis?: number | null;
-}
-
-function ArchiveModifiedDate({ millis }: { millis?: number | null }) {
-  if (typeof millis !== "number" || !Number.isSafeInteger(millis)) return null;
-  const date = new Date(millis);
-  if (Number.isNaN(date.getTime())) return null;
-  const timestamp = date.toISOString();
-
-  return (
-    <span className="inventory-map-modified">
-      Modified{" "}
-      <time dateTime={timestamp} title={timestamp}>
-        {MODIFIED_DATE.format(date)}
-      </time>
-    </span>
-  );
 }
 
 export interface MapFilters {
@@ -247,7 +229,10 @@ export function MapSidebar({
                     {map.author && (
                       <span className="inventory-map-author">{map.author}</span>
                     )}
-                    <ArchiveModifiedDate millis={map.modifiedAtMillis} />
+                    <MapArchiveDate
+                      millis={map.modifiedAtMillis}
+                      className="inventory-map-modified"
+                    />
                   </button>
                 </li>
               ))}

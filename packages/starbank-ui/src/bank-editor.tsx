@@ -27,6 +27,7 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
+import { type MapContext, MapContextDetails } from "./map-context";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
 import { TableEditor } from "./table-editor";
 
@@ -78,6 +79,7 @@ export function BankEditor({
   settings,
   onOpenSettings,
   tools,
+  mapContext,
 }: {
   controller: BankEditorController;
   document: BankEditorDocument;
@@ -88,6 +90,7 @@ export function BankEditor({
   settings?: EditorSettings;
   onOpenSettings?: () => void;
   tools?: ReactNode;
+  mapContext?: MapContext;
 }) {
   const { draft, profileDraft, view, setDraft, setProfileDraft, setView } =
     useEditorState();
@@ -213,6 +216,10 @@ export function BankEditor({
     controller.status ||
     profileStatus(profileController?.current) ||
     (document.dirty ? "Unsaved changes" : "");
+  const showBreadcrumbs =
+    Boolean(document.breadcrumbs?.length) &&
+    settings?.showBreadcrumbs !== false;
+  const title = mapContext?.map.name ?? document.name;
 
   return (
     <div
@@ -221,10 +228,9 @@ export function BankEditor({
     >
       <header className="editor-header">
         <div className="editor-header-bar">
-          {document.breadcrumbs?.length &&
-          settings?.showBreadcrumbs !== false ? (
+          {showBreadcrumbs && document.breadcrumbs && (
             <BankBreadcrumbs segments={document.breadcrumbs} />
-          ) : null}
+          )}
           <div className="editor-open-actions">
             <OpenBankButton
               controller={controller}
@@ -241,7 +247,14 @@ export function BankEditor({
             <SettingsButton open={onOpenSettings} />
           </div>
         </div>
-        <h1 title={document.name}>{document.name}</h1>
+        <h1 title={title}>{title}</h1>
+        {mapContext && (
+          <MapContextDetails
+            context={mapContext}
+            disabled={pending}
+            showBankName={!showBreadcrumbs}
+          />
+        )}
         {profileController && (
           <ProfilePicker
             controller={profileController}

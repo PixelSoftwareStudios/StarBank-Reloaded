@@ -32,6 +32,68 @@ function render(inventory: MapInventory) {
 }
 
 describe("desktop inventory projection", () => {
+  it("previews the selected map with source metadata and an explicit bank choice", () => {
+    const markup = renderToStaticMarkup(
+      <AppShell
+        name="StarBank Reloaded"
+        editor={{}}
+        inventory={{
+          status: "ready",
+          maps: [
+            {
+              ...maps[0],
+              author: "Fixture Studio",
+              modifiedAtMillis: Date.UTC(2024, 1, 29, 12),
+            },
+            ...maps.slice(1),
+          ],
+          selectedMapId: "alpha",
+          onSelectMap: () => {},
+          bankBrowser: { banks, onOpenBank: () => {} },
+        }}
+      />,
+    );
+    expect(markup).toContain(">Alpha</h1>");
+    expect(markup).toContain("Created by Fixture Studio");
+    expect(markup).toContain("Multiple bank files detected. Choose one:");
+    expect(markup).toContain('aria-label="Bank file for this map"');
+    expect(markup).toContain('value="ambiguous"');
+  });
+
+  it("keeps the open bank's map separate from unrelated filters and labels ambiguous associations", () => {
+    function show(selectedMapId: string, selectedBankId: string) {
+      return renderToStaticMarkup(
+        <AppShell
+          name="StarBank Reloaded"
+          editor={{
+            document: {
+              id: "fixture",
+              revision: "0",
+              name: "Open.SC2Bank",
+              dirty: false,
+              xml: "<Bank/>",
+              sections: [],
+            },
+          }}
+          inventory={{
+            status: "ready",
+            maps,
+            selectedMapId,
+            onSelectMap: () => {},
+            bankBrowser: { banks, selectedBankId, onOpenBank: () => {} },
+          }}
+        />,
+      );
+    }
+
+    expect(show("beta", "first")).toContain(">Alpha</h1>");
+    const candidate = show("beta", "ambiguous");
+    expect(candidate).toContain(">Beta</h1>");
+    expect(candidate).toContain("Possible map match");
+    expect(show("empty", "ambiguous")).toContain(">Open.SC2Bank</h1>");
+    expect(show("alpha", "unknown")).toContain(">Open.SC2Bank</h1>");
+  });
+
   it("preserves all candidate associations and isolates unmatched files", () => {
     expect(filterBanks(banks, { kind: "map", mapId: "alpha" })).toEqual([
       banks[0],

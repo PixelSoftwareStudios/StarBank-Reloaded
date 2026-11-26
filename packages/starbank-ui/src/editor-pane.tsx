@@ -7,6 +7,7 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
+import { type MapContext, MapContextDetails } from "./map-context";
 
 export function EditorPane({
   name,
@@ -14,12 +15,14 @@ export function EditorPane({
   settings,
   onOpenSettings,
   tools,
+  mapContext,
 }: {
   name: string;
   controller: BankEditorController;
   settings?: EditorSettings;
   onOpenSettings?: () => void;
   tools?: ReactNode;
+  mapContext?: MapContext;
 }) {
   const running = useRef(false);
   const [working, setWorking] = useState(false);
@@ -62,6 +65,7 @@ export function EditorPane({
         settings={settings}
         onOpenSettings={onOpenSettings}
         tools={tools}
+        mapContext={mapContext}
       />
     );
   }
@@ -71,7 +75,10 @@ export function EditorPane({
       className="editor-welcome"
       {...fileDropHandlers(controller.onOpenFile, busy, run)}
     >
-      <h1 className="text-[1.75rem] leading-tight font-semibold">{name}</h1>
+      <h1 className="text-[1.75rem] leading-tight font-semibold">
+        {mapContext?.map.name ?? name}
+      </h1>
+      {mapContext && <MapContextDetails context={mapContext} disabled={busy} />}
       <div className="editor-open-actions">
         <OpenBankButton controller={controller} disabled={busy} run={run} />
         {tools}
@@ -80,7 +87,11 @@ export function EditorPane({
       <p className="empty-message" role="status">
         {busy
           ? "Opening bank…"
-          : notice || controller.status || "No bank open."}
+          : notice ||
+            controller.status ||
+            (mapContext && mapContext.choices.length === 0
+              ? "No bank files associated with this map."
+              : "No bank open.")}
       </p>
     </div>
   );
