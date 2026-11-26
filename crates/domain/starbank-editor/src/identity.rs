@@ -1,6 +1,8 @@
 use std::{fmt, mem, num::NonZeroU64, str::FromStr};
 
-use sc2bank::{BankDocument, KeyId, SectionId, ValueId};
+use sc2bank::{
+	BankDocument, KeyId, SectionId, StructuralEditError, StructuralIdMap, StructuralNodeId, ValueId,
+};
 
 use crate::EditorError;
 
@@ -47,6 +49,14 @@ pub(crate) enum Occurrence {
 }
 
 impl Occurrence {
+	fn remap(self, changes: &StructuralIdMap) -> Option<Self> {
+		match self {
+			Self::Section(id) => changes.section(id).map(Self::Section),
+			Self::Key(id) => changes.key(id).map(Self::Key),
+			Self::Value(id) => changes.value(id).map(Self::Value),
+		}
+	}
+
 	fn source_index(self) -> u32 {
 		match self {
 			Self::Section(id) => id.get(),
@@ -80,16 +90,57 @@ impl Identities {
 		Ok(identities)
 	}
 
-	fn insert(&mut self, occurrence: Occurrence, cursor: &mut u64) -> Result<(), EditorError> {
+	pub(crate) fn remap(
+		&self,
+		changes: &StructuralIdMap,
+		addition: Option<StructuralNodeId>,
+		cursor: &mut u64,
+	) -> Result<(Self, Option<OccurrenceId>), EditorError> {
+		let mut identities = Self::default();
+		for &(id, occurrence) in &self.by_session {
+			if let Some(current) = occurrence.remap(changes) {
+				identities.store(id, current);
+			}
+		}
+
+		let added = match addition {
+			Some(StructuralNodeId::Section(id)) => Some(Occurrence::Section(id)),
+			Some(StructuralNodeId::Key(id)) => Some(Occurrence::Key(id)),
+			Some(StructuralNodeId::Value(id)) => Some(Occurrence::Value(id)),
+			None => None,
+			Some(_) => {
+				return Err(EditorError::Structure(
+					StructuralEditError::UnexpectedProjection,
+				));
+			}
+		};
+		let id = added
+			.map(|occurrence| identities.insert(occurrence, cursor))
+			.transpose()?;
+		identities
+			.by_source
+			.sort_unstable_by_key(|&(index, _)| index);
+		Ok((identities, id))
+	}
+
+	fn insert(
+		&mut self,
+		occurrence: Occurrence,
+		cursor: &mut u64,
+	) -> Result<OccurrenceId, EditorError> {
 		let next = cursor
 			.checked_add(1)
 			.and_then(NonZeroU64::new)
 			.ok_or(EditorError::IdentityExhausted)?;
 		*cursor = next.get();
 		let id = OccurrenceId(next);
+		self.store(id, occurrence);
+		Ok(id)
+	}
+
+	fn store(&mut self, id: OccurrenceId, occurrence: Occurrence) {
 		self.by_source.push((occurrence.source_index(), id));
 		self.by_session.push((id, occurrence));
-		Ok(())
 	}
 
 	pub(crate) fn id(&self, occurrence: Occurrence) -> Option<OccurrenceId> {

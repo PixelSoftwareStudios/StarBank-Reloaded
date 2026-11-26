@@ -9,6 +9,7 @@ mod lexeme;
 mod prepare;
 mod protocol;
 mod session;
+mod structure;
 
 pub use error::EditorError;
 pub use identity::{OccurrenceId, ParseOccurrenceIdError};
@@ -18,3 +19,4 @@ pub use protocol::{
 	Engine, MAX_CONTROL_BYTES, MAX_OPERATIONS, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
 };
 pub use session::{Session, ValueChange};
+pub use structure::{StructuralOutcome, StructureChange};
