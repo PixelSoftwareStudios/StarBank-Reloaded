@@ -98,8 +98,14 @@
 
 .editor-surface,
 .settings-surface {
-  height: 100%;
   min-height: 0;
+}
+
+@media (min-width: 42rem) {
+  .editor-surface,
+  .settings-surface {
+    height: 100%;
+  }
 }
 
 .editor-open-actions {
