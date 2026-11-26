@@ -1,27 +1,28 @@
 use std::{
-	error::Error,
-	fmt, fs, io,
+	fs, io,
 	num::NonZeroUsize,
-	path::{Component, Path},
+	path::{Component, Path, PathBuf},
 };
 
 use starbank_backup::{
-	BackupCatalog, BackupError, BackupHealth, BackupId, BackupPlacement, BackupRecord,
-	BackupRequest, BackupStatus, BackupTimestamp, BankSource, CommitState, Overwrite,
-	OverwriteBackup,
+	BackupCatalog, BackupHealth, BackupId, BackupPlacement, BackupRecord, BackupRequest,
+	BackupStatus, BackupTimestamp, BankSource, CommitState, Overwrite, OverwriteBackup,
+	RetentionPolicy,
 };
 use time::OffsetDateTime;
 
 use crate::{
-	CommitIssue, CommitOutcome, CommitReceipt, FileSnapshot, Fingerprint, StorageError,
+	BackupDirectory, CommitIssue, CommitOutcome, CommitReceipt, FileSnapshot, Fingerprint,
+	StorageError,
 	backup_metadata::{Metadata, backup_directory, is_candidate, sidecar_path},
 	backup_storage::NativeStorage,
-	read_snapshot,
 };
 
 const MAX_DIRECTORY_ENTRIES: usize = 10_000;
 
-type PolicyError = BackupError<StorageError, CommitIssue>;
+mod error;
+
+pub use error::NativeBackupError;
 
 /// Verification level for loading previously recorded backups.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,6 +64,7 @@ pub struct PreparedRestore {
 	record: BackupRecord,
 	current: FileSnapshot,
 	selected: FileSnapshot,
+	selected_directory: Option<BackupDirectory>,
 }
 
 impl PreparedRestore {
@@ -94,6 +96,7 @@ impl PreparedRestore {
 pub struct NativeBackupCatalog {
 	catalog: BackupCatalog,
 	max_bytes: usize,
+	managed_directory: Option<BackupDirectory>,
 }
 
 impl NativeBackupCatalog {
@@ -103,7 +106,16 @@ impl NativeBackupCatalog {
 		Self {
 			catalog: BackupCatalog::new(max_bytes),
 			max_bytes: max_bytes.get(),
+			managed_directory: None,
 		}
+	}
+
+	/// Updates the custom managed location while retaining the session backup policy.
+	///
+	/// Pass this grant's path for managed operations. The grant is rechecked by
+	/// native reads and writes, including when the folder changes after selection.
+	pub fn set_managed_directory(&mut self, directory: Option<BackupDirectory>) {
+		self.managed_directory = directory;
 	}
 
 	/// Returns previously loaded and newly created backups, most recent first.
@@ -124,10 +136,43 @@ impl NativeBackupCatalog {
 		self.catalog.status(source)
 	}
 
+	/// Returns older verified records eligible for a separate retention action.
+	#[must_use]
+	pub fn retention_candidates(
+		&self,
+		source: &BankSource,
+		policy: RetentionPolicy,
+	) -> Vec<&BackupRecord> {
+		self.catalog.retention_candidates(source, policy)
+	}
+
+	/// Verifies the bytes of a previously loaded record under the current location scope.
+	///
+	/// # Errors
+	///
+	/// Reports unknown or out-of-scope records, unreadable files, and digest mismatches.
+	pub fn verify(&mut self, id: &BackupId) -> Result<(), NativeBackupError> {
+		let (record, _) = self
+			.catalog
+			.get(id)
+			.ok_or(starbank_backup::BackupError::UnknownBackup)?;
+		let directory = record
+			.directory()
+			.ok_or(NativeBackupError::InvalidLocation)?;
+		let configured = self.managed_directory.as_ref();
+		let scope = if Some(directory) == record.source().path().parent() {
+			configured.filter(|grant| grant.path() == directory)
+		} else {
+			managed_scope(configured, BackupPlacement::Managed(directory))?
+		};
+		let mut storage = NativeStorage::new(scope).with_read_limit(record.integrity().byte_length);
+		Ok(self.catalog.verify(&mut storage, id)?)
+	}
+
 	/// Loads recorded backups in an authorized location and reports rejected metadata count.
 	///
-	/// A missing managed directory represents an empty catalog location. An individual
-	/// malformed sidecar is reported without preventing other records from being loaded.
+	/// A missing default managed location represents an empty catalog. A custom grant
+	/// must still match its directory. Invalid sidecars count as rejected metadata.
 	///
 	/// # Errors
 	///
@@ -139,6 +184,17 @@ impl NativeBackupCatalog {
 		verification: BackupVerification,
 	) -> Result<usize, NativeBackupError> {
 		let directory = backup_directory(source, placement)?;
+		let scope = managed_scope(self.managed_directory.as_ref(), placement)?.cloned();
+		let mut storage = NativeStorage::new(scope.as_ref());
+		if let Some(scope) = &scope {
+			let entries = scope
+				.entries()?
+				.map(|entry| entry.map_err(NativeBackupError::from));
+			let rejected =
+				self.load_entries(source, placement, verification, &mut storage, entries)?;
+			scope.validate()?;
+			return Ok(rejected);
+		}
 		let entries = match fs::read_dir(directory) {
 			Ok(entries) => entries,
 			Err(error)
@@ -149,16 +205,28 @@ impl NativeBackupCatalog {
 			}
 			Err(error) => return Err(directory_error(error)),
 		};
+		let entries = entries.map(|entry| entry.map(|entry| entry.path()).map_err(directory_error));
+		self.load_entries(source, placement, verification, &mut storage, entries)
+	}
+
+	fn load_entries(
+		&mut self,
+		source: &BankSource,
+		placement: BackupPlacement<'_>,
+		verification: BackupVerification,
+		storage: &mut NativeStorage<'_>,
+		entries: impl Iterator<Item = Result<PathBuf, NativeBackupError>>,
+	) -> Result<usize, NativeBackupError> {
 		let mut rejected_metadata = 0;
-		for (index, entry) in entries.enumerate() {
+		for (index, path) in entries.enumerate() {
 			if index == MAX_DIRECTORY_ENTRIES {
 				return Err(NativeBackupError::DirectoryLimit);
 			}
-			let path = entry.map_err(directory_error)?.path();
+			let path = path?;
 			if !is_candidate(&path, source) {
 				continue;
 			}
-			let record = match Metadata::read(source, placement, &path) {
+			let record = match Metadata::read(source, placement, &path, storage) {
 				Ok(Some(record)) => record,
 				Ok(None) => continue,
 				Err(_) => {
@@ -167,13 +235,16 @@ impl NativeBackupCatalog {
 				}
 			};
 			let id = record.id().clone();
+			let length = record.integrity().byte_length;
 			if self.ensure_record(record).is_err() {
 				rejected_metadata += 1;
 				continue;
 			}
 			if verification == BackupVerification::Verify {
 				// The policy records the observed health for missing or suspect snapshots.
-				let _ = self.catalog.verify(&mut NativeStorage, &id);
+				let _ = self
+					.catalog
+					.verify(&mut storage.with_read_limit(length), &id);
 			}
 		}
 		Ok(rejected_metadata)
@@ -193,7 +264,10 @@ impl NativeBackupCatalog {
 			timestamp: now()?,
 			placement,
 		};
-		Ok(self.catalog.create(&mut NativeStorage, source, request)?)
+		let scope = managed_scope(self.managed_directory.as_ref(), placement)?;
+		Ok(self
+			.catalog
+			.create(&mut NativeStorage::new(scope), source, request)?)
 	}
 
 	/// Applies the selected backup policy and then attempts a guarded native overwrite.
@@ -226,8 +300,15 @@ impl NativeBackupCatalog {
 			NativeBackupPolicy::Explicit => OverwriteBackup::Explicit(now()?),
 			NativeBackupPolicy::Disabled => OverwriteBackup::Disabled,
 		};
+		let scope = match policy {
+			NativeBackupPolicy::FirstInSession(placement)
+			| NativeBackupPolicy::EveryOverwrite(placement) => {
+				managed_scope(self.managed_directory.as_ref(), placement)?
+			}
+			NativeBackupPolicy::Explicit | NativeBackupPolicy::Disabled => None,
+		};
 		let effect = self.catalog.overwrite(
-			&mut NativeStorage,
+			&mut NativeStorage::new(scope),
 			source,
 			Overwrite {
 				expected,
@@ -260,12 +341,14 @@ impl NativeBackupCatalog {
 		if backup.parent() != Some(backup_directory(source, placement)?) {
 			return Err(NativeBackupError::MetadataMismatch);
 		}
-		let record = Metadata::read(source, placement, &sidecar_path(backup))?
+		let scope = managed_scope(self.managed_directory.as_ref(), placement)?;
+		let storage = NativeStorage::new(scope);
+		let record = Metadata::read(source, placement, &sidecar_path(backup), &storage)?
 			.ok_or(NativeBackupError::MetadataMismatch)?;
 		if record.id().path() != backup {
 			return Err(NativeBackupError::MetadataMismatch);
 		}
-		let selected = read_snapshot(backup, self.max_bytes)?;
+		let selected = storage.read_file(backup, self.max_bytes)?;
 		let integrity = record.integrity();
 		if selected.fingerprint().sha256() != &integrity.sha256
 			|| selected.bytes().len() != integrity.byte_length
@@ -276,6 +359,7 @@ impl NativeBackupCatalog {
 			record,
 			current,
 			selected,
+			selected_directory: scope.cloned(),
 		})
 	}
 
@@ -295,6 +379,7 @@ impl NativeBackupCatalog {
 			record,
 			current,
 			selected,
+			selected_directory,
 		} = prepared;
 		// Confirmed bytes are re-read and checked by the native policy at commit time.
 		drop(selected);
@@ -303,8 +388,17 @@ impl NativeBackupCatalog {
 		let source = record.source().clone();
 		let id = record.id().clone();
 		self.ensure_record(record)?;
+		let destination = managed_scope(self.managed_directory.as_ref(), reversal)?;
+		if let (Some(selected), Some(destination)) = (&selected_directory, destination)
+			&& selected.path() == destination.path()
+			&& selected != destination
+		{
+			return Err(StorageError::Conflict.into());
+		}
+		let mut storage =
+			NativeStorage::new(destination).with_selected(selected_directory.as_ref());
 		let effect = self.catalog.restore(
-			&mut NativeStorage,
+			&mut storage,
 			&id,
 			&source,
 			&expected,
@@ -330,6 +424,19 @@ impl NativeBackupCatalog {
 		self.catalog
 			.import(record)
 			.map_err(|_| NativeBackupError::MetadataMismatch)
+	}
+}
+
+fn managed_scope<'a>(
+	configured: Option<&'a BackupDirectory>,
+	placement: BackupPlacement<'_>,
+) -> Result<Option<&'a BackupDirectory>, NativeBackupError> {
+	match (configured, placement) {
+		(Some(directory), BackupPlacement::Managed(path)) if path != directory.path() => {
+			Err(NativeBackupError::InvalidLocation)
+		}
+		(Some(directory), BackupPlacement::Managed(_)) => Ok(Some(directory)),
+		_ => Ok(None),
 	}
 }
 
@@ -389,68 +496,4 @@ fn directory_error(source: io::Error) -> NativeBackupError {
 		source,
 	}
 	.into()
-}
-
-/// Failure before attempting to write live bank bytes.
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum NativeBackupError {
-	/// The selected bank path cannot be used as a portable backup identity.
-	InvalidSource,
-	/// The backup location must be absolute and contain no parent traversal.
-	InvalidLocation,
-	/// The machine's current UTC time cannot be formatted for a backup name.
-	Timestamp,
-	/// The selected backup directory exceeded its scan limit.
-	DirectoryLimit,
-	/// Sidecar, selected bank and snapshot failed consistency checks.
-	MetadataMismatch,
-	/// A native storage operation failed.
-	Storage(StorageError),
-	/// A backup policy precondition failed with any available recovery evidence.
-	Policy(Box<PolicyError>),
-}
-
-impl fmt::Display for NativeBackupError {
-	fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::InvalidSource => {
-				out.write_str("backup source requires a portable .sc2bank filename")
-			}
-			Self::InvalidLocation => {
-				out.write_str("backup location requires an absolute path without parent traversal")
-			}
-			Self::Timestamp => {
-				out.write_str("current UTC time cannot be used for a backup timestamp")
-			}
-			Self::DirectoryLimit => out.write_str("backup directory contains too many entries"),
-			Self::MetadataMismatch => {
-				out.write_str("backup metadata does not identify this bank and snapshot")
-			}
-			Self::Storage(error) => fmt::Display::fmt(error, out),
-			Self::Policy(error) => fmt::Display::fmt(error, out),
-		}
-	}
-}
-
-impl Error for NativeBackupError {
-	fn source(&self) -> Option<&(dyn Error + 'static)> {
-		match self {
-			Self::Storage(error) => Some(error),
-			Self::Policy(error) => Some(error.as_ref()),
-			_ => None,
-		}
-	}
-}
-
-impl From<StorageError> for NativeBackupError {
-	fn from(error: StorageError) -> Self {
-		Self::Storage(error)
-	}
-}
-
-impl From<PolicyError> for NativeBackupError {
-	fn from(error: PolicyError) -> Self {
-		Self::Policy(Box::new(error))
-	}
 }

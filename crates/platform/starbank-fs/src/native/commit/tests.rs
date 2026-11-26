@@ -78,6 +78,7 @@ fn failure_after_stage_sync_leaves_original_and_removes_owned_stage() -> io::Res
 		PREPARED,
 		CommitIntent::ReplaceExpected(before.fingerprint()),
 		LIMIT,
+		None,
 		|checkpoint| {
 			assert_eq!(checkpoint, CommitPhase::Staged);
 			assert_eq!(fs::read(&fixture.target).expect("original bytes"), ORIGINAL);
@@ -109,6 +110,7 @@ fn cancel_before_directory_sync_or_readback_preserves_recovery() -> io::Result<(
 			PREPARED,
 			CommitIntent::ReplaceExpected(before.fingerprint()),
 			LIMIT,
+			None,
 			|checkpoint| {
 				if checkpoint == at {
 					Err(injected_fault())
@@ -143,6 +145,7 @@ fn external_create_wins_atomic_no_replace() -> io::Result<()> {
 		PREPARED,
 		CommitIntent::CreateNew,
 		LIMIT,
+		None,
 		|checkpoint| {
 			assert_eq!(checkpoint, CommitPhase::Staged);
 			fs::write(&target, EXTERNAL)
@@ -167,6 +170,7 @@ fn external_replacement_after_final_check_retains_both_versions() -> io::Result<
 		PREPARED,
 		CommitIntent::ReplaceExpected(expected.fingerprint()),
 		LIMIT,
+		None,
 		|checkpoint| {
 			if checkpoint == CommitPhase::Staged {
 				fs::rename(&competing, &fixture.target)
@@ -194,6 +198,7 @@ fn post_publication_data_change_is_an_uncertain_outcome() -> io::Result<()> {
 		PREPARED,
 		CommitIntent::ReplaceExpected(before.fingerprint()),
 		LIMIT,
+		None,
 		|checkpoint| {
 			if checkpoint == CommitPhase::Published {
 				fs::write(&fixture.target, EXTERNAL)
@@ -333,6 +338,7 @@ fn pause_at_checkpoint() -> io::Result<()> {
 		PREPARED,
 		CommitIntent::ReplaceExpected(before.fingerprint()),
 		LIMIT,
+		None,
 		|checkpoint| {
 			if checkpoint == selected {
 				let mut stdout = io::stdout().lock();

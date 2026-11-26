@@ -6,7 +6,10 @@ use rustix::fs::OFlags;
 use rustix::fs::{self, FlockOperation, RenameFlags};
 use rustix::io::Errno;
 
-use crate::{CommitIntent, CommitIssue, CommitOutcome, CommitReceipt, Fingerprint, StorageError};
+use crate::{
+	BackupDirectory, CommitIntent, CommitIssue, CommitOutcome, CommitReceipt, Fingerprint,
+	StorageError,
+};
 
 #[cfg(target_os = "macos")]
 use super::darwin;
@@ -23,7 +26,7 @@ use super::stage::Stage;
 /// Rejects unsupported filesystems, unsafe targets or unsupported metadata.
 #[cfg(target_os = "macos")]
 pub fn check_replace_scope(path: &Path) -> Result<(), StorageError> {
-	let destination = Destination::open(path)?;
+	let destination = Destination::open(path, None)?;
 	darwin::require_local_apfs(&destination.dir)?;
 	let file = destination.open_file(&destination.name, OFlags::RDWR)?;
 	let observed = super::destination::observe(&file)?;
@@ -55,7 +58,17 @@ pub fn commit(
 	intent: CommitIntent<'_>,
 	max_bytes: usize,
 ) -> CommitOutcome {
-	match try_commit(path, bytes, intent, max_bytes, |_| Ok(())) {
+	commit_scoped(path, bytes, intent, max_bytes, None)
+}
+
+pub(crate) fn commit_scoped(
+	path: &Path,
+	bytes: &[u8],
+	intent: CommitIntent<'_>,
+	max_bytes: usize,
+	authority: Option<&BackupDirectory>,
+) -> CommitOutcome {
+	match try_commit(path, bytes, intent, max_bytes, authority, |_| Ok(())) {
 		Ok(outcome) => outcome,
 		Err(error) => CommitOutcome::RejectedUnchanged(error),
 	}
@@ -73,6 +86,7 @@ fn try_commit(
 	bytes: &[u8],
 	intent: CommitIntent<'_>,
 	max_bytes: usize,
+	authority: Option<&BackupDirectory>,
 	mut checkpoint: impl FnMut(CommitPhase) -> Result<(), StorageError>,
 ) -> Result<CommitOutcome, StorageError> {
 	if bytes.len() > max_bytes {
@@ -83,13 +97,16 @@ fn try_commit(
 		return Err(StorageError::Unsupported("Linux overwrite is unavailable"));
 	}
 
-	let destination = Destination::open(path)?;
+	let destination = Destination::open(path, authority)?;
 	#[cfg(target_os = "macos")]
 	darwin::require_local_apfs(&destination.dir)?;
 	// The held directory descriptor serializes cooperating writers in this directory, even
 	// across processes or differently spelled file names on case-insensitive filesystems.
 	fs::flock(&destination.dir, FlockOperation::NonBlockingLockExclusive)
 		.map_err(|error| StorageError::io("lock destination directory", error))?;
+	if let Some(authority) = authority {
+		authority.validate()?;
+	}
 	let mut stage = Stage::create(&destination)?;
 	let digest = digest(bytes);
 	stage.write(bytes)?;
@@ -123,6 +140,9 @@ fn try_commit(
 	#[cfg(target_os = "macos")]
 	let flags = darwin::publication_flags(flags);
 	checkpoint(CommitPhase::Staged)?;
+	if let Some(authority) = authority {
+		authority.validate()?;
+	}
 	let publish = fs::renameat_with(
 		&destination.dir,
 		stage.name(),
@@ -146,6 +166,9 @@ fn try_commit(
 		sync(&destination.dir, "sync destination directory")?;
 		checkpoint(CommitPhase::DirectorySynced)?;
 		let fingerprint = verify(&destination, &staged, digest, max_bytes)?;
+		if let Some(authority) = authority {
+			authority.validate()?;
+		}
 		#[cfg(target_os = "macos")]
 		if let Some(original) = &original {
 			original.verify_replacement(&destination, &stage, &fingerprint, max_bytes)?;
@@ -273,3 +296,6 @@ impl<'expected> Original<'expected> {
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests;
+
+#[cfg(test)]
+mod scope_tests;

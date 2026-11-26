@@ -8,7 +8,7 @@ use std::path::{Component, Path, PathBuf};
 use rustix::fs::{self, AtFlags, FileType, Mode, OFlags};
 use sha2::{Digest, Sha256};
 
-use crate::{FileSnapshot, Fingerprint, StorageError};
+use crate::{BackupDirectory, FileSnapshot, Fingerprint, StorageError};
 
 const OPEN_DIRECTORY: OFlags = OFlags::RDONLY
 	.union(OFlags::DIRECTORY)
@@ -76,7 +76,10 @@ pub(super) struct Destination {
 }
 
 impl Destination {
-	pub(super) fn open(path: &Path) -> Result<Self, StorageError> {
+	pub(super) fn open(
+		path: &Path,
+		authority: Option<&BackupDirectory>,
+	) -> Result<Self, StorageError> {
 		let name = path
 			.file_name()
 			.ok_or(StorageError::UnsafePath("missing regular file name"))?
@@ -101,7 +104,11 @@ impl Destination {
 				.map_err(|error| StorageError::io("resolve current directory", error))?
 				.join(parent)
 		};
-		let dir = open_directory(&parent)?;
+		let dir = match authority {
+			Some(scope) if scope.path() == parent => scope.open()?,
+			Some(_) => return Err(StorageError::Conflict),
+			None => open_directory(&parent)?,
+		};
 		let identity = directory_identity(&dir)?;
 		Ok(Self {
 			dir,
@@ -202,9 +209,20 @@ impl Destination {
 /// Returns a storage error for unsafe paths, excessive input, concurrent changes, or external I/O
 /// failures. The input is resolved relative to the current directory when it is not absolute.
 pub fn read_snapshot(path: &Path, max_bytes: usize) -> Result<FileSnapshot, StorageError> {
-	let destination = Destination::open(path)?;
+	read_scoped(path, max_bytes, None)
+}
+
+pub(crate) fn read_scoped(
+	path: &Path,
+	max_bytes: usize,
+	authority: Option<&BackupDirectory>,
+) -> Result<FileSnapshot, StorageError> {
+	let destination = Destination::open(path, authority)?;
 	let snapshot = destination.read_named(&destination.name, max_bytes)?;
 	destination.ensure_bound()?;
+	if let Some(authority) = authority {
+		authority.validate()?;
+	}
 	Ok(snapshot)
 }
 
@@ -219,7 +237,7 @@ pub(super) fn digest(bytes: &[u8]) -> [u8; 32] {
 	Sha256::digest(bytes).into()
 }
 
-fn open_directory(path: &Path) -> Result<File, StorageError> {
+pub(crate) fn open_directory(path: &Path) -> Result<File, StorageError> {
 	let anchor = if path.is_absolute() { "/" } else { "." };
 	let mut dir = File::from(
 		fs::open(anchor, OPEN_DIRECTORY, Mode::empty())

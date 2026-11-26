@@ -10,7 +10,7 @@ use starbank_backup::{
 };
 use starbank_paths::parse_signing_context;
 
-use crate::{NativeBackupError, StorageError, read_snapshot};
+use crate::{NativeBackupError, StorageError, backup_storage::NativeStorage};
 
 const ADJACENT_VERSION: u32 = 1;
 const MANAGED_VERSION: u32 = 2;
@@ -62,13 +62,14 @@ impl Metadata {
 		source: &BankSource,
 		placement: BackupPlacement<'_>,
 		sidecar: &Path,
+		storage: &NativeStorage<'_>,
 	) -> Result<Option<BackupRecord>, NativeBackupError> {
 		let directory = backup_directory(source, placement)?;
 		if sidecar.parent() != Some(directory) {
 			return Err(NativeBackupError::MetadataMismatch);
 		}
 		let metadata: Self =
-			serde_json::from_slice(read_snapshot(sidecar, MAX_METADATA_BYTES)?.bytes())
+			serde_json::from_slice(storage.read_file(sidecar, MAX_METADATA_BYTES)?.bytes())
 				.map_err(|_| NativeBackupError::MetadataMismatch)?;
 		let adjacent = source.path().parent() == Some(directory);
 		match (

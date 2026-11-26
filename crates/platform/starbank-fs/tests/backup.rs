@@ -223,3 +223,165 @@ fn unsafe_managed_locations_are_refused_before_loading() -> Result<(), Box<dyn E
 	);
 	Ok(())
 }
+
+#[test]
+fn custom_managed_directory_preserves_native_path_and_rejects_replacement()
+-> Result<(), Box<dyn Error>> {
+	use std::os::unix::fs::symlink;
+
+	use starbank_fs::{BackupDirectory, RetentionPolicy, StorageError};
+
+	let sandbox = tempfile::tempdir()?;
+	let root = sandbox.path().canonicalize()?;
+	#[cfg(target_os = "linux")]
+	let chosen = {
+		use std::os::unix::ffi::OsStrExt as _;
+		root.join(std::ffi::OsStr::from_bytes(b"Choice-\xff"))
+	};
+	#[cfg(target_os = "macos")]
+	let chosen = root.join("Choicé with spaces");
+	let moved = root.join("Moved");
+	let alias = root.join("Alias");
+	fs::create_dir(&chosen)?;
+	symlink(&chosen, &alias)?;
+	assert!(BackupDirectory::capture(&alias).is_err());
+	assert!(BackupDirectory::capture(&alias.join("child")).is_err());
+	assert!(BackupDirectory::capture(Path::new("relative")).is_err());
+
+	let grant = BackupDirectory::capture(&chosen)?;
+	let decoded: BackupDirectory = serde_json::from_slice(&serde_json::to_vec(&grant)?)?;
+	assert_eq!(grant, decoded);
+	assert_eq!(grant.path(), chosen);
+	decoded.validate()?;
+
+	let bank = root.join("Scout.SC2Bank");
+	fs::write(&bank, SAVED)?;
+	let source = backup_source(&bank)?;
+	let placement = BackupPlacement::Managed(grant.path());
+	let mut catalog = catalog();
+	catalog.set_managed_directory(Some(decoded));
+	assert!(matches!(
+		catalog.create(&source, BackupPlacement::Managed(&root)),
+		Err(NativeBackupError::InvalidLocation)
+	));
+	let first = catalog.create(&source, placement)?;
+	catalog.create(&source, placement)?;
+	assert_eq!(
+		catalog.load(&source, placement, BackupVerification::Recorded)?,
+		0
+	);
+	catalog.verify(&first)?;
+	assert_eq!(
+		catalog.retention_candidates(&source, RetentionPolicy::KeepNewest(NonZeroUsize::MIN),)[0]
+			.id(),
+		&first
+	);
+
+	let mut file = fs::OpenOptions::new().write(true).open(first.path())?;
+	std::io::Write::write_all(&mut file, &[b' '; SAVED.len() + 1])?;
+	drop(file);
+	let Err(NativeBackupError::Policy(error)) = catalog.verify(&first) else {
+		panic!("a payload larger than its recorded length must fail verification");
+	};
+	assert!(matches!(
+		*error,
+		starbank_backup::BackupError::Storage(StorageError::TooLarge { max_bytes })
+			if max_bytes == SAVED.len()
+	));
+
+	fs::rename(&chosen, &moved)?;
+	fs::create_dir(&chosen)?;
+	assert!(matches!(grant.validate(), Err(StorageError::Conflict)));
+	assert!(catalog.create(&source, placement).is_err());
+	assert!(
+		catalog
+			.load(&source, placement, BackupVerification::Verify)
+			.is_err()
+	);
+	assert_eq!(fs::read_dir(&chosen)?.count(), 0);
+	assert_eq!(fs::read_dir(&moved)?.count(), 4);
+	Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn restore_keeps_confirmed_custom_source_scope_when_the_current_location_changes()
+-> Result<(), Box<dyn Error>> {
+	use starbank_fs::BackupDirectory;
+
+	let sandbox = tempfile::tempdir()?;
+	let root = sandbox.path().canonicalize()?;
+	let path = root.join("Scout.SC2Bank");
+	let old = root.join("Original backup location");
+	let new = root.join("Current backup location");
+	fs::create_dir(&old)?;
+	fs::create_dir(&new)?;
+	fs::write(&path, SAVED)?;
+	let old_grant = BackupDirectory::capture(&old)?;
+	let new_grant = BackupDirectory::capture(&new)?;
+	let source = backup_source(&path)?;
+	let old_placement = BackupPlacement::Managed(old_grant.path());
+	let new_placement = BackupPlacement::Managed(new_grant.path());
+	let mut catalog = catalog();
+	catalog.set_managed_directory(Some(old_grant.clone()));
+	let current = read_snapshot(&path, LIMIT)?;
+	let first = catalog.overwrite(
+		&source,
+		current.fingerprint(),
+		CURRENT,
+		NativeBackupPolicy::FirstInSession(old_placement),
+	)?;
+	let backup = first.backup.expect("original custom backup");
+	assert!(matches!(first.commit, CommitOutcome::CommittedVerified(_)));
+
+	catalog.set_managed_directory(Some(new_grant.clone()));
+	let current = read_snapshot(&path, LIMIT)?;
+	let second = catalog.overwrite(
+		&source,
+		current.fingerprint(),
+		CURRENT,
+		NativeBackupPolicy::FirstInSession(new_placement),
+	)?;
+	assert!(second.backup.is_none());
+	assert!(matches!(second.commit, CommitOutcome::CommittedVerified(_)));
+	assert_eq!(fs::read_dir(&new)?.count(), 0);
+	let prepare = |catalog: &NativeBackupCatalog| -> Result<_, Box<dyn Error>> {
+		Ok(catalog.prepare_restore(
+			&source,
+			read_snapshot(&path, LIMIT)?,
+			backup.path(),
+			old_placement,
+		)?)
+	};
+	catalog.set_managed_directory(Some(old_grant.clone()));
+	let prepared = prepare(&catalog)?;
+	catalog.set_managed_directory(Some(new_grant.clone()));
+	let restored = catalog.restore(prepared, new_placement)?;
+	assert!(matches!(
+		restored.commit,
+		CommitOutcome::CommittedVerified(_)
+	));
+	let reversal = restored.backup.expect("reversal in current location");
+	assert_eq!(reversal.path().parent(), Some(new.as_path()));
+	assert_eq!(fs::read(reversal.path())?, CURRENT);
+	assert_eq!(fs::read(&path)?, SAVED);
+
+	catalog.set_managed_directory(Some(old_grant.clone()));
+	let pending_when_replaced = prepare(&catalog)?;
+	catalog.set_managed_directory(Some(new_grant.clone()));
+	let moved = root.join("Moved old location");
+	fs::rename(&old, &moved)?;
+	fs::create_dir(&old)?;
+	// Even identical bytes at the previous path must not redirect a confirmed restore.
+	let leaf = backup.path().file_name().expect("backup leaf");
+	fs::copy(moved.join(leaf), old.join(leaf))?;
+	let before = fs::read_dir(&new)?.count();
+	assert!(
+		catalog
+			.restore(pending_when_replaced, new_placement)
+			.is_err()
+	);
+	assert_eq!(fs::read_dir(&new)?.count(), before);
+	assert_eq!(fs::read(&path)?, SAVED);
+	Ok(())
+}

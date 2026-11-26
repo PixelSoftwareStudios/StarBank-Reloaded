@@ -4,6 +4,8 @@
 #[cfg(not(target_family = "wasm"))]
 mod backup_catalog;
 #[cfg(not(target_family = "wasm"))]
+mod backup_directory;
+#[cfg(not(target_family = "wasm"))]
 mod backup_metadata;
 #[cfg(not(target_family = "wasm"))]
 mod backup_storage;
@@ -21,6 +23,8 @@ pub use backup_catalog::{
 	NativeBackupPolicy, PreparedRestore, backup_source,
 };
 #[cfg(not(target_family = "wasm"))]
+pub use backup_directory::BackupDirectory;
+#[cfg(not(target_family = "wasm"))]
 pub use backup_metadata::BackupReasonCode;
 pub use contract::{
 	CommitIntent, CommitIssue, CommitOutcome, CommitReceipt, FileSnapshot, Fingerprint,
@@ -31,6 +35,7 @@ pub use native::{check_replace_scope, commit, read_snapshot};
 #[cfg(not(target_family = "wasm"))]
 pub use starbank_backup::{
 	BackupHealth, BackupId, BackupPlacement, BackupRecord, BackupStatus, BankSource,
+	RetentionPolicy,
 };
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 pub use unsupported::read_snapshot;

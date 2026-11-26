@@ -5,14 +5,71 @@ use starbank_backup::{
 };
 
 use crate::{
-	CommitIntent, CommitIssue, CommitOutcome, CommitReceipt, Fingerprint, StorageError,
+	BackupDirectory, CommitIntent, CommitIssue, CommitOutcome, CommitReceipt, FileSnapshot,
+	Fingerprint, StorageError,
 	backup_metadata::{MAX_METADATA_BYTES, Metadata, sidecar_path},
 	commit, read_snapshot,
 };
 
-pub(super) struct NativeStorage;
+#[derive(Clone, Copy)]
+pub(super) struct NativeStorage<'a> {
+	destination: Option<&'a BackupDirectory>,
+	selected: Option<&'a BackupDirectory>,
+	read_limit: usize,
+}
 
-impl BackupStorage for NativeStorage {
+impl<'a> NativeStorage<'a> {
+	pub(super) fn new(destination: Option<&'a BackupDirectory>) -> Self {
+		Self {
+			destination,
+			selected: None,
+			read_limit: usize::MAX,
+		}
+	}
+
+	pub(super) fn with_selected(mut self, source: Option<&'a BackupDirectory>) -> Self {
+		self.selected = source;
+		self
+	}
+
+	pub(super) fn with_read_limit(mut self, limit: usize) -> Self {
+		self.read_limit = limit;
+		self
+	}
+
+	pub(super) fn read_file(
+		&self,
+		path: &Path,
+		max_bytes: usize,
+	) -> Result<FileSnapshot, StorageError> {
+		match [self.selected, self.destination]
+			.into_iter()
+			.flatten()
+			.find(|directory| path.parent() == Some(directory.path()))
+		{
+			Some(directory) => directory.read(path, max_bytes),
+			None => read_snapshot(path, max_bytes),
+		}
+	}
+
+	fn write_file(
+		&self,
+		path: &Path,
+		bytes: &[u8],
+		intent: CommitIntent<'_>,
+		max_bytes: usize,
+	) -> CommitOutcome {
+		match self
+			.destination
+			.filter(|directory| path.parent() == Some(directory.path()))
+		{
+			Some(directory) => directory.commit(path, bytes, intent, max_bytes),
+			None => commit(path, bytes, intent, max_bytes),
+		}
+	}
+}
+
+impl BackupStorage for NativeStorage<'_> {
 	type Fingerprint = Fingerprint;
 	type Receipt = CommitReceipt;
 	type Error = StorageError;
@@ -23,7 +80,7 @@ impl BackupStorage for NativeStorage {
 		path: &Path,
 		max_bytes: usize,
 	) -> Result<Snapshot<Self::Fingerprint>, ReadFailure<Self::Error>> {
-		match read_snapshot(path, max_bytes) {
+		match self.read_file(path, max_bytes.min(self.read_limit)) {
 			Ok(snapshot) => Ok(Snapshot {
 				fingerprint: snapshot.fingerprint().clone(),
 				bytes: snapshot.into_bytes(),
@@ -44,7 +101,7 @@ impl BackupStorage for NativeStorage {
 			StorageIntent::CreateNew => CommitIntent::CreateNew,
 			StorageIntent::ReplaceExpected(expected) => CommitIntent::ReplaceExpected(expected),
 		};
-		match commit(path, bytes, intent, max_bytes) {
+		match self.write_file(path, bytes, intent, max_bytes) {
 			CommitOutcome::CommittedVerified(receipt) => CommitState::Verified(receipt),
 			CommitOutcome::RejectedUnchanged(error)
 				if matches!(intent, CommitIntent::CreateNew)
@@ -69,10 +126,13 @@ impl BackupStorage for NativeStorage {
 			})
 		})?;
 		let path = sidecar_path(record.id().path());
-		match commit(&path, &bytes, CommitIntent::CreateNew, MAX_METADATA_BYTES) {
+		match self.write_file(&path, &bytes, CommitIntent::CreateNew, MAX_METADATA_BYTES) {
 			CommitOutcome::CommittedVerified(_) => Ok(()),
 			CommitOutcome::RejectedUnchanged(error) => Err(RecordFailure::Rejected(error)),
 			CommitOutcome::CommitUncertain(issue) => Err(RecordFailure::Uncertain(issue)),
 		}
 	}
 }
+
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod tests;

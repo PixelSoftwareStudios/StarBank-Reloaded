@@ -30,7 +30,7 @@ pub(super) struct Security {
 	xattrs: Vec<(OsString, Vec<u8>)>,
 }
 
-pub(super) fn require_local_apfs(dir: &File) -> Result<(), StorageError> {
+pub(crate) fn require_local_apfs(dir: &File) -> Result<(), StorageError> {
 	let filesystem =
 		fs::fstatfs(dir).map_err(|error| StorageError::io("inspect filesystem", error))?;
 	let local = filesystem.f_flags & (libc::MNT_LOCAL as u32) != 0;
