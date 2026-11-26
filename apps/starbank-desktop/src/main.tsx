@@ -13,6 +13,7 @@ import {
   engineRequest,
   profileLoadForFile,
 } from "starbank-engine-client/protocol";
+import { decodeBankFileXml } from "starbank-platform/bank-encoding";
 import type {
   BankEditorController,
   BankEditorDocument,
@@ -193,8 +194,8 @@ function DesktopApp() {
     }
     const target = { id: reply.document_id, revision: reply.revision };
     const snapshot = reply.result.payload;
-    const raw = await dispatch(target, { kind: "raw" });
-    if (raw.reply.result.kind !== "raw" || raw.bytes === undefined) {
+    const raw = await dispatch(target, { kind: "raw_text" });
+    if (raw.reply.result.kind !== "raw_text" || raw.bytes === undefined) {
       throw new Error("The bank engine did not return XML.");
     }
     setDocument({
@@ -459,7 +460,7 @@ function DesktopApp() {
     onEditValues: (target, edits) =>
       update(target, { kind: "set_values", payload: { edits } }),
     onReplaceXml: (target, xml) =>
-      update(target, { kind: "replace_raw" }, encodeBankXml(xml)),
+      update(target, { kind: "replace_raw_text" }, encodeBankXml(xml)),
     onReset: (target) => update(target, { kind: "reset" }),
     onUndo: document?.canUndo
       ? (target) => update(target, { kind: "undo" })
@@ -541,7 +542,7 @@ function DesktopApp() {
             ) {
               return { ok: true };
             }
-            await navigator.clipboard.writeText(decodeBankXml(bytes));
+            await navigator.clipboard.writeText(decodeBankFileXml(bytes));
             return { ok: true, message: "Copied bank XML." };
           })
       : undefined,

@@ -13,7 +13,7 @@ pub(crate) const MAX_NAMESPACE_SCOPE: usize = 128;
 /// Resource bounds shared by the XML reader and writer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-	/// Maximum complete input or output size in bytes.
+	/// Maximum complete input or output size in native and working UTF-8 bytes.
 	pub document_bytes: usize,
 	/// Maximum nesting of XML elements, including the root.
 	pub element_depth: usize,

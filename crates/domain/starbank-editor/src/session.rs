@@ -206,8 +206,8 @@ impl Session {
 	///
 	/// # Errors
 	///
-	/// Stale revisions, invalid XML, and new invalid or grouped numeric attributes
-	/// leave the previous checked document intact.
+	/// Rejects stale revisions, encoding changes, invalid XML, and new invalid
+	/// or grouped numeric attributes. The previous checked document stays intact.
 	pub fn replace_raw(
 		&mut self,
 		expected: Revision,
@@ -218,6 +218,9 @@ impl Session {
 			return Ok(self.revision);
 		}
 		let document = parse(bytes, self.limits).map_err(EditorError::Parse)?;
+		if document.encoding() != self.document.encoding() {
+			return Err(EditorError::RawEncodingMismatch);
+		}
 		validate_raw_numbers(&self.document, &document)?;
 		let mut cursor = self.id_cursor;
 		let identities = Arc::new(Identities::allocate(&document, &mut cursor)?);

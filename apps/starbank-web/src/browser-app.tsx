@@ -5,13 +5,16 @@ import type {
   EngineSigningContext,
 } from "starbank-engine-client/protocol";
 import {
+  decodeBankFileXml,
+  encodeBankFileXml,
+} from "starbank-platform/bank-encoding";
+import {
   prepareBankDownload,
   writeBankClipboard,
 } from "starbank-platform/browser";
 import {
   AppShell,
   type BankEditorController,
-  type BankEditorDocument,
   type EditorAction,
   type EditorActionResult,
   type EditorTarget,
@@ -20,10 +23,9 @@ import {
 } from "starbank-ui";
 import {
   type BankEditCommand,
+  type BrowserBankDocument,
   type BrowserBankSession,
   createBankSession,
-  encodeBankXml,
-  readPreparedXml,
 } from "./bank-session";
 import { LocalBankLibrary } from "./local-bank-library";
 import { useBrowserSettings } from "./use-browser-settings";
@@ -40,7 +42,7 @@ export function StarBankWeb() {
   }, [preferences.settings.theme, preferences.settings.textSize]);
   const session = useRef<BrowserBankSession>(null);
   const actionInProgress = useRef(false);
-  const [document, setDocument] = useState<BankEditorDocument>();
+  const [document, setDocument] = useState<BrowserBankDocument>();
   const [openedFile, setOpenedFile] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState<EngineProfile>();
@@ -96,7 +98,7 @@ export function StarBankWeb() {
     return session.current;
   }
 
-  function activeDocument(target: EditorTarget): BankEditorDocument {
+  function activeDocument(target: EditorTarget): BrowserBankDocument {
     if (document?.id !== target.id || document.revision !== target.revision) {
       throw new Error("The bank changed before the action could start.");
     }
@@ -215,7 +217,7 @@ export function StarBankWeb() {
         activeDocument(target);
         const text = bankSession()
           .prepare(target)
-          .then(({ bytes }) => readPreparedXml(bytes));
+          .then(({ bytes }) => decodeBankFileXml(bytes));
         try {
           await writeBankClipboard(text);
           return { ok: true, message: "Bank XML copied." };
@@ -226,7 +228,7 @@ export function StarBankWeb() {
       }),
   };
 
-  async function publish(next: BankEditorDocument) {
+  async function publish(next: BrowserBankDocument) {
     if (profile !== undefined && profile.status !== "unloaded") {
       try {
         setProfile(await bankSession().profile(next));
@@ -279,7 +281,10 @@ export function StarBankWeb() {
         );
       }
       return {
-        download: prepareBankDownload(encodeBankXml(document.xml), name),
+        download: prepareBankDownload(
+          encodeBankFileXml(document.xml, document.sourceEncoding),
+          name,
+        ),
         message:
           "The bank engine stopped. This recovery copy contains the last accepted revision. Its signature has not been re-verified.",
       };

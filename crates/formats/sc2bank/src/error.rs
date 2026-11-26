@@ -48,7 +48,7 @@ impl Location {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParseErrorKind {
-	/// Source bytes or encoding declaration use an encoding other than UTF-8.
+	/// Source encoding is unsupported or contradicts its XML declaration.
 	UnsupportedEncoding,
 	/// The declaration specifies an XML version other than 1.0.
 	UnsupportedXmlVersion,
@@ -93,6 +93,13 @@ impl ParseError {
 		self
 	}
 
+	pub(crate) fn remap_byte(mut self, map: impl FnOnce(usize) -> Option<usize>) -> Self {
+		if let Some(location) = &mut self.location {
+			location.byte = location.byte.and_then(map);
+		}
+		self
+	}
+
 	/// Returns the failure category.
 	pub fn kind(&self) -> ParseErrorKind {
 		self.kind
@@ -107,7 +114,7 @@ impl ParseError {
 impl fmt::Display for ParseError {
 	fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self.kind {
-			ParseErrorKind::UnsupportedEncoding => write!(output, "expected UTF-8 bank XML")?,
+			ParseErrorKind::UnsupportedEncoding => write!(output, "unsupported bank XML encoding")?,
 			ParseErrorKind::UnsupportedXmlVersion => write!(output, "expected XML version 1.0")?,
 			ParseErrorKind::InvalidXml => write!(output, "invalid XML")?,
 			ParseErrorKind::UnsupportedNamespace => {

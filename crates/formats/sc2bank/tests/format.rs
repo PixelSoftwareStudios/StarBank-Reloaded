@@ -341,12 +341,6 @@ fn parse_errors_have_typed_categories_and_positions() {
 		assert_eq!(error.kind(), *expected, "{error} for {source:?}");
 		assert!(error.location().is_some(), "no location for {error}");
 	}
-	let utf16 = parse(
-		include_bytes!("fixtures/ordinary-utf16le.sc2bank"),
-		Limits::default(),
-	)
-	.unwrap_err();
-	assert_eq!(utf16.kind(), ParseErrorKind::UnsupportedEncoding);
 }
 
 #[test]

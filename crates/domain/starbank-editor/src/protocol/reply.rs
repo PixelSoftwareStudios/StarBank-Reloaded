@@ -13,7 +13,7 @@ use super::snapshot::{Snapshot, WireSignatureStatus};
 pub struct WireReply {
 	/// JSON control reply, encoded as UTF-8 text.
 	pub json: String,
-	/// Raw or prepared bank bytes, present only for a successful binary response.
+	/// Raw text, raw file bytes, or prepared file bytes, according to the response kind.
 	pub bytes: Option<Vec<u8>>,
 }
 
@@ -40,6 +40,9 @@ pub(super) enum ReplyResult<'a> {
 	ProfilePreview(ProfilePreview),
 	Diff(WireDiff<'a>),
 	Raw {},
+	RawText {
+		source_encoding: &'static str,
+	},
 	Prepared {
 		signature_status: WireSignatureStatus,
 	},

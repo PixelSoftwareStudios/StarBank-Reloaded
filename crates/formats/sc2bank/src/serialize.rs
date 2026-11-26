@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, ops::Range};
 
 use crate::{
-	BankDocument, LimitKind, Limits, SerializeError, ValueId, ValueKind, parse,
+	BankDocument, LimitKind, Limits, ParseErrorKind, SerializeError, ValueId, ValueKind, parse,
 	parse::is_xml_character,
 };
 
@@ -68,7 +68,9 @@ pub fn serialize(
 				return Err(SerializeError::UnsupportedValue(node.id()));
 			}
 
-			let range = attribute.source_range();
+			let range = document
+				.text_range(attribute.source_range())
+				.ok_or(SerializeError::InvalidSourceSpan)?;
 			let quote = source_quote(&document.source, &range)?;
 			let length = encoded_length(new_value, quote, node.id(), limits.scalar_bytes)?;
 			total_replacement_bytes = total_replacement_bytes
@@ -101,8 +103,22 @@ pub fn serialize(
 	}
 
 	let output = replace(&document.source, &replacements, output_len)?;
-	parse(output.as_bytes(), limits).map_err(SerializeError::InvalidOutput)?;
-	Ok(output.into_bytes())
+	let bytes = native_bytes(document, output, limits)?;
+	parse(&bytes, limits).map_err(SerializeError::InvalidOutput)?;
+	Ok(bytes)
+}
+
+pub(crate) fn native_bytes(
+	document: &BankDocument,
+	output: String,
+	limits: Limits,
+) -> Result<Vec<u8>, SerializeError> {
+	document
+		.encode_owned_xml_text(output, limits)
+		.map_err(|error| match error.kind() {
+			ParseErrorKind::LimitExceeded(limit) => SerializeError::LimitExceeded(limit),
+			_ => SerializeError::InvalidOutput(error),
+		})
 }
 
 pub(crate) fn source_quote(source: &str, range: &Range<usize>) -> Result<char, SerializeError> {

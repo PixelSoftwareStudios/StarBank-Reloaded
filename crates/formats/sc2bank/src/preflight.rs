@@ -5,7 +5,7 @@ use quick_xml::{
 };
 
 use crate::{
-	LimitKind, Limits, Location, ParseError, ParseErrorKind,
+	LimitKind, Limits, Location, ParseError, ParseErrorKind, XmlEncoding,
 	encoding::{self, UTF8_BOM},
 	limits::{MAX_NAMESPACE_DECLARATIONS, MAX_NAMESPACE_SCOPE},
 	parse::{is_xml_character, is_xml_space},
@@ -26,7 +26,11 @@ pub(crate) struct Inspection {
 }
 
 /// Scans without a DOM so resource limits apply before tree allocation.
-pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Inspection, ParseError> {
+pub(crate) fn inspect(
+	source: &str,
+	encoding: XmlEncoding,
+	limits: Limits,
+) -> Result<Inspection, ParseError> {
 	check_marker_budget(source, limits.markup_markers)?;
 
 	let xml = source.strip_prefix(UTF8_BOM).unwrap_or(source);
@@ -62,7 +66,7 @@ pub(crate) fn inspect(source: &str, limits: Limits) -> Result<Inspection, ParseE
 						.at(location()));
 				}
 				check_scalar(declaration.len(), limits).map_err(|error| error.at(location()))?;
-				check_declaration(declaration).map_err(|error| error.at(location()))?;
+				check_declaration(declaration, encoding).map_err(|error| error.at(location()))?;
 				inspection.declaration_start = Some(position);
 				continue;
 			}
@@ -221,13 +225,13 @@ pub(crate) fn probe_unsupported_declaration(prefix: &str) -> Option<ParseError> 
 		return None;
 	};
 	let byte = prefix.len() - xml.len();
-	check_declaration(&declaration)
+	check_declaration(&declaration, XmlEncoding::Utf8)
 		.err()
 		.filter(|error| error.kind() == ParseErrorKind::UnsupportedEncoding)
 		.map(|error| error.at(Location::at(prefix, byte)))
 }
 
-fn check_declaration(declaration: &BytesDecl<'_>) -> Result<(), ParseError> {
+fn check_declaration(declaration: &BytesDecl<'_>, encoding: XmlEncoding) -> Result<(), ParseError> {
 	let content: &str = declaration.as_ref();
 	let fields = content
 		.strip_prefix(XML_TARGET)
@@ -255,7 +259,7 @@ fn check_declaration(declaration: &BytesDecl<'_>) -> Result<(), ParseError> {
 		}
 		remaining = tail;
 	}
-	declared_encoding.map_or(Ok(()), encoding::validate_name)
+	declared_encoding.map_or(Ok(()), |name| encoding::validate_name(name, encoding))
 }
 
 fn split_declaration_field(input: &str) -> Result<(&str, &str, &str), ParseError> {

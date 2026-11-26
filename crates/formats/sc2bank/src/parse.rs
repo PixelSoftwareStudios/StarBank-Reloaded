@@ -5,7 +5,9 @@ use roxmltree::{Attribute, Document, Node, ParsingOptions, TextPos};
 use crate::{
 	BankDocument, Key, KeyId, LimitKind, Limits, Location, OpaqueReason, ParseError,
 	ParseErrorKind, Section, SectionId, StoredSignature, TypedAttribute, ValueId, ValueKind,
-	ValueNode, encoding, preflight,
+	ValueNode, XmlEncoding, encoding,
+	offsets::{NativeXml, Utf16Offsets},
+	preflight,
 };
 
 pub(crate) const BANK: &str = "Bank";
@@ -18,7 +20,7 @@ pub(crate) const VALUE: &str = "value";
 const PI_OPENING: &str = "<?";
 const PI_CLOSING: &str = "?>";
 
-/// Parses XML 1.0 bank bytes as UTF-8, preserving the source exactly.
+/// Parses UTF-8 or BOM-marked UTF-16 XML 1.0, preserving the native source exactly.
 ///
 /// Unknown markup remains in the source. Only unqualified, direct bank, section and key
 /// elements enter the structural projection. Repeated occurrences keep distinct IDs.
@@ -31,22 +33,79 @@ pub fn parse(bytes: &[u8], limits: Limits) -> Result<BankDocument, ParseError> {
 	if bytes.len() > limits.document_bytes {
 		return Err(preflight::limit_error(LimitKind::DocumentBytes));
 	}
-	let source = encoding::utf8_source(bytes)?;
-	let inspection = preflight::inspect(source, limits)?;
+	let (text, encoding) = encoding::decode(bytes, limits)?;
+	let offsets = (encoding != XmlEncoding::Utf8).then(|| Utf16Offsets::new(&text));
+	let source = WorkingSource {
+		text: &text,
+		offsets: offsets.as_ref(),
+	};
+	let projection = parse_working(source, encoding, limits).map_err(|error| {
+		if let Some(offsets) = &offsets {
+			error.remap_byte(|byte| offsets.native_byte(&text, byte))
+		} else {
+			error
+		}
+	})?;
+	Ok(BankDocument {
+		source: text.into_owned(),
+		native: offsets.map(|offsets| NativeXml {
+			encoding,
+			bytes: bytes.to_vec(),
+			offsets,
+		}),
+		limits,
+		root_range: projection.root_range,
+		version: projection.version,
+		signature: projection.signature,
+		sections: projection.sections,
+		has_unprojected_bank_nodes: projection.has_unprojected_bank_nodes,
+	})
+}
+
+#[derive(Clone, Copy)]
+struct WorkingSource<'input> {
+	text: &'input str,
+	offsets: Option<&'input Utf16Offsets>,
+}
+
+impl WorkingSource<'_> {
+	fn native_range(self, range: Range<usize>) -> Result<Range<usize>, ParseError> {
+		match self.offsets {
+			Some(offsets) => offsets
+				.native_range(self.text, range)
+				.ok_or_else(|| preflight::invalid_xml("invalid UTF-16 source boundary")),
+			None => Ok(range),
+		}
+	}
+}
+
+struct Projection {
+	root_range: Range<usize>,
+	version: Option<String>,
+	signature: Option<StoredSignature>,
+	sections: Vec<Section>,
+	has_unprojected_bank_nodes: bool,
+}
+
+fn parse_working(
+	source: WorkingSource<'_>,
+	encoding: XmlEncoding,
+	limits: Limits,
+) -> Result<Projection, ParseError> {
+	let inspection = preflight::inspect(source.text, encoding, limits)?;
 	let options = ParsingOptions {
 		allow_dtd: false,
 		// The validator also counts its synthetic document root.
 		nodes_limit: limits.nodes.saturating_add(1),
 		entity_resolver: None,
 	};
-	let xml =
-		Document::parse_with_options(source, options).map_err(|error| xml_error(source, error))?;
-	check_validated_nodes(source, &xml, limits, inspection.declaration_start)?;
+	let xml = Document::parse_with_options(source.text, options)
+		.map_err(|error| xml_error(source.text, error))?;
+	check_validated_nodes(source.text, &xml, limits, inspection.declaration_start)?;
 	project(
 		source,
 		xml.root_element(),
 		&inspection.namespace_declarations,
-		limits,
 	)
 }
 
@@ -142,15 +201,13 @@ fn check_processing_instruction(
 }
 
 fn project(
-	source: &str,
+	source: WorkingSource<'_>,
 	root: Node<'_, '_>,
 	namespace_declarations: &[usize],
-	limits: Limits,
-) -> Result<BankDocument, ParseError> {
+) -> Result<Projection, ParseError> {
 	if !is_unqualified(root, BANK) {
-		return Err(
-			ParseError::new(ParseErrorKind::WrongRoot).at(Location::at(source, root.range().start))
-		);
+		return Err(ParseError::new(ParseErrorKind::WrongRoot)
+			.at(Location::at(source.text, root.range().start)));
 	}
 
 	let mut signature = None;
@@ -163,29 +220,27 @@ fn project(
 				child,
 				namespace_declarations,
 				&mut has_unprojected_bank_nodes,
-			);
+			)?;
 			sections.push(section);
 		} else if is_unqualified(child, SIGNATURE) {
 			if signature.is_some() {
 				return Err(ParseError::new(ParseErrorKind::DuplicateSignature)
-					.at(Location::at(source, child.range().start)));
+					.at(Location::at(source.text, child.range().start)));
 			}
 			has_unprojected_bank_nodes |= child.children().any(is_significant);
 			let value = unqualified_attribute(child, VALUE);
 			signature = Some(StoredSignature {
 				value: value.map(|attribute| attribute.value().to_owned()),
 				value_range: value
-					.and_then(|attribute| attribute_value_range(source, attribute.range())),
-				source_range: child.range(),
+					.and_then(|attribute| attribute_value_range(source.text, attribute.range())),
+				source_range: source.native_range(child.range())?,
 			});
 		} else {
 			has_unprojected_bank_nodes |= is_significant(child);
 		}
 	}
 
-	Ok(BankDocument {
-		source: source.to_owned(),
-		limits,
+	Ok(Projection {
 		root_range: root.range(),
 		version: decoded_attribute(root, VERSION),
 		signature,
@@ -195,11 +250,11 @@ fn project(
 }
 
 fn project_section(
-	source: &str,
+	source: WorkingSource<'_>,
 	section: Node<'_, '_>,
 	namespace_declarations: &[usize],
 	has_unprojected_bank_nodes: &mut bool,
-) -> Section {
+) -> Result<Section, ParseError> {
 	let mut keys = Vec::new();
 	for child in section.children() {
 		if !is_unqualified(child, KEY) {
@@ -210,49 +265,49 @@ fn project_section(
 		let mut values = Vec::new();
 		for element in child.children() {
 			if element.is_element() {
-				values.push(project_value(source, element, namespace_declarations));
+				values.push(project_value(source, element, namespace_declarations)?);
 			} else {
 				*has_unprojected_bank_nodes |= is_significant(element);
 			}
 		}
-		let (name, name_source_range) = project_name(source, child);
+		let (name, name_source_range) = project_name(source.text, child);
 		keys.push(Key {
 			id: KeyId(child.id().get()),
 			name,
 			name_source_range,
-			source_range: child.range(),
+			source_range: source.native_range(child.range())?,
 			values,
 		});
 	}
-	let (name, name_source_range) = project_name(source, section);
-	Section {
+	let (name, name_source_range) = project_name(source.text, section);
+	Ok(Section {
 		id: SectionId(section.id().get()),
 		name,
 		name_source_range,
-		source_range: section.range(),
+		source_range: source.native_range(section.range())?,
 		keys,
-	}
+	})
 }
 
 fn project_value(
-	source: &str,
+	source: WorkingSource<'_>,
 	element: Node<'_, '_>,
 	namespace_declarations: &[usize],
-) -> ValueNode {
+) -> Result<ValueNode, ParseError> {
 	let namespace = namespace_uri(element);
 	let range = element.range();
 	let declares_namespace = namespace_declarations.binary_search(&range.start).is_ok();
-	ValueNode {
+	Ok(ValueNode {
 		id: ValueId(element.id().get()),
 		name: element.tag_name().name().to_owned(),
 		namespace: namespace.map(str::to_owned),
-		source_range: range,
+		source_range: source.native_range(range)?,
 		value: project_type_attribute(source, element, namespace.is_some() || declares_namespace),
-	}
+	})
 }
 
 fn project_type_attribute(
-	source: &str,
+	source: WorkingSource<'_>,
 	element: Node<'_, '_>,
 	has_namespace: bool,
 ) -> Result<TypedAttribute, OpaqueReason> {
@@ -271,8 +326,11 @@ fn project_type_attribute(
 	if attribute.namespace().is_some() {
 		return Err(OpaqueReason::Namespace);
 	}
-	let source_range =
-		attribute_value_range(source, attribute.range()).ok_or(OpaqueReason::InvalidSourceSpan)?;
+	let source_range = attribute_value_range(source.text, attribute.range())
+		.ok_or(OpaqueReason::InvalidSourceSpan)?;
+	let source_range = source
+		.native_range(source_range)
+		.map_err(|_| OpaqueReason::InvalidSourceSpan)?;
 	Ok(TypedAttribute {
 		kind: ValueKind::from_name(attribute.name()),
 		name_source_range: attribute.range().start

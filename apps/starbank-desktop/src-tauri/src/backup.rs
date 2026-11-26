@@ -261,14 +261,14 @@ fn describe_restore(storage: &PreparedRestore, signature: SignatureStatus, dirty
 	let change = if original == backup {
 		String::from("The backup and the current file have identical bytes.")
 	} else {
-		let first_changed_line = original
-			.split(|byte| *byte == b'\n')
-			.zip(backup.split(|byte| *byte == b'\n'))
-			.take_while(|(live_line, backup_line)| live_line == backup_line)
+		let first_changed_byte = original
+			.iter()
+			.zip(backup)
+			.take_while(|(live_byte, backup_byte)| live_byte == backup_byte)
 			.count()
 			+ 1;
 		format!(
-			"The first changed line is {first_changed_line}. The file changes from {} to {} bytes.",
+			"The first difference is at byte {first_changed_byte}. The file changes from {} to {} bytes.",
 			original.len(),
 			backup.len()
 		)

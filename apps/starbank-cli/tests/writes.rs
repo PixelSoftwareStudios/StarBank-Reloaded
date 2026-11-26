@@ -377,3 +377,52 @@ fn structural_patch_targets_original_occurrences_after_projected_order_changes()
 	assert_eq!(keys[0]["values"][2]["value"], "1234.50");
 	assert_eq!(fs::read_to_string(&source).expect("read original"), SOURCE);
 }
+
+#[test]
+fn utf16_exports_and_edits_keep_the_original_byte_order() {
+	let text =
+		format!("<?xml version='1.0' encoding='UTF-16'?>\r\n{SOURCE}").replace("Player", "星😀");
+	for little in [true, false] {
+		let encode = |xml: &str| -> Vec<u8> {
+			let units = std::iter::once(0xfeff).chain(xml.encode_utf16());
+			if little {
+				units.flat_map(u16::to_le_bytes).collect()
+			} else {
+				units.flat_map(u16::to_be_bytes).collect()
+			}
+		};
+		let fixture = Fixture::new();
+		let bytes = encode(&text);
+		let source = fixture.write("Source.sc2bank", &bytes);
+		let unchanged = fixture.path.join("Unchanged.sc2bank");
+		let output = bank_command("export", &source)
+			.arg("--no-resign")
+			.arg("--output")
+			.arg(&unchanged)
+			.output()
+			.expect("export UTF-16 bank");
+		assert_eq!(json(&output, 0)["result"]["outcome"], "committed_verified");
+		assert_eq!(fs::read(&unchanged).expect("read unedited export"), bytes);
+
+		let patch = edit_patch(
+			object!({"op":"set_value","section":0,"key":1,"value":0,"lexeme":"1,001"}),
+			&digest(&source),
+			&fixture,
+		);
+		let destination = fixture.path.join("Edited.sc2bank");
+		let output = bank_command("edit", &source)
+			.arg("--patch")
+			.arg(patch)
+			.arg("--no-resign")
+			.arg("--output")
+			.arg(&destination)
+			.output()
+			.expect("edit UTF-16 bank");
+		assert_eq!(json(&output, 0)["result"]["outcome"], "committed_verified");
+		assert_eq!(fs::read(&source).expect("read source"), bytes);
+		assert_eq!(
+			fs::read(&destination).expect("read edited export"),
+			encode(&text.replace("00065", "1001"))
+		);
+	}
+}

@@ -5,12 +5,14 @@ mod encoding;
 mod error;
 mod limits;
 mod model;
+mod offsets;
 mod parse;
 mod preflight;
 mod serialize;
 mod signature;
 mod structural;
 
+pub use encoding::XmlEncoding;
 pub use error::{Location, ParseError, ParseErrorKind, SerializeError};
 pub use limits::{LimitKind, Limits};
 pub use model::{

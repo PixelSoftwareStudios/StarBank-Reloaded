@@ -34,11 +34,6 @@ fn empty_default_namespace_is_unqualified_and_preserved() {
 #[test]
 fn unsupported_octet_signatures_get_named_refusals() {
 	let cases: &[(&[u8], &str)] = &[
-		(
-			include_bytes!("fixtures/ordinary-utf16le.sc2bank"),
-			"UTF-16LE",
-		),
-		(&[0xfe, 0xff, 0, b'<'], "UTF-16BE"),
 		(&[0, b'<', 0, b'?'], "UTF-16BE"),
 		(&[b'<', 0, b'?', 0], "UTF-16LE"),
 		(&[0, 0, 0xfe, 0xff, 0, 0, 0, b'<'], "UTF-32BE"),

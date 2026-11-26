@@ -88,7 +88,10 @@ export type EngineCommand =
     }
   | { readonly kind: "snapshot" }
   | { readonly kind: "raw" }
+  | { readonly kind: "raw_text" }
+  | { readonly kind: "opening_raw" }
   | { readonly kind: "replace_raw" }
+  | { readonly kind: "replace_raw_text" }
   | {
       readonly kind: "set_values";
       readonly payload: { readonly edits: readonly EngineValueEdit[] };
@@ -188,6 +191,10 @@ const engineDiff = v.object({
 export type EngineDiff = v.InferOutput<typeof engineDiff>;
 export type EngineOccurrenceDiff = v.InferOutput<typeof engineOccurrenceDiff>;
 
+const sourceEncoding = v.picklist(["utf-8", "utf-16le", "utf-16be"]);
+
+export type EngineSourceEncoding = v.InferOutput<typeof sourceEncoding>;
+
 const emptyPayload = v.object({});
 const resultSchema = v.variant("kind", [
   v.object({ kind: v.literal("snapshot"), payload: engineSnapshot }),
@@ -197,6 +204,10 @@ const resultSchema = v.variant("kind", [
     payload: profilePreviewSchema,
   }),
   v.object({ kind: v.literal("raw"), payload: emptyPayload }),
+  v.object({
+    kind: v.literal("raw_text"),
+    payload: v.object({ source_encoding: sourceEncoding }),
+  }),
   v.object({ kind: v.literal("diff"), payload: engineDiff }),
   v.object({
     kind: v.literal("prepared"),

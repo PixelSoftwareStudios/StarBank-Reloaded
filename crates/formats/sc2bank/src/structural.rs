@@ -181,7 +181,10 @@ pub fn apply_structural_edit(
 		document.clone()
 	} else {
 		let source = source::materialize(&document.source, &plan.patches, limits)?;
-		parse(source.as_bytes(), limits).map_err(|error| match error.kind() {
+		let reparsed = document
+			.encode_owned_xml_text(source, limits)
+			.and_then(|bytes| parse(&bytes, limits));
+		reparsed.map_err(|error| match error.kind() {
 			crate::ParseErrorKind::LimitExceeded(limit) => {
 				StructuralEditError::LimitExceeded(limit)
 			}
@@ -230,14 +233,15 @@ fn plan_edit(
 ) -> Result<Plan, StructuralEditError> {
 	match edit {
 		StructuralEdit::AddSection { name } => plan_add_section(document, name, limits),
-		StructuralEdit::RemoveSection { id } => {
-			Ok(Plan::removal(find_section(document, id)?.source_range()))
-		}
+		StructuralEdit::RemoveSection { id } => Ok(Plan::removal(text_range(
+			document,
+			find_section(document, id)?.source_range(),
+		)?)),
 		StructuralEdit::RenameSection { id, name } => {
 			let section = find_section(document, id)?;
 			let patches = source::rename_attribute(
 				&document.source,
-				section.source_range(),
+				text_range(document, section.source_range())?,
 				SECTION,
 				section.name(),
 				section.name_source_range.clone(),
@@ -252,18 +256,23 @@ fn plan_edit(
 		StructuralEdit::AddKey { section, name } => {
 			let section = find_section(document, section)?;
 			let child = source::new_named_child(KEY, name, limits)?;
-			let (patch, start) =
-				source::append_child(&document.source, section.source_range(), SECTION, child)?;
+			let (patch, start) = source::append_child(
+				&document.source,
+				text_range(document, section.source_range())?,
+				SECTION,
+				child,
+			)?;
 			Ok(Plan::insertion(patch, InsertedAt::Key(start)))
 		}
-		StructuralEdit::RemoveKey { id } => {
-			Ok(Plan::removal(find_key(document, id)?.source_range()))
-		}
+		StructuralEdit::RemoveKey { id } => Ok(Plan::removal(text_range(
+			document,
+			find_key(document, id)?.source_range(),
+		)?)),
 		StructuralEdit::RenameKey { id, name } => {
 			let key = find_key(document, id)?;
 			let patches = source::rename_attribute(
 				&document.source,
-				key.source_range(),
+				text_range(document, key.source_range())?,
 				KEY,
 				key.name(),
 				key.name_source_range.clone(),
@@ -283,13 +292,18 @@ fn plan_edit(
 		} => {
 			let key = find_key(document, key)?;
 			let child = source::new_value_child(name, known_kind(kind)?, value, limits)?;
-			let (patch, start) =
-				source::append_child(&document.source, key.source_range(), KEY, child)?;
+			let (patch, start) = source::append_child(
+				&document.source,
+				text_range(document, key.source_range())?,
+				KEY,
+				child,
+			)?;
 			Ok(Plan::insertion(patch, InsertedAt::Value(start)))
 		}
-		StructuralEdit::RemoveValue { id } => {
-			Ok(Plan::removal(find_value(document, id)?.source_range()))
-		}
+		StructuralEdit::RemoveValue { id } => Ok(Plan::removal(text_range(
+			document,
+			find_value(document, id)?.source_range(),
+		)?)),
 		StructuralEdit::RenameValue { id, name } => plan_rename_value(document, id, name, limits),
 		StructuralEdit::SetValueType { id, kind, value } => {
 			plan_set_type(document, id, kind, value, limits)
@@ -310,7 +324,7 @@ fn plan_add_section(
 			.is_none_or(|section| section.source_range().end <= signature.source_range().start)
 	});
 	let (patch, start) = if let Some(signature) = trailing_signature {
-		let start = signature.source_range().start;
+		let start = text_range(document, signature.source_range())?.start;
 		(Patch::new(start..start, child), start)
 	} else {
 		source::append_child(&document.source, document.root_range.clone(), BANK, child)?
@@ -338,7 +352,7 @@ fn plan_rename_value(
 		return Ok(Plan::default());
 	}
 	source::validate_element_name(name, limits)?;
-	let element = node.source_range();
+	let element = text_range(document, node.source_range())?;
 	let opening = source::opening_name(&document.source, element.clone(), node.name())?;
 	let mut patches = vec![Patch::new(opening, name.to_owned())];
 	if !source::is_empty_tag(&document.source, element.clone())? {
@@ -377,7 +391,7 @@ fn plan_set_type(
 	if attribute.value() != value {
 		patches.push(source::replace_attribute_content(
 			&document.source,
-			attribute.source_range(),
+			text_range(document, attribute.source_range())?,
 			value,
 			limits,
 		)?);
@@ -386,6 +400,15 @@ fn plan_set_type(
 		patches,
 		inserted: None,
 	})
+}
+
+fn text_range(
+	document: &BankDocument,
+	range: Range<usize>,
+) -> Result<Range<usize>, StructuralEditError> {
+	document
+		.text_range(range)
+		.ok_or(StructuralEditError::InvalidSourceSpan)
 }
 
 fn known_kind(kind: &ValueKind) -> Result<&str, StructuralEditError> {

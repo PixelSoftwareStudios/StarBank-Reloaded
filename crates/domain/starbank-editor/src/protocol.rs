@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, str};
 
 use sc2bank::Limits;
 use starbank_core::Revision;
@@ -63,6 +63,10 @@ enum Output {
 	ProfilePreview(ProfilePreview),
 	Diff(OpeningDiff),
 	Raw(Vec<u8>),
+	RawText {
+		source_encoding: &'static str,
+		bytes: Vec<u8>,
+	},
 	Prepared {
 		status: WireSignatureStatus,
 		bytes: Vec<u8>,
@@ -202,6 +206,15 @@ impl Engine {
 				ReplyResult::Raw {},
 				Some(bytes),
 			),
+			Ok(Output::RawText {
+				source_encoding,
+				bytes,
+			}) => WireReply::encode(
+				Some(request_id),
+				active.scope(),
+				ReplyResult::RawText { source_encoding },
+				Some(bytes),
+			),
 			Ok(Output::Prepared { status, bytes }) => WireReply::encode(
 				Some(request_id),
 				active.scope(),
@@ -255,10 +268,21 @@ fn execute(
 	operation: Operation,
 	bytes: Option<&[u8]>,
 ) -> Result<Output, ProtocolError> {
-	if matches!(operation, Operation::ReplaceRaw) {
+	if matches!(operation, Operation::ReplaceRaw | Operation::ReplaceRawText) {
 		let attached = require_attachment(bytes, max_attachment_bytes())?;
+		let encoded;
+		let native = if matches!(operation, Operation::ReplaceRawText) {
+			let xml = str::from_utf8(attached).map_err(|_| ProtocolError::InvalidDocument)?;
+			encoded = session
+				.document()
+				.encode_xml_text(xml, session.limits)
+				.map_err(|_| ProtocolError::InvalidDocument)?;
+			encoded.as_slice()
+		} else {
+			attached
+		};
 		let _ = session
-			.replace_raw(expected, attached)
+			.replace_raw(expected, native)
 			.map_err(|error| ProtocolError::editor(&error, ProtocolError::InvalidDocument))?;
 		return Ok(Output::Snapshot);
 	}
@@ -268,6 +292,13 @@ fn execute(
 	let _ = match operation {
 		Operation::Snapshot => return Ok(Output::Snapshot),
 		Operation::Raw => return Ok(Output::Raw(session.document().source().to_vec())),
+		Operation::RawText => {
+			return Ok(Output::RawText {
+				source_encoding: session.document().encoding().as_str(),
+				bytes: session.document().xml_text().as_bytes().to_vec(),
+			});
+		}
+		Operation::OpeningRaw => return Ok(Output::Raw(session.opening.to_vec())),
 		Operation::SetValues(edits) => session.set_values(expected, &interpret_edits(&edits)?),
 		Operation::Structure(edit) => session
 			.apply_structure(expected, edit.interpret()?)
@@ -290,7 +321,10 @@ fn execute(
 		Operation::Redo => session.redo(expected),
 		Operation::Reset => session.reset(expected),
 		Operation::Prepare(options) => return prepare(session, expected, options),
-		Operation::ReplaceRaw | Operation::Close(_) | Operation::Profile(_) => {
+		Operation::ReplaceRaw
+		| Operation::ReplaceRawText
+		| Operation::Close(_)
+		| Operation::Profile(_) => {
 			return Err(ProtocolError::Internal);
 		}
 	}

@@ -20,6 +20,12 @@ Browser file inputs and drop provide readable bytes. Export as a download is the
 
 Tauri uses typed Serde control messages. The initial WASM worker sends JSON control messages and transfers bounded byte buffers separately. This avoids coercing file bytes into text and allows the Rust JSON decoder to reject unpaired surrogates in string fields. Product bounds cover file size, command operations and worker queues. [Tauri command transport](https://v2.tauri.app/develop/calling-rust/) · [wasm-bindgen data transport](https://wasm-bindgen.github.io/wasm-bindgen/reference/arbitrary-data-with-serde.html)
 
+## XML text and file bytes
+
+The v1 commands `raw`, `opening_raw` and `prepare` carry exact file bytes. `opening_raw` returns the immutable bytes captured when the bank was opened for a local backup. The additive v1 command `raw_text` carries the decoded XML in a UTF-8 attachment, with `source_encoding` reporting `utf-8`, `utf-16le` or `utf-16be`. `replace_raw_text` accepts a UTF-8 text attachment and retains the active bank's native encoding. `replace_raw` is for exact binary input in the existing encoding. Both replacement commands reject invalid XML or an incompatible declaration before advancing the revision.
+
+Copy XML interprets the prepared file attachment as text using its byte-order mark. Saving and exporting use those bytes directly. A recovery download can re-encode the last accepted raw projection in its reported source encoding.
+
 ## Acceptance cases
 
 | Concern | Check |

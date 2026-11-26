@@ -9,14 +9,15 @@ import {
   type EngineSignatureStatus,
   type EngineSigningContext,
   type EngineSnapshot,
+  type EngineSourceEncoding,
   type EngineTarget,
   engineRequest,
   profileLoadForFile,
 } from "starbank-engine-client/protocol";
+import { encodeBankFileXml } from "starbank-platform/bank-encoding";
 import { readBankFile } from "starbank-platform/browser";
 import type { BankEditorDocument, EditorTarget } from "starbank-ui";
 
-const xmlEncoder = new TextEncoder();
 const xmlDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const signatureText: Record<EngineSignatureStatus, string> = {
@@ -47,6 +48,10 @@ type ProfileCommand = Extract<
   { kind: "profile_load" | "profile_snapshot" | "profile_clear" }
 >;
 
+export interface BrowserBankDocument extends BankEditorDocument {
+  readonly sourceEncoding: EngineSourceEncoding;
+}
+
 interface PreparedBank {
   readonly bytes: ArrayBuffer;
   readonly signatureStatus: EngineSignatureStatus;
@@ -75,7 +80,7 @@ export class BrowserBankSession {
     this.client.close();
   }
 
-  async open(file: File, discardCurrent = false): Promise<BankEditorDocument> {
+  async open(file: File, discardCurrent = false): Promise<BrowserBankDocument> {
     const { maxBankBytes } = await this.client.ready();
     const { bytes, name } = await readBankFile(file, maxBankBytes).catch(
       (error: unknown) => {
@@ -96,7 +101,7 @@ export class BrowserBankSession {
     name: string,
     target: EditorTarget,
     command: BankEditCommand,
-  ): Promise<BankEditorDocument> {
+  ): Promise<BrowserBankDocument> {
     return this.#update(name, command, this.#target(target));
   }
 
@@ -104,16 +109,16 @@ export class BrowserBankSession {
     name: string,
     target: EditorTarget,
     xml: string,
-  ): Promise<BankEditorDocument> {
+  ): Promise<BrowserBankDocument> {
     const { maxBankBytes } = await this.client.ready();
     if (xml.length > maxBankBytes) {
       throw new RangeError("This bank exceeds the engine's file size limit.");
     }
     return this.#update(
       name,
-      { kind: "replace_raw" },
+      { kind: "replace_raw_text" },
       this.#target(target),
-      encodeBankXml(xml),
+      encodeBankFileXml(xml, "utf-8"),
     );
   }
 
@@ -226,11 +231,11 @@ export class BrowserBankSession {
     }
     const { document_id, revision } = reply;
     const raw = await this.#dispatch(
-      { kind: "raw" },
+      { kind: "raw_text" },
       { document_id, expected_revision: revision },
     );
     if (
-      raw.reply.result.kind !== "raw" ||
+      raw.reply.result.kind !== "raw_text" ||
       raw.bytes === undefined ||
       raw.reply.revision !== revision
     ) {
@@ -244,6 +249,7 @@ export class BrowserBankSession {
       revision,
       reply.result.payload,
       raw.bytes,
+      raw.reply.result.payload.source_encoding,
     );
   }
 
@@ -267,26 +273,20 @@ export class BrowserBankSession {
   }
 }
 
-export function encodeBankXml(xml: string): ArrayBuffer {
-  return xmlEncoder.encode(xml).buffer;
-}
-
-export function readPreparedXml(bytes: ArrayBuffer): string {
-  return xmlDecoder.decode(bytes);
-}
-
 function projectDocument(
   name: string,
   id: string,
   revision: string,
   snapshot: EngineSnapshot,
   bytes: ArrayBuffer,
-): BankEditorDocument {
+  sourceEncoding: EngineSourceEncoding,
+): BrowserBankDocument {
   return {
     name,
     id,
     revision,
-    xml: readPreparedXml(bytes),
+    xml: xmlDecoder.decode(bytes),
+    sourceEncoding,
     dirty: snapshot.dirty,
     signatureStatus: signatureText[snapshot.signature_status],
     sections: snapshot.sections.map((section) => ({

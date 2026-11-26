@@ -59,6 +59,8 @@ pub enum EditorError {
 	},
 	/// A requested structural change could not be applied losslessly.
 	Structure(StructuralEditError),
+	/// The raw XML replacement would change the active bank's native encoding.
+	RawEncodingMismatch,
 	/// The submitted XML could not replace or open a document.
 	Parse(ParseError),
 	/// A requested change could not be serialized losslessly.
@@ -112,6 +114,9 @@ impl fmt::Display for EditorError {
 				write!(formatter, "invalid new value for key {key}: {source}")
 			}
 			Self::Structure(source) => source.fmt(formatter),
+			Self::RawEncodingMismatch => {
+				formatter.write_str("raw replacement changes bank encoding")
+			}
 			Self::Parse(source) => source.fmt(formatter),
 			Self::Serialize(source) => source.fmt(formatter),
 			Self::NoHistory => formatter.write_str("no history entry in the requested direction"),

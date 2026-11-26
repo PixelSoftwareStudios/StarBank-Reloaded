@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::Limits;
+use crate::{Limits, ParseError, XmlEncoding, encoding, offsets::NativeXml};
 
 /// An occurrence in a parsed document, independent of the section name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -38,7 +38,9 @@ impl ValueId {
 /// Parsed XML and the exact source bytes needed for a lossless export.
 #[derive(Clone, Debug)]
 pub struct BankDocument {
+	// Working UTF-8 lexical text. Public source() exposes the original native bytes.
 	pub(crate) source: String,
+	pub(crate) native: Option<NativeXml>,
 	pub(crate) limits: Limits,
 	pub(crate) root_range: Range<usize>,
 	pub(crate) version: Option<String>,
@@ -50,7 +52,65 @@ pub struct BankDocument {
 impl BankDocument {
 	/// Returns the original bytes, including BOM and lexical formatting if present.
 	pub fn source(&self) -> &[u8] {
-		self.source.as_bytes()
+		self.native
+			.as_ref()
+			.map_or(self.source.as_bytes(), |native| &native.bytes)
+	}
+
+	/// Returns the native file encoding.
+	pub fn encoding(&self) -> XmlEncoding {
+		self.native
+			.as_ref()
+			.map_or(XmlEncoding::Utf8, |native| native.encoding)
+	}
+
+	/// Returns decoded lexical XML, including a leading BOM marker when present.
+	///
+	/// UTF-16 source declarations and line endings remain as written. Use [Self::source]
+	/// for native bytes and for offsets returned by the document's nodes.
+	pub fn xml_text(&self) -> &str {
+		&self.source
+	}
+
+	/// Encodes a working XML draft in the bank's native encoding and byte order.
+	///
+	/// A UTF-16 draft preserves the required native byte-order mark even when its UTF-8
+	/// presentation omits the marker. The returned bytes still require [crate::parse]
+	/// to validate their XML and encoding declaration.
+	///
+	/// # Errors
+	///
+	/// Rejects native or working-text output above the document byte limit.
+	pub fn encode_xml_text(&self, text: &str, limits: Limits) -> Result<Vec<u8>, ParseError> {
+		encoding::encode(text, self.encoding(), limits)
+	}
+
+	pub(crate) fn encode_owned_xml_text(
+		&self,
+		text: String,
+		limits: Limits,
+	) -> Result<Vec<u8>, ParseError> {
+		match self.encoding() {
+			XmlEncoding::Utf8 if text.len() <= limits.document_bytes => Ok(text.into_bytes()),
+			_ => self.encode_xml_text(&text, limits),
+		}
+	}
+
+	pub(crate) fn text_range(&self, native: Range<usize>) -> Option<Range<usize>> {
+		let Some(encoded) = &self.native else {
+			return Some(native);
+		};
+		Some(
+			encoded.offsets.text_byte(&self.source, native.start)?
+				..encoded.offsets.text_byte(&self.source, native.end)?,
+		)
+	}
+
+	pub(crate) fn native_range(&self, text: Range<usize>) -> Option<Range<usize>> {
+		match &self.native {
+			Some(encoded) => encoded.offsets.native_range(&self.source, text),
+			None => Some(text),
+		}
 	}
 
 	/// Returns the version attribute, distinguishing missing from empty.

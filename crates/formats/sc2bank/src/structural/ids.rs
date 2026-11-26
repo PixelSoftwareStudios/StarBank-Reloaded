@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Range};
 
-use crate::{BankDocument, KeyId, SectionId, ValueId};
+use crate::{BankDocument, KeyId, SectionId, ValueId, XmlEncoding, encoding::UTF16_UNIT_BYTES};
 
 use super::{StructuralEditError, source::Patch};
 
@@ -46,6 +46,10 @@ impl StructuralIdMap {
 		patches: &[Patch],
 		inserted: Option<InsertedAt>,
 	) -> Result<(Self, Option<StructuralNodeId>), StructuralEditError> {
+		let shifts = native_shifts(original, patches)?;
+		let inserted = inserted
+			.map(|position| position.native(current))
+			.transpose()?;
 		let (sections, new_section) = correlate(
 			original
 				.sections()
@@ -55,7 +59,7 @@ impl StructuralIdMap {
 				.sections()
 				.iter()
 				.map(|node| (node.source_range().start, node.id())),
-			patches,
+			&shifts,
 			match inserted {
 				Some(InsertedAt::Section(byte)) => Some(byte),
 				_ => None,
@@ -64,7 +68,7 @@ impl StructuralIdMap {
 		let (keys, new_key) = correlate(
 			key_positions(original),
 			key_positions(current),
-			patches,
+			&shifts,
 			match inserted {
 				Some(InsertedAt::Key(byte)) => Some(byte),
 				_ => None,
@@ -73,7 +77,7 @@ impl StructuralIdMap {
 		let (values, new_value) = correlate(
 			value_positions(original),
 			value_positions(current),
-			patches,
+			&shifts,
 			match inserted {
 				Some(InsertedAt::Value(byte)) => Some(byte),
 				_ => None,
@@ -101,6 +105,53 @@ pub(super) enum InsertedAt {
 	Value(usize),
 }
 
+impl InsertedAt {
+	fn native(self, document: &BankDocument) -> Result<Self, StructuralEditError> {
+		let (offset, wrap): (usize, fn(usize) -> Self) = match self {
+			Self::Section(offset) => (offset, Self::Section),
+			Self::Key(offset) => (offset, Self::Key),
+			Self::Value(offset) => (offset, Self::Value),
+		};
+		let range = document
+			.native_range(offset..offset)
+			.ok_or(StructuralEditError::InvalidSourceSpan)?;
+		Ok(wrap(range.start))
+	}
+}
+
+struct NativeShift {
+	range: Range<usize>,
+	replacement_bytes: usize,
+}
+
+fn native_shifts(
+	document: &BankDocument,
+	patches: &[Patch],
+) -> Result<Vec<NativeShift>, StructuralEditError> {
+	patches
+		.iter()
+		.map(|patch| {
+			let range = document
+				.native_range(patch.range.clone())
+				.ok_or(StructuralEditError::InvalidSourceSpan)?;
+			let replacement_bytes = if document.encoding() == XmlEncoding::Utf8 {
+				patch.replacement.len()
+			} else {
+				patch
+					.replacement
+					.encode_utf16()
+					.count()
+					.checked_mul(UTF16_UNIT_BYTES)
+					.ok_or(StructuralEditError::UnexpectedProjection)?
+			};
+			Ok(NativeShift {
+				range,
+				replacement_bytes,
+			})
+		})
+		.collect()
+}
+
 fn key_positions(document: &BankDocument) -> impl Iterator<Item = (usize, KeyId)> {
 	document
 		.sections()
@@ -121,7 +172,7 @@ fn value_positions(document: &BankDocument) -> impl Iterator<Item = (usize, Valu
 fn correlate<Id: Ord>(
 	original: impl Iterator<Item = (usize, Id)>,
 	current: impl Iterator<Item = (usize, Id)>,
-	patches: &[Patch],
+	patches: &[NativeShift],
 	inserted: Option<usize>,
 ) -> Result<(BTreeMap<Id, Id>, Option<Id>), StructuralEditError> {
 	let mut positions: BTreeMap<_, _> = current.collect();
@@ -149,7 +200,10 @@ fn correlate<Id: Ord>(
 	Ok((remapped, added))
 }
 
-fn shifted_byte(byte: usize, patches: &[Patch]) -> Result<Option<usize>, StructuralEditError> {
+fn shifted_byte(
+	byte: usize,
+	patches: &[NativeShift],
+) -> Result<Option<usize>, StructuralEditError> {
 	let mut current = byte;
 	for patch in patches {
 		if byte < patch.range.start {
@@ -160,7 +214,7 @@ fn shifted_byte(byte: usize, patches: &[Patch]) -> Result<Option<usize>, Structu
 		}
 		current = current
 			.checked_sub(patch.range.len())
-			.and_then(|reduced| reduced.checked_add(patch.replacement.len()))
+			.and_then(|reduced| reduced.checked_add(patch.replacement_bytes))
 			.ok_or(StructuralEditError::UnexpectedProjection)?;
 	}
 	Ok(Some(current))

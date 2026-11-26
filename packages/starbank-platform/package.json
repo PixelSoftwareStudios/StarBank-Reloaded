@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./bank-encoding": "./src/bank-encoding.ts",
     "./browser": "./src/browser.ts",
     "./settings": "./src/settings.ts"
   },

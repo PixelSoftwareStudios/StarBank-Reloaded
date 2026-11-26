@@ -3,6 +3,7 @@ use std::{borrow::Cow, ops::Range};
 use crate::{
 	BankDocument, LimitKind, Limits, SerializeError, parse,
 	parse::{BANK, SIGNATURE, VALUE},
+	serialize::native_bytes,
 };
 
 const SIGNATURE_HEX_DIGITS: usize = 40;
@@ -48,7 +49,8 @@ pub fn replace_signature(
 	output.push_str(&source[..range.start]);
 	output.push_str(&replacement);
 	output.push_str(&source[range.end..]);
-	parse(output.as_bytes(), limits).map_err(SerializeError::InvalidOutput)
+	let bytes = native_bytes(document, output, limits)?;
+	parse(&bytes, limits).map_err(SerializeError::InvalidOutput)
 }
 
 fn signature_patch<'digest>(
@@ -63,7 +65,10 @@ fn signature_patch<'digest>(
 				.ok_or(SerializeError::InvalidSourceSpan)?;
 			return Ok((range, Cow::Borrowed(digest)));
 		}
-		let offset = signature.source_range.start + 1 + SIGNATURE.len();
+		let range = document
+			.text_range(signature.source_range())
+			.ok_or(SerializeError::InvalidSourceSpan)?;
+		let offset = range.start + 1 + SIGNATURE.len();
 		return Ok((offset..offset, Cow::Owned(format!(" {VALUE}=\"{digest}\""))));
 	}
 
