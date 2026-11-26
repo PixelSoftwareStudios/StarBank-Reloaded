@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/discovery/starbank-paths",
+    "crates/domain/starbank-signature",
     "crates/engineering/starbank-source-check",
     "crates/formats/sc2bank",
     "crates/foundation/starbank-core",
@@ -14,9 +15,15 @@ rust-version = "1.100.0"
 publish = false
 
 [workspace.dependencies]
+starbank-core = { path = "crates/foundation/starbank-core" }
+
 # Bank XML
 quick-xml = { version = "=0.42.0", default-features = false }
 roxmltree = "=0.21.2"
+
+# Legacy bank signatures
+hex = { version = "=0.4.3", default-features = false, features = ["alloc"] }
+sha1 = { version = "=0.11.0", default-features = false }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 cap-std = "=4.0.3"
+starbank-core.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = [

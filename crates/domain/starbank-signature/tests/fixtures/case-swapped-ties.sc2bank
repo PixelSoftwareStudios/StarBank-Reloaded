@@ -1,0 +1,1 @@
+<Bank version="27"><Section name="alpha"><Key name="a"><Value int="001"/></Key></Section><Section name="Zeta"><Key name="a"><Z string="second"/><Z string="first"/></Key><Key name="A"><Value Text="kept"/></Key><Key name="a"><Value text="omitted"/></Key></Section></Bank>

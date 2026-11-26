@@ -1,0 +1,1 @@
+<Bank version="1"><Section name="Z"><Key name="Empty"/></Section><Section name="A"><Key name="Text"><Value text="EXCLUDED"/></Key><Key name="Same"><Zed string="A &amp; B"/><One fixed="1.50"/></Key><Key name="Same"><Value int="9007199254740993"/></Key></Section></Bank>

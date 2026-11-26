@@ -1,6 +1,8 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 
+use starbank_core::is_sc2_account_handle;
+
 pub(crate) const GAME_DIRECTORY: &str = "StarCraft II";
 pub(crate) const ACCOUNTS: &str = "Accounts";
 pub(crate) const BANKS: &str = "Banks";
@@ -75,26 +77,7 @@ pub(crate) fn valid_numeric_account(name: &OsStr) -> bool {
 }
 
 pub(crate) fn valid_handle(name: &OsStr) -> Option<&str> {
-	let name = name.to_str()?;
-	let mut parts = name.split('-');
-	let [Some(region), Some(game), Some(realm), Some(id), None] = [
-		parts.next(),
-		parts.next(),
-		parts.next(),
-		parts.next(),
-		parts.next(),
-	] else {
-		return None;
-	};
-	if [region, realm, id]
-		.into_iter()
-		.all(|part| !part.is_empty() && part.bytes().all(|item| item.is_ascii_digit()))
-		&& game == "S2"
-	{
-		Some(name)
-	} else {
-		None
-	}
+	name.to_str().filter(|name| is_sc2_account_handle(name))
 }
 
 pub(crate) fn has_extension(path: &Path, extension: &str) -> bool {
