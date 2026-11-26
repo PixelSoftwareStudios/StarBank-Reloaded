@@ -44,6 +44,40 @@ impl Sandbox {
 }
 
 #[test]
+fn separate_backup_preferences_survive_regular_preference_edits() -> Result<(), Box<dyn Error>> {
+	let sandbox = Sandbox::new()?;
+	let store = sandbox.store();
+	let name = "backup-preferences.json";
+	let record = br#"{"version":1,"folders":[],"selected":null,"keepNewest":4}"#;
+	assert!(store.read_record(name)?.is_none());
+	store.update_record(name, |current| {
+		assert!(current.is_none());
+		Ok((record.to_vec(), ()))
+	})?;
+	assert!(!sandbox.current().exists());
+	store.change(SettingChange::HideBlizzardMaps(false))?;
+
+	let reopened = sandbox.store();
+	let rejected = reopened.update_record(name, |current| -> Result<(_, ()), SettingsIssue> {
+		assert_eq!(current, Some(record.as_slice()));
+		Err(SettingsIssue::InvalidSettings)
+	});
+	assert_eq!(rejected, Err(SettingsIssue::InvalidSettings));
+	assert_eq!(
+		reopened
+			.read_record(name)?
+			.expect("persisted record")
+			.bytes(),
+		record
+	);
+	assert_eq!(
+		serde_json::to_value(reopened.load()?.settings)?["hideBlizzardMaps"],
+		false
+	);
+	Ok(())
+}
+
+#[test]
 fn first_load_returns_defaults_without_creating_a_file() -> Result<(), Box<dyn Error>> {
 	let sandbox = Sandbox::new()?;
 	let first = sandbox.store().load_or_migrate()?;

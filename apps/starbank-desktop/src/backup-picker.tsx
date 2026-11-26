@@ -73,6 +73,9 @@ export function BackupPicker({
             ))}
           </fieldset>
         )}
+        {choices.unavailableLocations > 0 && (
+          <p className="mt-2">Some managed backup folders are unavailable.</p>
+        )}
         {choices.rejectedMetadata > 0 ? (
           <p className="mt-2">
             Some backup records could not be read or verified.

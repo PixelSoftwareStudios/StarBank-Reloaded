@@ -99,6 +99,30 @@ impl SettingsStore {
 			.transpose()
 	}
 
+	pub(crate) fn read_record(&self, name: &str) -> Result<Option<FileSnapshot>, SettingsIssue> {
+		read_optional(&self.directory.join(name))
+	}
+
+	pub(crate) fn update_record<T>(
+		&self,
+		name: &str,
+		update: impl FnOnce(Option<&[u8]>) -> Result<(Vec<u8>, T), SettingsIssue>,
+	) -> Result<T, SettingsIssue> {
+		let _lease = self.lock()?;
+		let original = self.read_record(name)?;
+		let (bytes, result) = update(original.as_ref().map(FileSnapshot::bytes))?;
+		if bytes.len() > MAX_SETTINGS_BYTES {
+			return Err(SettingsIssue::SettingsTooLarge);
+		}
+		if !original
+			.as_ref()
+			.is_some_and(|snapshot| snapshot.bytes() == bytes)
+		{
+			self.publish_bytes(&self.directory.join(name), &bytes, original.as_ref())?;
+		}
+		Ok(result)
+	}
+
 	fn snapshot(&self, settings: AppSettings) -> SettingsSnapshot {
 		SettingsSnapshot::new(settings, matches!(self.legacy_root_override(), Ok(Some(_))))
 	}
@@ -152,22 +176,22 @@ impl SettingsStore {
 			return Err(SettingsIssue::SettingsTooLarge);
 		}
 
-		self.publish_bytes(&bytes, original)
+		self.publish_bytes(&self.path(), &bytes, original)
 	}
 
 	#[cfg(target_os = "macos")]
 	fn publish_bytes(
 		&self,
+		path: &Path,
 		bytes: &[u8],
 		original: Option<&FileSnapshot>,
 	) -> Result<(), SettingsIssue> {
 		use starbank_fs::{CommitIntent, CommitOutcome};
 
-		let path = self.path();
 		let intent = original.map_or(CommitIntent::CreateNew, |snapshot| {
 			CommitIntent::ReplaceExpected(snapshot.fingerprint())
 		});
-		match starbank_fs::commit(&path, bytes, intent, MAX_SETTINGS_BYTES) {
+		match starbank_fs::commit(path, bytes, intent, MAX_SETTINGS_BYTES) {
 			CommitOutcome::CommittedVerified(receipt) => {
 				// The preserved sibling belongs to the app config transaction.
 				if let Some(previous) = receipt.recovery() {
@@ -189,12 +213,12 @@ impl SettingsStore {
 	#[cfg(not(target_os = "macos"))]
 	fn publish_bytes(
 		&self,
+		path: &Path,
 		bytes: &[u8],
 		original: Option<&FileSnapshot>,
 	) -> Result<(), SettingsIssue> {
 		use std::io::Write as _;
 
-		let path = self.path();
 		let mut stage = tempfile::Builder::new()
 			.prefix(SETTINGS_STAGE_PREFIX)
 			.tempfile_in(&self.directory)
@@ -204,7 +228,7 @@ impl SettingsStore {
 			.map_err(|_| SettingsIssue::StorageUnavailable)?;
 		if original.is_some() {
 			let metadata =
-				fs::symlink_metadata(&path).map_err(|_| SettingsIssue::SettingsChanged)?;
+				fs::symlink_metadata(path).map_err(|_| SettingsIssue::SettingsChanged)?;
 			if !metadata.is_file() || metadata.permissions().readonly() {
 				return Err(SettingsIssue::StorageUnavailable);
 			}
@@ -218,7 +242,7 @@ impl SettingsStore {
 			.sync_all()
 			.map_err(|_| SettingsIssue::StorageUnavailable)?;
 
-		let current = self.read_current()?;
+		let current = read_optional(path)?;
 		if original.map(FileSnapshot::fingerprint)
 			!= current.as_ref().map(FileSnapshot::fingerprint)
 		{

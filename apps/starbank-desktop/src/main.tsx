@@ -24,6 +24,11 @@ import type {
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
 import { BackupPicker } from "./backup-picker";
+import {
+  BackupPreferencesFields,
+  useBackupPreferences,
+} from "./backup-preferences";
+import { BackupRetentionReview } from "./backup-retention";
 import { useActiveBackupStatus } from "./backup-status";
 import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
 import { resignExternalBank } from "./external-sign";
@@ -90,6 +95,7 @@ function DesktopApp() {
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
+  const backupPreferences = useBackupPreferences(exportAvailable);
   const { theme, textSize } = preferences.settings;
   const backupStatus = useActiveBackupStatus(
     document?.projection,
@@ -551,6 +557,19 @@ function DesktopApp() {
           })
       : undefined,
   };
+
+  function updateBackupSettings(
+    command: Parameters<typeof backupPreferences.update>[0],
+    args?: { keepNewest: number | null },
+  ) {
+    void action(async () => {
+      const changed = await backupPreferences.update(command, args);
+      if (changed && command !== "set_backup_retention")
+        setBackupGeneration((value) => value + 1);
+      return { ok: true };
+    });
+  }
+
   return (
     <>
       <AppShell
@@ -559,6 +578,43 @@ function DesktopApp() {
         editor={controller}
         inventory={inventoryWithBackupStatus}
         preferences={preferences}
+        backupSettings={
+          exportAvailable && (
+            <>
+              <BackupPreferencesFields
+                preferences={backupPreferences.preferences}
+                issue={backupPreferences.issue}
+                disabled={busy || closeGuard.pending}
+                choose={() => updateBackupSettings("choose_backup_location")}
+                useDefault={() =>
+                  updateBackupSettings("use_default_backup_location")
+                }
+                setKeepNewest={(keepNewest) =>
+                  updateBackupSettings("set_backup_retention", { keepNewest })
+                }
+              />
+              {backupPreferences.preferences && (
+                <BackupRetentionReview
+                  key={backupGeneration}
+                  target={
+                    document && {
+                      documentId: document.projection.id,
+                      revision: document.projection.revision,
+                      requestId: `retention-${document.projection.revision}`,
+                    }
+                  }
+                  keepNewest={backupPreferences.preferences.keepNewest}
+                  disabled={
+                    busy ||
+                    closeGuard.pending ||
+                    backupPreferences.preferences.location.mode ===
+                      "needs_authorization"
+                  }
+                />
+              )}
+            </>
+          )
+        }
         breadcrumbAvailable
         tools={
           <BatchBackupTools

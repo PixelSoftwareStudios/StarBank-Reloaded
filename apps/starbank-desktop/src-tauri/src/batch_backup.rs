@@ -1,5 +1,5 @@
 use std::{
-	path::{Path, PathBuf},
+	path::Path,
 	sync::{
 		Arc, Mutex,
 		atomic::{AtomicBool, Ordering},
@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use crate::{
 	backup,
-	commands::{CommandError, DesktopEngine},
+	commands::DesktopEngine,
 	inventory::{InventoryBatch, InventoryBatchMember, InventoryError, InventoryService},
 	save::confirm,
 };
@@ -207,7 +207,7 @@ fn publish(
 	let inventory = app.state::<InventoryService>();
 	let engine = app.state::<DesktopEngine>();
 	let generation = plan.generation;
-	let mut managed: Option<Result<PathBuf, CommandError>> = None;
+	let mut managed = None;
 	execute(
 		plan.members,
 		|| {
@@ -233,17 +233,25 @@ fn publish(
 			if member.authority.validate().is_err() {
 				return (BatchOutcome::SourceUnavailable, None);
 			}
+			let Ok(catalog) = backup::catalog(&mut session) else {
+				return (BatchOutcome::Rejected, None);
+			};
 			let destination = match placement {
-				BatchBackupPlacement::Adjacent => BackupPlacement::Adjacent,
+				BatchBackupPlacement::Adjacent => {
+					catalog.set_managed_directory(None);
+					BackupPlacement::Adjacent
+				}
 				BatchBackupPlacement::Managed => {
-					match managed.get_or_insert_with(|| backup::backup_folder(app, true)) {
-						Ok(folder) => BackupPlacement::Managed(folder),
+					match managed
+						.get_or_insert_with(|| crate::backup_location::backup_folder(app, true))
+					{
+						Ok(folder) => {
+							folder.authorize(catalog);
+							BackupPlacement::Managed(folder.path())
+						}
 						Err(_) => return (BatchOutcome::Rejected, None),
 					}
 				}
-			};
-			let Ok(catalog) = backup::catalog(&mut session) else {
-				return (BatchOutcome::Rejected, None);
 			};
 			create_one(catalog, member, destination)
 		},

@@ -5,7 +5,8 @@ use starbank_fs::{BackupPlacement, BackupVerification, Fingerprint, backup_sourc
 use tauri::{AppHandle, Manager as _, WebviewWindow};
 
 use crate::{
-	backup::{backup_folder, fresh_catalog},
+	backup::fresh_catalog,
+	backup_location::{ManagedBackupHistory, backup_history},
 	commands::{CommandError, DesktopEngine},
 	save::{ActiveTarget, trusted_fingerprint},
 };
@@ -51,8 +52,7 @@ fn status_for_selection(
 ) -> Result<ActiveBackupStatus, CommandError> {
 	let engine = app.state::<DesktopEngine>();
 	let pinned = selected(&engine, target)?;
-	let managed = backup_folder(app, false).ok();
-	let status = recorded_status(&pinned.path, managed.as_deref())?;
+	let status = recorded_status(&pinned.path, &backup_history(app))?;
 	if selected(&engine, target)? != pinned {
 		return Err(CommandError::Unavailable);
 	}
@@ -76,7 +76,7 @@ fn selected(
 
 fn recorded_status(
 	path: &Path,
-	managed: Option<&Path>,
+	managed: &ManagedBackupHistory,
 ) -> Result<ActiveBackupStatus, CommandError> {
 	let Ok(source) = backup_source(path) else {
 		return Ok(ActiveBackupStatus {
@@ -88,14 +88,23 @@ fn recorded_status(
 		});
 	};
 	let mut catalog = fresh_catalog()?;
-	let placements = [
-		Some(BackupPlacement::Adjacent),
-		managed.map(BackupPlacement::Managed),
-	];
-	let mut incomplete = managed.is_none();
-	let mut rejected_metadata = 0;
-	for placement in placements.into_iter().flatten() {
-		match catalog.load(&source, placement, BackupVerification::Recorded) {
+	let adjacent = catalog.load(
+		&source,
+		BackupPlacement::Adjacent,
+		BackupVerification::Recorded,
+	);
+	let mut incomplete = managed.unavailable > 0 || adjacent.is_err();
+	let mut rejected_metadata = adjacent.unwrap_or_default();
+	for folder in &managed.folders {
+		if path.parent() == Some(folder.path()) {
+			continue;
+		}
+		folder.authorize(&mut catalog);
+		match catalog.load(
+			&source,
+			BackupPlacement::Managed(folder.path()),
+			BackupVerification::Recorded,
+		) {
 			Ok(rejected) => rejected_metadata += rejected,
 			Err(_) => incomplete = true,
 		}

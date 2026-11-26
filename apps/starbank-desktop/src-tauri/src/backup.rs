@@ -1,5 +1,3 @@
-use std::fs;
-use std::io;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
@@ -13,20 +11,22 @@ use starbank_fs::{
 use starbank_signature::SignatureStatus;
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
-use crate::commands::{CommandError, DesktopEngine, OpenedBank};
 use crate::save::{
 	ActiveTarget, DesktopSession, SelectedBank, confirm, trusted_fingerprint, verify_write,
 	write_rejected,
 };
 use crate::settings::AutomaticBackup;
-
-const BACKUP_DIRECTORY: &str = "Backups";
+use crate::{
+	backup_location::{ManagedBackupFolder, backup_folder, backup_history},
+	commands::{CommandError, DesktopEngine, OpenedBank},
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BackupChoices {
 	records: Vec<BackupChoice>,
 	rejected_metadata: usize,
+	unavailable_locations: usize,
 }
 
 #[derive(Serialize)]
@@ -34,15 +34,20 @@ struct BackupChoice {
 	id: usize,
 	name: String,
 	timestamp: String,
-	placement: Location,
+	placement: BackupPlacementLabel,
 	health: Health,
 }
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum Location {
+enum BackupPlacementLabel {
 	Adjacent,
 	Managed,
+}
+
+enum Location {
+	Adjacent,
+	Managed(ManagedBackupFolder),
 }
 
 #[derive(Serialize)]
@@ -69,13 +74,16 @@ pub(crate) fn overwrite(
 	automatic: AutomaticBackup,
 ) -> Result<CommitOutcome, CommandError> {
 	let source = backup_source(path).map_err(write_rejected)?;
+	let catalog = catalog(session)?;
+	catalog.set_managed_directory(None);
 	let managed;
 	let policy = match (with_backup, automatic) {
 		(true, _) => NativeBackupPolicy::Explicit,
 		(false, AutomaticBackup::Off) => NativeBackupPolicy::Disabled,
 		(false, mode) => {
 			managed = backup_folder(app, true)?;
-			let placement = BackupPlacement::Managed(&managed);
+			managed.authorize(catalog);
+			let placement = BackupPlacement::Managed(managed.path());
 			match mode {
 				AutomaticBackup::FirstOverwrite => NativeBackupPolicy::FirstInSession(placement),
 				AutomaticBackup::EveryOverwrite => NativeBackupPolicy::EveryOverwrite(placement),
@@ -83,7 +91,7 @@ pub(crate) fn overwrite(
 			}
 		}
 	};
-	Ok(catalog(session)?
+	Ok(catalog
 		.overwrite(&source, expected, bytes, policy)
 		.map_err(write_rejected)?
 		.commit)
@@ -110,26 +118,44 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 	trusted_fingerprint(selected)?;
 	starbank_fs::check_replace_scope(&selected.path).map_err(write_rejected)?;
 	let source = backup_source(&selected.path).map_err(write_rejected)?;
-	let managed = backup_folder(app, false)?;
+	let mut history = backup_history(app);
 	let mut catalog = fresh_catalog()?;
-	let mut rejected_metadata = 0;
-	for placement in [
-		BackupPlacement::Adjacent,
-		BackupPlacement::Managed(&managed),
-	] {
-		let rejected = catalog
-			.load(&source, placement, BackupVerification::Verify)
-			.map_err(write_rejected)?;
-		rejected_metadata += rejected;
+	let mut rejected_metadata = catalog
+		.load(
+			&source,
+			BackupPlacement::Adjacent,
+			BackupVerification::Verify,
+		)
+		.map_err(write_rejected)?;
+	for folder in &history.folders {
+		if selected.path.parent() == Some(folder.path()) {
+			continue;
+		}
+		folder.authorize(&mut catalog);
+		match catalog.load(
+			&source,
+			BackupPlacement::Managed(folder.path()),
+			BackupVerification::Verify,
+		) {
+			Ok(rejected) => rejected_metadata += rejected,
+			Err(_) => history.unavailable += 1,
+		}
 	}
 	let mut records = Vec::new();
 	let mut selections = Vec::new();
 	for (record, health) in catalog.history(&source) {
 		let id = record.id();
-		let location = if id.path().parent() == Some(&managed) {
-			Location::Managed
-		} else {
-			Location::Adjacent
+		let folder = history
+			.folders
+			.iter()
+			.find(|folder| id.path().parent() == Some(folder.path()))
+			.filter(|folder| selected.path.parent() != Some(folder.path()));
+		let (label, location) = match folder {
+			Some(folder) => (
+				BackupPlacementLabel::Managed,
+				Location::Managed(folder.clone()),
+			),
+			None => (BackupPlacementLabel::Adjacent, Location::Adjacent),
 		};
 		records.push(BackupChoice {
 			id: selections.len(),
@@ -140,7 +166,7 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 				.to_string_lossy()
 				.into_owned(),
 			timestamp: record.timestamp().to_string(),
-			placement: location,
+			placement: label,
 			health: match health {
 				BackupHealth::Verified => Health::Verified,
 				BackupHealth::Missing => Health::Missing,
@@ -157,6 +183,7 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 	Ok(BackupChoices {
 		records,
 		rejected_metadata,
+		unavailable_locations: history.unavailable,
 	})
 }
 
@@ -219,12 +246,18 @@ fn prepare_restore(
 		})
 		.and_then(|selection| selection.records.into_iter().nth(backup_id))
 		.ok_or(CommandError::InvalidControl)?;
-	let managed = backup_folder(app, false)?;
-	let placement = match location {
-		Location::Adjacent => BackupPlacement::Adjacent,
-		Location::Managed => BackupPlacement::Managed(&managed),
+	let catalog = catalog(&mut session)?;
+	let placement = match &location {
+		Location::Adjacent => {
+			catalog.set_managed_directory(None);
+			BackupPlacement::Adjacent
+		}
+		Location::Managed(folder) => {
+			folder.authorize(catalog);
+			BackupPlacement::Managed(folder.path())
+		}
 	};
-	let storage = catalog(&mut session)?
+	let storage = catalog
 		.prepare_restore(&source, current, backup.path(), placement)
 		.map_err(write_rejected)?;
 	let dirty = session
@@ -307,8 +340,10 @@ fn publish_restore(
 		.validate_native_active_restore(&prepared.editor)
 		.map_err(write_rejected)?;
 	let managed = backup_folder(app, true)?;
-	let effect = catalog(&mut session)?
-		.restore(prepared.storage, BackupPlacement::Managed(&managed))
+	let catalog = catalog(&mut session)?;
+	managed.authorize(catalog);
+	let effect = catalog
+		.restore(prepared.storage, BackupPlacement::Managed(managed.path()))
 		.map_err(write_rejected)?;
 	let committed = verify_write(&mut session, effect.commit, true)?;
 	let outcome = session
@@ -347,37 +382,4 @@ pub(crate) fn catalog(
 	Ok(session
 		.backups
 		.get_or_insert_with(|| NativeBackupCatalog::new(limit)))
-}
-
-pub(crate) fn backup_folder(app: &AppHandle, create: bool) -> Result<PathBuf, CommandError> {
-	let data = app.path().app_data_dir().map_err(write_rejected)?;
-	let folder = data.join(BACKUP_DIRECTORY);
-	if create {
-		ensure_folder(&data)?;
-		ensure_folder(&folder)?;
-	}
-	Ok(folder)
-}
-
-fn ensure_folder(path: &Path) -> Result<(), CommandError> {
-	#[cfg(unix)]
-	let mut builder = fs::DirBuilder::new();
-	#[cfg(not(unix))]
-	let builder = fs::DirBuilder::new();
-	#[cfg(unix)]
-	{
-		use std::os::unix::fs::DirBuilderExt as _;
-		builder.mode(0o700);
-	}
-	match builder.create(path) {
-		Ok(()) => Ok(()),
-		Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-			if fs::symlink_metadata(path).map_err(write_rejected)?.is_dir() {
-				Ok(())
-			} else {
-				Err(write_rejected("Backup location is not a local directory."))
-			}
-		}
-		Err(error) => Err(write_rejected(error)),
-	}
 }

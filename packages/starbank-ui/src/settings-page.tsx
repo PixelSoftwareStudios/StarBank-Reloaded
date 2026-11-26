@@ -49,6 +49,7 @@ export interface SettingsPageProps {
   readonly breadcrumbAvailable?: boolean;
   readonly onRecover?: () => void;
   readonly platformInfo?: SettingsPlatformInfo;
+  readonly backupSettings?: ReactNode;
 }
 
 type Choice<Value extends string> = readonly [value: Value, label: string];
@@ -95,6 +96,7 @@ export function SettingsPage({
   breadcrumbAvailable = false,
   onRecover,
   platformInfo,
+  backupSettings,
 }: SettingsPageProps) {
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -241,6 +243,7 @@ export function SettingsPage({
             )}
           </>
         )}
+        {backupSettings}
       </Group>
       {platformInfo && (
         <Group title="Advanced">

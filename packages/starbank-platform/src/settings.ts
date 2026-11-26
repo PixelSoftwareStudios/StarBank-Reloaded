@@ -6,6 +6,35 @@ export const BROWSER_SETTINGS_KEY = "starbank.preferences";
 const MAX_SETTINGS_BYTES = 64 * 1024;
 const MAX_NATIVE_PATH_LENGTH = 32767;
 const MAX_ROOT_ID_LENGTH = 128;
+export const MAX_BACKUP_RETENTION = 1_000;
+
+const namedBackupFolder = v.pipe(v.string(), v.nonEmpty(), v.maxLength(4_096));
+const backupPreferencesSchema = v.strictObject({
+  location: v.variant("mode", [
+    v.strictObject({ mode: v.literal("default") }),
+    v.strictObject({ mode: v.literal("selected"), name: namedBackupFolder }),
+    v.strictObject({
+      mode: v.literal("needs_authorization"),
+      name: namedBackupFolder,
+    }),
+  ]),
+  keepNewest: v.nullable(
+    v.pipe(
+      v.number(),
+      v.integer(),
+      v.minValue(1),
+      v.maxValue(MAX_BACKUP_RETENTION),
+    ),
+  ),
+});
+
+export type BackupPreferences = Readonly<
+  v.InferOutput<typeof backupPreferencesSchema>
+>;
+
+export function decodeBackupPreferences(input: unknown): BackupPreferences {
+  return v.parse(backupPreferencesSchema, input);
+}
 
 const settingsSchema = v.strictObject({
   version: v.literal(SETTINGS_VERSION),

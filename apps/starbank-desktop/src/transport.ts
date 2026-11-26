@@ -141,6 +141,7 @@ export interface BackupChoice {
 export interface BackupChoices {
   records: readonly BackupChoice[];
   rejectedMetadata: number;
+  unavailableLocations: number;
 }
 
 export function confirmDiscardBank(target: ActiveBankTarget): Promise<boolean> {

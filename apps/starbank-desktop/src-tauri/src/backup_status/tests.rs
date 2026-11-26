@@ -3,9 +3,17 @@ use std::{fs, io};
 use starbank_editor::PROTOCOL_VERSION;
 
 use super::*;
+use crate::backup_location::ManagedBackupFolder;
 
 const LIVE: &[u8] = b"<Bank version='1'/>";
 const EDITED: &[u8] = b"<Bank version='2'/>";
+
+fn history(path: &Path) -> ManagedBackupHistory {
+	ManagedBackupHistory {
+		folders: vec![ManagedBackupFolder::Default(path.to_owned())],
+		unavailable: 0,
+	}
+}
 
 #[test]
 fn only_a_complete_empty_history_is_never_backed_up() -> io::Result<()> {
@@ -15,13 +23,20 @@ fn only_a_complete_empty_history_is_never_backed_up() -> io::Result<()> {
 	let managed = directory.join("managed");
 	fs::write(&bank, LIVE)?;
 
-	let empty = recorded_status(&bank, Some(&managed)).expect("empty catalog");
+	let empty = recorded_status(&bank, &history(&managed)).expect("empty catalog");
 	assert_eq!(empty.state, Status::NeverBackedUp);
 	assert!(!empty.incomplete);
 	assert_eq!(empty.record_count, 0);
 	assert!(!managed.exists(), "status must not create its directory");
 
-	let unavailable = recorded_status(&bank, None).expect("unavailable managed location");
+	let unavailable = recorded_status(
+		&bank,
+		&ManagedBackupHistory {
+			folders: Vec::new(),
+			unavailable: 1,
+		},
+	)
+	.expect("unavailable managed location");
 	assert_eq!(unavailable.state, Status::Unknown);
 	assert!(unavailable.incomplete);
 
@@ -29,7 +44,7 @@ fn only_a_complete_empty_history_is_never_backed_up() -> io::Result<()> {
 		directory.join("Fixture_20261126_225000.sc2bank.bak.json"),
 		b"malformed",
 	)?;
-	let suspect = recorded_status(&bank, Some(&managed)).expect("malformed catalog");
+	let suspect = recorded_status(&bank, &history(&managed)).expect("malformed catalog");
 	assert_eq!(suspect.state, Status::Unknown);
 	assert!(suspect.incomplete);
 	assert_eq!(suspect.rejected_metadata, 1);
@@ -60,7 +75,7 @@ fn recorded_status_uses_current_sidecars_and_does_not_imply_payload_integrity() 
 	fs::remove_file(adjacent.path())?;
 	fs::write(managed_backup.path(), b"tampered")?;
 
-	let status = recorded_status(&bank, Some(&managed)).expect("recorded sidecars");
+	let status = recorded_status(&bank, &history(&managed)).expect("recorded sidecars");
 	assert_eq!(status.state, Status::Recorded);
 	assert_eq!(status.record_count, 2);
 	assert_eq!(status.rejected_metadata, 0);
@@ -69,7 +84,7 @@ fn recorded_status_uses_current_sidecars_and_does_not_imply_payload_integrity() 
 
 	fs::remove_file(adjacent.path().with_extension("bak.json"))?;
 	fs::remove_file(managed_backup.path().with_extension("bak.json"))?;
-	let status = recorded_status(&bank, Some(&managed)).expect("current sidecars removed");
+	let status = recorded_status(&bank, &history(&managed)).expect("current sidecars removed");
 	assert_eq!(status.state, Status::NeverBackedUp);
 	assert_eq!(status.record_count, 0);
 	assert_eq!(fs::read(&bank)?, LIVE);

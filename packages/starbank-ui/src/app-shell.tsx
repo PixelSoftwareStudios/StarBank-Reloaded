@@ -51,6 +51,7 @@ export function AppShell({
   tools,
   breadcrumbAvailable,
   platformInfo,
+  backupSettings,
 }: {
   name: string;
   inventory?: MapInventory;
@@ -61,6 +62,7 @@ export function AppShell({
   tools?: ReactNode;
   breadcrumbAvailable?: boolean;
   platformInfo?: SettingsPlatformInfo;
+  backupSettings?: ReactNode;
 }) {
   const mapPaneId = useId();
   const accountScope = useBankAccountScope(
@@ -161,6 +163,7 @@ export function AppShell({
                 breadcrumbAvailable={breadcrumbAvailable}
                 focusOnMount
                 platformInfo={platformInfo}
+                backupSettings={backupSettings}
               />
             </Suspense>
           </div>
