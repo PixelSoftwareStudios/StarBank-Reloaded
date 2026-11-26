@@ -1,0 +1,17 @@
+# Synthetic mapping in the archived Go schema format.
+map: "legacy-fixture"
+groups:
+  - label: "Training"
+    fields:
+      - label: "Coins"
+        section: "Counts"
+        key: "coins"
+        type: number
+      - label: "Show hints"
+        section: "Counts"
+        key: "hints"
+        type: checkbox
+      - label: "Alias"
+        section: "Counts"
+        key: "display"
+        type: string

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "id": "synthetic-training",
+  "identity": {
+    "author": "9-S2-1-123",
+    "bank": "TrainingBank",
+    "predicates": [
+      {
+        "path": { "section": { "name": "Meta" }, "key": { "name": "Layout" } },
+        "equals": "fixture-v1"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "label": "Training progress",
+      "fields": [
+        {
+          "id": "reward",
+          "label": "Reward",
+          "path": {
+            "section": { "name": "Stats" },
+            "key": { "name": "Progress" },
+            "child": { "name": "Reward" }
+          },
+          "control": { "kind": "number", "storage": "fixed", "scale": 2 }
+        },
+        {
+          "id": "score",
+          "label": "Score",
+          "description": "Synthetic score",
+          "path": {
+            "section": { "name": "Stats" },
+            "key": { "name": "Progress" },
+            "child": { "name": "Score" }
+          },
+          "control": {
+            "kind": "number",
+            "storage": "fixed",
+            "scale": 2,
+            "min": "-9007199254740994.00",
+            "max": "9007199254740994.00"
+          }
+        },
+        {
+          "id": "total",
+          "label": "Total",
+          "path": {
+            "section": { "name": "Stats" },
+            "key": { "name": "Progress" },
+            "child": { "name": "Total" }
+          },
+          "control": { "kind": "number", "storage": "fixed", "scale": 2 }
+        }
+      ]
+    },
+    {
+      "label": "Training options",
+      "description": "A fixture-only group",
+      "fields": [
+        {
+          "id": "enabled",
+          "label": "Enabled",
+          "path": { "section": { "name": "Stats" }, "key": { "name": "Enabled" } },
+          "control": { "kind": "checkbox", "storage": "flag", "checked": "yes", "unchecked": "no" }
+        },
+        {
+          "id": "note",
+          "label": "Note",
+          "path": { "section": { "name": "Stats" }, "key": { "name": "Note" } },
+          "control": { "kind": "text", "storage": "string" }
+        }
+      ]
+    }
+  ],
+  "rules": [
+    { "source": "total", "target": "reward", "multiplier": 3, "addend": "-0.50" },
+    { "source": "score", "target": "total", "multiplier": 2, "addend": "0.25" }
+  ]
+}

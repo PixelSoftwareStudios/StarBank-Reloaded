@@ -2,6 +2,7 @@
 members = [
     "crates/discovery/starbank-paths",
     "crates/domain/starbank-editor",
+    "crates/domain/starbank-profiles",
     "crates/domain/starbank-signature",
     "crates/engineering/starbank-source-check",
     "crates/formats/sc2bank",

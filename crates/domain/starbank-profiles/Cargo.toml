@@ -1,0 +1,17 @@
+[package]
+name = "starbank-profiles"
+description = "Declarative bank profile matching and edit proposals"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+sc2bank = { path = "../../formats/sc2bank" }
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr = { version = "=2.2.0", default-features = false, features = ["deserialize"] }
+starbank-core.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bank version="1">
+	<Section name="Meta"><Key name="Layout"><Value string="fixture-v1"/></Key></Section>
+	<Section name="Stats">
+		<Key name="Progress"><Score fixed='01.00' /><Reward fixed="6.25"/><Total fixed="2.25"/></Key>
+		<Key name="Enabled"><Value flag="yes"/></Key>
+		<Key name="Note"><Value string="A, B &amp; C"/></Key>
+	</Section>
+	<!-- unrelated extension -->
+	<Extension><Unprojected /></Extension>
+</Bank>
