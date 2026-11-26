@@ -56,6 +56,7 @@ import { useDesktopSettings } from "./use-desktop-settings";
 import { openInventoryBank, useInventory } from "./use-inventory";
 import { useNativeCloseGuard } from "./use-native-close-guard";
 import "starbank-ui/styles.css";
+import "starbank-ui/settings.css";
 
 const APP_NAME = "StarBank Reloaded";
 
