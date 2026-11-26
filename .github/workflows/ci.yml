@@ -97,13 +97,22 @@ jobs:
           test "$("$bindgen_dir/wasm-bindgen" --version)" = "wasm-bindgen $bindgen_version"
           printf '%s\n' "$bindgen_dir" >> "$GITHUB_PATH"
       - run: pnpm install --frozen-lockfile
-      # Building generates the bindings needed by the source checks and tests.
+      # Building generates the release WASM bindings used by the web app and adapter parity.
       - run: pnpm build
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm --filter starbank-web exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm --filter starbank-web test:browser
-      - run: pnpm --filter starbank-web exec node test/breadcrumbs.mjs chromium firefox webkit
+      - name: Build the native adapter parity fixtures
+        run: |
+          cargo build --locked --target-dir target -p starbank-cli --bin starbank
+          cargo build --locked --target-dir target -p starbank-editor --example parity_protocol
+      - name: Compare native, release WASM and CLI bank output
+        run: node apps/starbank-web/test/adapter-parity.mjs
+      - name: Install pinned Playwright browsers and dependencies
+        run: pnpm --filter starbank-web exec playwright install --with-deps chromium firefox webkit
+      - name: Test the production web app offline
+        run: pnpm --filter starbank-web test:browser
+      - name: Test the breadcrumb layout and keyboard navigation
+        run: pnpm --filter starbank-web exec node test/breadcrumbs.mjs chromium firefox webkit
 
   desktop:
     name: Native desktop on ${{ matrix.os }}

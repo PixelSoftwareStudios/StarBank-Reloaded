@@ -24,11 +24,11 @@ Times are medians (minimum–maximum) in milliseconds across five fresh
 processes per scenario. The runner alternated scenarios and excluded one
 initial sweep of all three cases.
 
-| Synthetic scenario | File bytes | Launch → on-screen window | Launch → enabled UI action | Confirm Open → section observable |
-| --- | ---: | ---: | ---: | ---: |
-| Empty editor | 0 | 220 (218–410) | 511 (432–757) | — |
-| 32 integer values | 1,557 | 401 (225–677) | 659 (547–1,155) | 126 (88–170) |
-| 10,000 integer values | 488,953 | 269 (221–729) | 614 (506–1,223) | 130 (85–181) |
+| Synthetic scenario    | File bytes | Launch → on-screen window | Launch → enabled UI action | Confirm Open → section observable |
+| --------------------- | ---------: | ------------------------: | -------------------------: | --------------------------------: |
+| Empty editor          |          0 |             220 (218–410) |              511 (432–757) |                                 — |
+| 32 integer values     |      1,557 |             401 (225–677) |            659 (547–1,155) |                      126 (88–170) |
+| 10,000 integer values |    488,953 |             269 (221–729) |            614 (506–1,223) |                      130 (85–181) |
 
 The launcher starts a monotonic timer immediately before `Process.run()`.
 It polls for an on-screen Quartz layer-zero window owned by the launched
@@ -53,11 +53,11 @@ parentheses. Maximum footprint is the kernel's lifetime physical-footprint
 high-water mark as of the idle interval's end. Its range and the CPU ranges
 are across the five trials.
 
-| Synthetic scenario | Idle RSS, MiB | Idle physical footprint, MiB | Lifetime max physical footprint, MiB | Idle CPU time, ms | Idle CPU, % of one core |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Empty editor | 67.1 (65.5–78.3) | 23.7 (21.6–25.8) | 28.2 (27.4–29.2) | 2.84 (2.14–46.96) | 0.094 (0.071–1.556) |
-| 32 values | 78.2 (53.1–78.8) | 23.7 (22.5–25.8) | 27.9 (27.5–29.0) | 2.50 (1.74–28.77) | 0.082 (0.057–0.955) |
-| 10,000 values | 79.0 (67.3–99.8) | 36.2 (34.9–41.0) | 44.0 (41.3–44.8) | 2.86 (0.81–14.63) | 0.094 (0.027–0.484) |
+| Synthetic scenario |    Idle RSS, MiB | Idle physical footprint, MiB | Lifetime max physical footprint, MiB | Idle CPU time, ms | Idle CPU, % of one core |
+| ------------------ | ---------------: | ---------------------------: | -----------------------------------: | ----------------: | ----------------------: |
+| Empty editor       | 67.1 (65.5–78.3) |             23.7 (21.6–25.8) |                     28.2 (27.4–29.2) | 2.84 (2.14–46.96) |     0.094 (0.071–1.556) |
+| 32 values          | 78.2 (53.1–78.8) |             23.7 (22.5–25.8) |                     27.9 (27.5–29.0) | 2.50 (1.74–28.77) |     0.082 (0.057–0.955) |
+| 10,000 values      | 79.0 (67.3–99.8) |             36.2 (34.9–41.0) |                     44.0 (41.3–44.8) | 2.86 (0.81–14.63) |     0.094 (0.027–0.484) |
 
 Cumulative user and system CPU deltas were converted from Mach ticks using
 the host's `mach_timebase_info` scale, 125/3 nanoseconds per tick. An
