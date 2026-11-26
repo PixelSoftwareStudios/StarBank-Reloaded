@@ -450,3 +450,49 @@
 .editor-diff-list code {
   white-space: pre-wrap;
 }
+
+.editor-table-layout[data-windowed="true"] .editor-table-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-table-navigation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding-block-end: 0.25rem;
+  color: var(--shell-muted);
+}
+
+.editor-windowed-table {
+  flex: 1;
+  min-block-size: 0;
+  max-block-size: 100dvb;
+  overflow: auto;
+  overflow-anchor: none;
+  --editor-windowed-row-height: 2.125rem;
+}
+
+.editor-windowed-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.editor-windowed-table [data-bank-row-index] :is(th, td) {
+  height: var(--editor-windowed-row-height);
+  padding-block: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-windowed-table [data-bank-field="value"] {
+  height: calc(var(--editor-windowed-row-height) - 0.375rem);
+}
+
+.editor-windowed-table .editor-table-spacer td {
+  padding: 0;
+  border: 0;
+}
