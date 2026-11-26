@@ -1,0 +1,213 @@
+use std::ffi::OsStr;
+
+#[path = "support/cli.rs"]
+mod cli;
+
+use cli::{Fixture, SOURCE, bank_command, command, json};
+
+#[test]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn inspect_preserves_exact_values_and_duplicate_occurrences() {
+	let fixture = Fixture::new();
+	let path = fixture.write("Player.sc2bank", SOURCE);
+	let output = bank_command("inspect", &path)
+		.output()
+		.expect("run inspect");
+	let body = json(&output, 0);
+	assert_eq!(body["command"], "inspect");
+	let result = &body["result"];
+	assert_eq!(result["sections"], 1);
+	assert_eq!(result["keys"], 2);
+	assert_eq!(result["signature"]["status"], "unsigned");
+	let keys = &result["contents"][0]["keys"];
+	assert_eq!(keys[0]["name"], "Points");
+	assert_eq!(keys[1]["name"], "Points");
+	assert_eq!(keys[0]["values"][0]["value"], "9007199254740993.050");
+	assert_eq!(keys[1]["values"][0]["value"], "00065");
+	assert_eq!(keys[1]["values"][1]["value"], "A & B");
+	assert_eq!(result["sha256"].as_str().expect("SHA-256 string").len(), 64);
+}
+
+#[test]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn validate_reports_typed_status_and_anonymized_diagnostics() {
+	let fixture = Fixture::new();
+	let path = fixture.write(
+		"private-label.sc2bank",
+		b"<Bank>\n<Section name=\"private content\"></Bank>",
+	);
+	let output = bank_command("validate", &path)
+		.output()
+		.expect("run validate for malformed XML");
+	let body = json(&output, 3);
+	assert_eq!(body["error"]["code"], "invalid_bank");
+	assert_eq!(body["error"]["location"]["line"], 2);
+	let stdout = String::from_utf8(output.stdout).expect("JSON is UTF-8");
+	assert!(!stdout.contains("private"));
+
+	let path = fixture.write("Unsigned.sc2bank", SOURCE);
+	let output = bank_command("validate", &path)
+		.arg("--require-signature")
+		.output()
+		.expect("run validate for unsigned XML");
+	assert_eq!(
+		json(&output, 3)["result"]["signature"]["status"],
+		"unsigned"
+	);
+}
+
+#[test]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn validate_matches_known_signature_only_with_the_exact_context() {
+	let fixture = Fixture::new();
+	let data = include_str!(
+		"../../../crates/domain/starbank-signature/tests/fixtures/canonical-ascii.sc2bank"
+	);
+	let expected = "9689A338F3C1C57C9090E476B6A5F60336C17DAC";
+	let signed = data.replace(
+		"</Bank>",
+		&format!("<Signature value='{expected}'/></Bank>"),
+	);
+	let path = fixture.write("Outside.sc2bank", signed);
+	let output = bank_command("validate", &path)
+		.output()
+		.expect("run validate without explicit context");
+	assert_eq!(
+		json(&output, 0)["result"]["signature"]["status"],
+		"missing_context"
+	);
+
+	let output = bank_command("validate", &path)
+		.args([
+			"--author",
+			"1-S2-1-0",
+			"--player",
+			"1-S2-1-0",
+			"--bank-name",
+			"Fixture",
+			"--require-signature",
+		])
+		.output()
+		.expect("run validate with given context");
+	let body = json(&output, 0);
+	assert_eq!(body["result"]["signature"]["status"], "valid");
+	assert_eq!(body["result"]["signature"]["digest"], expected);
+}
+
+#[test]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn diff_disambiguates_by_order_and_reports_opaque_source_only_changes() {
+	let fixture = Fixture::new();
+	let before = fixture.write("Before.sc2bank", SOURCE);
+	let after = fixture.write("After.sc2bank", SOURCE.replace("00065", "00066"));
+	let output = command()
+		.arg("diff")
+		.arg(&before)
+		.arg(after)
+		.arg("--json")
+		.output()
+		.expect("run diff");
+	let result = &json(&output, 0)["result"];
+	assert_eq!(result["source_changed"], true);
+	let key = &result["sections"][0]["keys"][0];
+	assert_eq!(key["index"], 1);
+	assert_eq!(key["values"][0]["before"]["value"], "00065");
+	assert_eq!(key["values"][0]["after"]["value"], "00066");
+
+	let after = fixture.write(
+		"Comment.sc2bank",
+		format!("<!-- unchanged fields -->\n{SOURCE}"),
+	);
+	let output = command()
+		.arg("diff")
+		.arg(before)
+		.arg(after)
+		.arg("--json")
+		.output()
+		.expect("run diff for comment-only change");
+	let result = &json(&output, 0)["result"];
+	assert_eq!(result["source_changed"], true);
+	assert_eq!(result["sections"], serde_json::json!([]));
+}
+
+#[test]
+fn discover_reports_live_and_backup_files_without_reading_bank_contents() {
+	let fixture = Fixture::new();
+	fixture.write("Banks/First.sc2bank", b"not XML");
+	fixture.write("Banks/First_20261126_100000.sc2bank.bak", b"older bank");
+	fixture.write("Loose.sc2bank", b"not XML either");
+	let output = command()
+		.args(["discover", "--root"])
+		.arg(&fixture.path)
+		.arg("--json")
+		.output()
+		.expect("run discovery");
+	let result = &json(&output, 0)["result"];
+	assert_eq!(result["banks"].as_array().expect("live banks").len(), 2);
+	assert_eq!(result["backups"].as_array().expect("backup files").len(), 1);
+	assert_eq!(result["root"]["lossless"], true);
+}
+
+#[test]
+fn json_argument_errors_do_not_leak_arguments() {
+	let output = command()
+		.args([
+			OsStr::new("inspect"),
+			OsStr::new("--private-argument"),
+			OsStr::new("--json"),
+		])
+		.output()
+		.expect("run invalid command");
+	let body = json(&output, 2);
+	assert_eq!(body["error"]["code"], "invalid_arguments");
+	assert!(!String::from_utf8_lossy(&output.stdout).contains("private-argument"));
+}
+
+#[test]
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+fn unavailable_storage_has_an_explicit_exit_code() {
+	let fixture = Fixture::new();
+	let path = fixture.write("Bank.sc2bank", SOURCE);
+	let output = bank_command("inspect", &path)
+		.output()
+		.expect("run inspect");
+	assert_eq!(json(&output, 7)["error"]["code"], "unsupported_storage");
+}
+
+#[test]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn inspection_matches_portable_engine_values_and_signature_status() {
+	let fixture = Fixture::new();
+	let path = fixture.write("Projection.sc2bank", SOURCE);
+	let output = bank_command("inspect", &path)
+		.output()
+		.expect("inspect source");
+	let inspection = json(&output, 0);
+	let mut engine = starbank_editor::Engine::default();
+	let opened = engine.dispatch(
+		r#"{"schema_version":1,"request_id":"test","command":{"kind":"open"}}"#,
+		Some(SOURCE.as_bytes()),
+	);
+	let wire: serde_json::Value =
+		serde_json::from_str(&opened.json).expect("decode engine projection");
+	assert_eq!(wire["result"]["kind"], "snapshot");
+	let snapshot = &wire["result"]["payload"];
+	let result = &inspection["result"];
+	assert_eq!(result["signature"]["status"], snapshot["signature_status"]);
+	let cli = result["contents"][0]["keys"].as_array().expect("CLI keys");
+	let engine = snapshot["sections"][0]["keys"]
+		.as_array()
+		.expect("engine keys");
+	assert_eq!(cli.len(), engine.len());
+	for (cli, engine) in cli.iter().zip(engine) {
+		assert_eq!(cli["name"], engine["name"]);
+		let cli_values = cli["values"].as_array().expect("CLI values");
+		let engine_values = engine["values"].as_array().expect("engine values");
+		assert_eq!(cli_values.len(), engine_values.len());
+		for (cli, engine) in cli_values.iter().zip(engine_values) {
+			assert_eq!(cli["name"], engine["name"]);
+			assert_eq!(cli["kind"], engine["kind"]);
+			assert_eq!(cli["value"], engine["value"]);
+		}
+	}
+}

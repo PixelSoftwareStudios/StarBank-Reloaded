@@ -1,0 +1,32 @@
+[package]
+name = "starbank-cli"
+description = "Local StarCraft II bank editor for the command line"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "starbank"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+hex.workspace = true
+sc2bank = { path = "../../crates/formats/sc2bank" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+starbank-backup = { path = "../../crates/domain/starbank-backup" }
+starbank-editor = { path = "../../crates/domain/starbank-editor" }
+starbank-fs = { path = "../../crates/platform/starbank-fs" }
+starbank-paths = { path = "../../crates/discovery/starbank-paths" }
+starbank-signature = { path = "../../crates/domain/starbank-signature" }
+
+time.workspace = true
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[lints]
+workspace = true
