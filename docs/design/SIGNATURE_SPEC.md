@@ -1,6 +1,6 @@
 # SC2 bank signature compatibility
 
-Source: [BankSignatureGenerator.cs](https://github.com/BlueRaja/Starbank/blob/v2.0/StarBank/Bank%20Stuffs/BankSignatureGenerator.cs) (UpdateSignature, Sha1Hash), [BankReader.cs](https://github.com/BlueRaja/Starbank/blob/v2.0/StarBank/Bank%20Stuffs/BankReader.cs), [BankWriter.cs](https://github.com/BlueRaja/Starbank/blob/v2.0/StarBank/Bank%20Stuffs/BankWriter.cs), [text-type fix](https://github.com/BlueRaja/Starbank/commit/cfe856766eebcceb54f2c0978181d98a7dc1eb0d), [PR 23](https://github.com/BlueRaja/Starbank/pull/23). Reviewed current source 2026-11-26; pin v2.0 as oracle. Describe protocol facts rather than porting implementation expression.
+The behavioral oracle is the pinned StarBank v2.0 source, reviewed 2026-11-26. [BankSignatureGenerator.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankSignatureGenerator.cs#L11-L47) · [BankReader.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankReader.cs#L14-L78) · [BankWriter.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankWriter.cs#L19-L71)
 
 ## Required behavior
 

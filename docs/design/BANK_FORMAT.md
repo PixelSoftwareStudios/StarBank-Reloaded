@@ -1,6 +1,6 @@
 # Bank format and lossless model
 
-Reference: [v2.0 BankReader.cs](https://github.com/BlueRaja/Starbank/blob/v2.0/StarBank/Bank%20Stuffs/BankReader.cs) (child node handling), [BankWriter.cs](https://github.com/BlueRaja/Starbank/blob/v2.0/StarBank/Bank%20Stuffs/BankWriter.cs). Source checked 2026-11-26 on master; tag is the acceptance baseline. Bank XML is not an MPQ archive. No StormLib, ZIP extraction, or game installation required for editing an external bank.
+External bank editing uses plain XML and needs no game installation or archive backend. The acceptance baseline is StarBank v2.0 at the pinned revision reviewed 2026-11-26. [BankReader.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankReader.cs#L14-L78) · [BankWriter.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankWriter.cs#L19-L71)
 
 Illustrative synthetic example (not a captured or signed SC2 fixture):
 

@@ -9,12 +9,14 @@ One frontend, same engine behavior. Tauri 2 system WebView (WebView2 Windows, WK
 | Open single/multiple external files; drag/drop | native chooser/drop/open events | file input/drop |
 | Directory | native chooser | File System Access API when supported; folder-input/import fallback |
 | Save overwrite | verified storage | explicit authorized writable handle only; otherwise download |
-| Save As/copy | native save dialog/clipboard | download or save picker; clipboard user gesture/permission fallback |
+| Save As/copy | native save dialog/clipboard | download for Save As; clipboard with user gesture and permission fallback |
 | Backup/restore | managed storage + explicit same-directory backup | backup export/import/session storage, clear limitations |
 | Open in Folder, watch, associations | native scoped APIs | disabled with explanation; no fake path reveal |
 | MPQ | native reader/writer selected by spike | optional WASM capability only after tests |
 
 Platform abstraction `BankEngine` commands and `FilePlatform` capabilities, not UA sniffing. Rust native / WASM expose same versioned DTOs, exact value strings. Browser engine in worker with bounded queues, transfer ArrayBuffers where supported, cancel/generation handling; avoid duplicate copies. IPC only typed application commands, no arbitrary FS access/shell/network commands. Scope Tauri capabilities to known windows, picker-selected/authorized handles, validated roots; no broad unrestricted filesystem permissions or unsafe remote content. Use safe CSP, avoid remote navigation/scripts and inline unsafe eval, audit npm/Rust deps, escape user XML and filenames as text. Worker/WASM fallback/error state visible. Local path data not sent to any network. Save/clipboard operations honor browser gesture constraints. Store browser settings locally (versioned, no sensitive content by default); native app config/data/cache paths via `directories` or native API, migrate original `StarBank-Reloaded/settings.json` keys `hide_blizzard_maps`, `hide_maps_without_banks`, `auto_resign_on_save`, `sc2_root_override` without losing user choices. Invalid settings are reported and recoverable. Persist layout and last selection optional; no saved raw bank drafts without explicit consent.
+
+Browser Save As exports prepared bytes as a download. The browser save picker can truncate an existing destination before returning a handle. Optional in-place writes use an existing file handle, a fresh content check and explicit write permission. Apply the CSP to the worker script as well as the document. [Save file picker specification](https://wicg.github.io/file-system-access/#api-showsavefilepicker) · [Worker CSP](https://html.spec.whatwg.org/multipage/workers.html#run-a-worker)
 
 ## Packaging / associations
 

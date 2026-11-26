@@ -13,7 +13,7 @@ StarBank Reloaded is a local-first, cross-platform StarCraft II bank editor with
 5. [TASKS.md](TASKS.md) — ordered, testable implementation work packages.
 6. [docs/design/UX.md](docs/design/UX.md), [visual reference](docs/design/editor-reference.svg), [docs/design/EDITOR.md](docs/design/EDITOR.md) — visual and behavioral specifications.
 7. [docs/design/BANK_FORMAT.md](docs/design/BANK_FORMAT.md), [docs/design/SIGNATURE_SPEC.md](docs/design/SIGNATURE_SPEC.md), [docs/design/DISCOVERY_MPQ.md](docs/design/DISCOVERY_MPQ.md), [docs/design/PERSISTENCE.md](docs/design/PERSISTENCE.md) — compatibility and safety design.
-8. [docs/design/PLATFORMS.md](docs/design/PLATFORMS.md), [docs/design/PROFILES.md](docs/design/PROFILES.md), [docs/design/AGENT_API.md](docs/design/AGENT_API.md) — shared frontend, profiles and agent-facing access.
+8. [docs/design/PLATFORMS.md](docs/design/PLATFORMS.md), [docs/design/ENGINE_CONTRACT.md](docs/design/ENGINE_CONTRACT.md), [docs/design/PROFILES.md](docs/design/PROFILES.md), [docs/design/AGENT_API.md](docs/design/AGENT_API.md) — platform capabilities, shared engine, profiles and agent-facing access.
 9. [docs/standards/EES-1.md](docs/standards/EES-1.md), [docs/standards/EVS-1.md](docs/standards/EVS-1.md), [docs/verification/TEST_PLAN.md](docs/verification/TEST_PLAN.md) — engineering and verification contracts.
 10. [docs/TECH_STACK.md](docs/TECH_STACK.md), [docs/decisions/ADR_REGISTER.md](docs/decisions/ADR_REGISTER.md), [docs/reference/UPSTREAM.md](docs/reference/UPSTREAM.md), [docs/reference/CONVERSATION_DECISIONS.md](docs/reference/CONVERSATION_DECISIONS.md) — rationale, references and historical reconciliation.
 
