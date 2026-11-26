@@ -7,6 +7,7 @@ import {
   simulateUnavailableBank,
   verifyLocalImports,
 } from "./local-bank-library.mjs";
+import { verifyWindowedTable } from "./windowed-table.mjs";
 
 const playwright = await import(
   process.env.STARBANK_TEST_PLAYWRIGHT_MODULE ?? "playwright"
@@ -81,6 +82,21 @@ async function startServer() {
       server.closeAllConnections();
       await new Promise((resolveClose) => server.close(resolveClose));
     },
+  };
+}
+
+function bankPicker(page) {
+  const fileInput = page.getByLabel("Bank file", { exact: true });
+  return async (fileName, xml) => {
+    await page.waitForFunction(() => {
+      const input = document.querySelector('input[aria-label="Bank file"]');
+      return input instanceof HTMLInputElement && !input.disabled;
+    });
+    await fileInput.setInputFiles({
+      name: fileName,
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(xml),
+    });
   };
 }
 
@@ -339,10 +355,32 @@ async function verify(name) {
     });
     const browserErrors = [];
     const requests = [];
+    context.setDefaultTimeout(10_000);
     context.on("request", (request) => requests.push(request.url()));
+    context.on("page", (page) =>
+      page.on("pageerror", (error) => browserErrors.push(error.message)),
+    );
+
+    const viewport =
+      name === "firefox"
+        ? { width: 390, height: 640 }
+        : { width: 850, height: 500 };
+    const windowedPage = await context.newPage();
+    try {
+      await windowedPage.setViewportSize(viewport);
+      await windowedPage.goto(server.origin);
+      const { initialRows, scrolledRows } = await verifyWindowedTable(
+        windowedPage,
+        bankPicker(windowedPage),
+      );
+      console.log(
+        `${name} ${browser.version()} mounted ${initialRows} initial rows and ${scrolledRows} distant rows of 10,000 at ${viewport.width}×${viewport.height}. Focus, bulk edit, undo, and display filtering and sorting passed.`,
+      );
+    } finally {
+      await windowedPage.close();
+    }
+
     const page = await context.newPage();
-    page.setDefaultTimeout(10_000);
-    page.on("pageerror", (error) => browserErrors.push(error.message));
     await page.goto(server.origin);
     await page.getByRole("button", { name: "Open Bank…" }).waitFor();
     await verifyPreferences(page);
@@ -353,18 +391,7 @@ async function verify(name) {
     await server.stop();
     const assetRequests = requests.length;
 
-    const fileInput = page.getByLabel("Bank file", { exact: true });
-    const chooseBank = async (fileName, xml) => {
-      await page.waitForFunction(() => {
-        const input = document.querySelector('input[aria-label="Bank file"]');
-        return input instanceof HTMLInputElement && !input.disabled;
-      });
-      await fileInput.setInputFiles({
-        name: fileName,
-        mimeType: "application/octet-stream",
-        buffer: Buffer.from(xml),
-      });
-    };
+    const chooseBank = bankPicker(page);
     await verifyLocalImports(page, initial);
     await chooseBank(documentName, initial);
     const value = page.getByRole("textbox", { name: "Gold · Value value" });
@@ -408,7 +435,9 @@ async function verify(name) {
     assert.equal(await raw.textContent(), "<Bank>");
     await raw.fill(rawEdited);
     await page.getByRole("button", { name: "Apply XML" }).click();
-    await page.getByRole("button", { name: "Undo" }).waitFor();
+    await page
+      .getByRole("button", { name: "Apply XML" })
+      .waitFor({ state: "hidden" });
     await page.getByRole("tab", { name: "Raw View" }).focus();
     await page.keyboard.press("Meta+z");
     await raw.filter({ hasText: "<!-- synthetic -->" }).waitFor();
@@ -488,7 +517,8 @@ async function verify(name) {
     const editedUtf16Xml = utf16Opening
       .replaceAll("\r\n", "")
       .replace('int="002"', 'int="004"');
-    await raw.fill(editedUtf16Xml);
+    await raw.press("ControlOrMeta+a");
+    await page.keyboard.insertText(editedUtf16Xml);
     await page.getByRole("button", { name: "Apply XML" }).click();
     await page
       .getByRole("button", { name: "Apply XML" })
