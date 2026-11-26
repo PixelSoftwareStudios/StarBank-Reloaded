@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/adapters/starbank-mpq",
+    "crates/discovery/starbank-map-index",
     "crates/discovery/starbank-paths",
     "crates/domain/starbank-backup",
     "crates/domain/starbank-editor",

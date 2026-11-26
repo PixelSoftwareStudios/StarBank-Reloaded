@@ -656,6 +656,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "starbank-map-index"
+version = "0.1.0"
+dependencies = [
+ "cap-std",
+ "rustix",
+ "serde",
+ "serde_json",
+ "starbank-mpq",
+ "starbank-paths",
+ "tempfile",
+]
+
+[[package]]
 name = "starbank-mpq"
 version = "0.1.0"
 dependencies = [
