@@ -7,12 +7,16 @@ const description = {
   unverified: "Unverified",
 };
 
+export type BackupAction = { kind: "restore" | "export"; id: number };
+
 export function BackupPicker({
   choices,
+  canRestore,
   select,
 }: {
   choices: BackupChoices;
-  select: (id?: number) => void;
+  canRestore: boolean;
+  select: (action?: BackupAction) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState(
@@ -36,11 +40,12 @@ export function BackupPicker({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (selected !== undefined) select(selected);
+          if (selected !== undefined)
+            select({ kind: canRestore ? "restore" : "export", id: selected });
         }}
       >
         <h2 id="backup-picker-title" className="mb-3 font-semibold">
-          Restore Bank Backup
+          {canRestore ? "Restore Bank Backup" : "Bank Backups"}
         </h2>
         {choices.records.length === 0 ? (
           <p>No recorded backups were found for this bank.</p>
@@ -81,6 +86,12 @@ export function BackupPicker({
             Some backup records could not be read or verified.
           </p>
         ) : null}
+        {selected !== undefined && (
+          <p className="mt-2">
+            Save a copy to a new file with the backup’s original bytes and
+            signature.
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
@@ -89,12 +100,25 @@ export function BackupPicker({
           >
             Cancel
           </button>
+          {canRestore && (
+            <button
+              type="button"
+              className="rounded border px-3 py-1 disabled:opacity-40"
+              disabled={selected === undefined}
+              onClick={() => {
+                if (selected !== undefined)
+                  select({ kind: "export", id: selected });
+              }}
+            >
+              Save a Copy…
+            </button>
+          )}
           <button
             type="submit"
             className="rounded border px-3 py-1 disabled:opacity-40"
             disabled={selected === undefined}
           >
-            Continue
+            {canRestore ? "Continue" : "Save a Copy…"}
           </button>
         </div>
       </form>

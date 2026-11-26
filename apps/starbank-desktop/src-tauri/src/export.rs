@@ -153,23 +153,22 @@ fn publish(
 	let mut engine = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
 	let reply = engine.dispatch(control, None);
 	if let Some(bytes) = reply.bytes {
-		match starbank_fs::commit(
-			path,
-			&bytes,
-			CommitIntent::CreateNew,
-			max_attachment_bytes(),
-		) {
-			CommitOutcome::CommittedVerified(_) => {}
-			CommitOutcome::RejectedUnchanged(error) => {
-				return Err(CommandError::WriteRejected(error.to_string()));
-			}
-			CommitOutcome::CommitUncertain(_) => return Err(CommandError::WriteUncertain),
-		}
+		commit_new_copy(path, &bytes)?;
 	}
 	Ok(ExportReply {
 		name,
 		control: reply.json,
 	})
+}
+
+pub(crate) fn commit_new_copy(path: &Path, bytes: &[u8]) -> Result<(), CommandError> {
+	match starbank_fs::commit(path, bytes, CommitIntent::CreateNew, max_attachment_bytes()) {
+		CommitOutcome::CommittedVerified(_) => Ok(()),
+		CommitOutcome::RejectedUnchanged(error) => {
+			Err(CommandError::WriteRejected(error.to_string()))
+		}
+		CommitOutcome::CommitUncertain(_) => Err(CommandError::WriteUncertain),
+	}
 }
 
 #[cfg(test)]

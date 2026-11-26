@@ -14,13 +14,14 @@ use time::OffsetDateTime;
 use crate::{
 	BackupDirectory, CommitIssue, CommitOutcome, CommitReceipt, FileSnapshot, Fingerprint,
 	StorageError,
-	backup_metadata::{Metadata, backup_directory, is_candidate, sidecar_path},
+	backup_metadata::{Metadata, backup_directory, is_candidate},
 	backup_storage::NativeStorage,
 };
 
 const MAX_DIRECTORY_ENTRIES: usize = 10_000;
 
 mod error;
+mod snapshot;
 
 pub use error::NativeBackupError;
 
@@ -319,47 +320,6 @@ impl NativeBackupCatalog {
 		Ok(NativeBackupEffect {
 			backup: effect.backup,
 			commit: native_outcome(effect.commit),
-		})
-	}
-
-	/// Reads a selected snapshot and matches it to a validated sidecar, without writing.
-	///
-	/// Supply the current file observed when the user selected the restore. The native
-	/// restore checks that exact identity and bytes again before writing the live bank.
-	///
-	/// # Errors
-	///
-	/// Rejects a mismatched scope, filename, or sidecar, an unreadable snapshot, or invalid
-	/// snapshot length or digest.
-	pub fn prepare_restore(
-		&self,
-		source: &BankSource,
-		current: FileSnapshot,
-		backup: &Path,
-		placement: BackupPlacement<'_>,
-	) -> Result<PreparedRestore, NativeBackupError> {
-		if backup.parent() != Some(backup_directory(source, placement)?) {
-			return Err(NativeBackupError::MetadataMismatch);
-		}
-		let scope = managed_scope(self.managed_directory.as_ref(), placement)?;
-		let storage = NativeStorage::new(scope);
-		let record = Metadata::read(source, placement, &sidecar_path(backup), &storage)?
-			.ok_or(NativeBackupError::MetadataMismatch)?;
-		if record.id().path() != backup {
-			return Err(NativeBackupError::MetadataMismatch);
-		}
-		let selected = storage.read_file(backup, self.max_bytes)?;
-		let integrity = record.integrity();
-		if selected.fingerprint().sha256() != &integrity.sha256
-			|| selected.bytes().len() != integrity.byte_length
-		{
-			return Err(NativeBackupError::MetadataMismatch);
-		}
-		Ok(PreparedRestore {
-			record,
-			current,
-			selected,
-			selected_directory: scope.cloned(),
 		})
 	}
 

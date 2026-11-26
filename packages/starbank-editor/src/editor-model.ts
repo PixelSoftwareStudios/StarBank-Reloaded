@@ -88,7 +88,8 @@ export interface BankEditorController {
   onSave?: EditorAction;
   onSaveAs?: EditorAction;
   onSaveWithBackup?: EditorAction;
-  onRestore?: EditorAction;
+  onBackupHistory?: EditorAction;
+  canRestoreBackup?: boolean;
   onResign?: EditorAction;
   onExport?: EditorAction;
   onCopy?: EditorAction;

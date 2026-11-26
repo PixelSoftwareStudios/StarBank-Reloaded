@@ -23,7 +23,7 @@ import type {
   SettingsPlatformInfo,
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
-import { BackupPicker } from "./backup-picker";
+import { type BackupAction, BackupPicker } from "./backup-picker";
 import {
   BackupPreferencesFields,
   useBackupPreferences,
@@ -50,6 +50,7 @@ import {
   decodeBankXml,
   dispatchBank,
   encodeBankXml,
+  exportActiveBackup,
   exportBankCopy,
   listActiveBackups,
   pickBank,
@@ -89,7 +90,8 @@ function DesktopApp() {
   const [overwriteAvailable, setOverwriteAvailable] = useState(false);
   const [backupPrompt, setBackupPrompt] = useState<{
     choices: BackupChoices;
-    select: (id?: number) => void;
+    canRestore: boolean;
+    select: (action?: BackupAction) => void;
   }>();
   const [signingPrompt, setSigningPrompt] = useState<ManualSigningPrompt>();
   const inProgress = useRef(false);
@@ -353,6 +355,7 @@ function DesktopApp() {
       );
       setOverwriteAvailable(saved.can_overwrite === true);
       if (mode === "new") setSelectedBankId(undefined);
+      else setBackupGeneration((value) => value + 1);
       return {
         ok: true,
         message:
@@ -363,21 +366,31 @@ function DesktopApp() {
     });
   }
 
-  function restore(target: EditorTarget) {
+  function browseBackups(target: EditorTarget) {
     return action(async () => {
-      const choices = await listActiveBackups(activeTarget(target));
-      const backupId = await new Promise<number | undefined>((resolve) => {
-        setBackupPrompt({
-          choices,
-          select(id) {
-            setBackupPrompt(undefined);
-            resolve(id);
-          },
-        });
-      });
-      if (backupId === undefined) return { ok: true };
       const nativeTarget = activeTarget(target);
-      const restored = await restoreActiveBank(nativeTarget, backupId);
+      const choices = await listActiveBackups(nativeTarget);
+      const selection = await new Promise<BackupAction | undefined>(
+        (resolve) => {
+          setBackupPrompt({
+            choices,
+            canRestore: overwriteAvailable,
+            select(selection) {
+              setBackupPrompt(undefined);
+              resolve(selection);
+            },
+          });
+        },
+      );
+      if (!selection) return { ok: true };
+      if (selection.kind === "export") {
+        const name = await exportActiveBackup(nativeTarget, selection.id);
+        return {
+          ok: true,
+          message: name ? `Saved backup copy ${name}.` : undefined,
+        };
+      }
+      const restored = await restoreActiveBank(nativeTarget, selection.id);
       if (!restored) return { ok: true };
       await adopt(
         restored.name,
@@ -385,6 +398,7 @@ function DesktopApp() {
         restored.breadcrumbs,
       );
       setOverwriteAvailable(restored.can_overwrite === true);
+      setBackupGeneration((value) => value + 1);
       return {
         ok: true,
         message: `Restored ${restored.name} and saved a reversal backup.`,
@@ -485,7 +499,8 @@ function DesktopApp() {
     onSaveWithBackup: overwriteAvailable
       ? (target) => save(target, "backup")
       : undefined,
-    onRestore: overwriteAvailable ? restore : undefined,
+    onBackupHistory: exportAvailable ? browseBackups : undefined,
+    canRestoreBackup: overwriteAvailable,
     onReveal: revealAvailable
       ? (target) =>
           action(async () => {
@@ -679,6 +694,7 @@ function DesktopApp() {
       {backupPrompt ? (
         <BackupPicker
           choices={backupPrompt.choices}
+          canRestore={backupPrompt.canRestore}
           select={backupPrompt.select}
         />
       ) : null}

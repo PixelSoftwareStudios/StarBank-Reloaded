@@ -26,6 +26,7 @@
     "allow-list-active-backups",
     "allow-active-backup-status",
     "allow-restore-active-bank",
+    "allow-export-active-backup",
     "allow-read-backup-preferences",
     "allow-choose-backup-location",
     "allow-use-default-backup-location",

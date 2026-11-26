@@ -124,7 +124,10 @@ export function EditorActions({
     { label: "Save", action: controller.onSave },
     { label: "Save As…", action: controller.onSaveAs },
     { label: "Save w/ Backup", action: controller.onSaveWithBackup },
-    { label: "Restore Backup…", action: controller.onRestore },
+    {
+      label: controller.canRestoreBackup ? "Restore Backup…" : "Bank Backups…",
+      action: controller.onBackupHistory,
+    },
     { label: "Re-sign Bank", action: controller.onResign },
     { label: "Export copy…", action: controller.onExport },
     { label: "Copy bank XML", action: controller.onCopy },

@@ -98,6 +98,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::backup::list_active_backups,
 			crate::backup_status::active_backup_status,
 			crate::backup::restore_active_bank,
+			crate::backup::export_copy::export_active_backup,
 			crate::backup_location::read_backup_preferences,
 			crate::backup_location::choose_backup_location,
 			crate::backup_location::use_default_backup_location,

@@ -170,6 +170,13 @@ export function listActiveBackups(
   return invoke<BackupChoices>("list_active_backups", { target });
 }
 
+export function exportActiveBackup(
+  target: ActiveBankTarget,
+  backupId: number,
+): Promise<string | null> {
+  return invoke<string | null>("export_active_backup", { target, backupId });
+}
+
 export function restoreActiveBank(
   target: ActiveBankTarget,
   backupId: number,

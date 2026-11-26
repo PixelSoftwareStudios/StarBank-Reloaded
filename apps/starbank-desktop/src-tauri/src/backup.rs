@@ -5,7 +5,7 @@ use serde::Serialize;
 use starbank_core::Revision;
 use starbank_editor::{NativeRestorePolicy, NativeRestoreReceipt, max_attachment_bytes};
 use starbank_fs::{
-	BackupHealth, BackupId, BackupPlacement, BackupVerification, CommitOutcome, Fingerprint,
+	BackupHealth, BackupPlacement, BackupRecord, BackupVerification, CommitOutcome, Fingerprint,
 	NativeBackupCatalog, NativeBackupPolicy, PreparedRestore, backup_source, read_snapshot,
 };
 use starbank_signature::SignatureStatus;
@@ -19,7 +19,10 @@ use crate::settings::AutomaticBackup;
 use crate::{
 	backup_location::{ManagedBackupFolder, backup_folder, backup_history},
 	commands::{CommandError, DesktopEngine, OpenedBank},
+	export::can_export_bank,
 };
+
+pub(crate) mod export_copy;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,9 +62,51 @@ enum Health {
 }
 
 pub(crate) struct BackupSelection {
+	request_id: String,
 	document_id: String,
 	revision: Revision,
-	records: Vec<(BackupId, Location)>,
+	records: Vec<SelectedBackup>,
+}
+
+struct SelectedBackup {
+	record: BackupRecord,
+	location: Location,
+}
+
+impl SelectedBackup {
+	fn placement(&self, catalog: &mut NativeBackupCatalog) -> BackupPlacement<'_> {
+		match &self.location {
+			Location::Adjacent => {
+				catalog.set_managed_directory(None);
+				BackupPlacement::Adjacent
+			}
+			Location::Managed(folder) => {
+				folder.authorize(catalog);
+				BackupPlacement::Managed(folder.path())
+			}
+		}
+	}
+}
+
+fn take_backup(
+	session: &mut DesktopSession,
+	target: &ActiveTarget,
+	revision: Revision,
+	backup_id: usize,
+) -> Result<SelectedBackup, CommandError> {
+	if !session.backup_selection.as_ref().is_some_and(|selection| {
+		selection.request_id == target.request_id
+			&& selection.document_id == target.document_id
+			&& selection.revision == revision
+			&& backup_id < selection.records.len()
+	}) {
+		return Err(CommandError::InvalidControl);
+	}
+	session
+		.backup_selection
+		.take()
+		.and_then(|selection| selection.records.into_iter().nth(backup_id))
+		.ok_or(CommandError::InvalidControl)
 }
 
 pub(crate) fn overwrite(
@@ -102,7 +147,7 @@ pub(crate) async fn list_active_backups(
 	window: WebviewWindow,
 	target: ActiveTarget,
 ) -> Result<BackupChoices, CommandError> {
-	if !cfg!(target_os = "macos") {
+	if !can_export_bank() {
 		return Err(CommandError::Unavailable);
 	}
 	let app = window.app_handle().clone();
@@ -116,7 +161,6 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
 	let (selected, revision) = session.selected_for(target)?;
 	trusted_fingerprint(selected)?;
-	starbank_fs::check_replace_scope(&selected.path).map_err(write_rejected)?;
 	let source = backup_source(&selected.path).map_err(write_rejected)?;
 	let mut history = backup_history(app);
 	let mut catalog = fresh_catalog()?;
@@ -173,9 +217,13 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 				BackupHealth::Unverified => Health::Unverified,
 			},
 		});
-		selections.push((id.clone(), location));
+		selections.push(SelectedBackup {
+			record: record.clone(),
+			location,
+		});
 	}
 	session.backup_selection = Some(BackupSelection {
+		request_id: target.request_id.clone(),
 		document_id: target.document_id.clone(),
 		revision,
 		records: selections,
@@ -238,28 +286,17 @@ fn prepare_restore(
 	}
 	let path = selected.path.clone();
 	let source = backup_source(&path).map_err(write_rejected)?;
-	let (backup, location) = session
-		.backup_selection
-		.take()
-		.filter(|selection| {
-			selection.document_id == target.document_id && selection.revision == revision
-		})
-		.and_then(|selection| selection.records.into_iter().nth(backup_id))
-		.ok_or(CommandError::InvalidControl)?;
+	let backup = take_backup(&mut session, target, revision, backup_id)?;
 	let catalog = catalog(&mut session)?;
-	let placement = match &location {
-		Location::Adjacent => {
-			catalog.set_managed_directory(None);
-			BackupPlacement::Adjacent
-		}
-		Location::Managed(folder) => {
-			folder.authorize(catalog);
-			BackupPlacement::Managed(folder.path())
-		}
-	};
+	let placement = backup.placement(catalog);
 	let storage = catalog
-		.prepare_restore(&source, current, backup.path(), placement)
+		.prepare_restore(&source, current, backup.record.id().path(), placement)
 		.map_err(write_rejected)?;
+	if storage.record() != &backup.record {
+		return Err(write_rejected(
+			"This backup changed. Open the backup list again.",
+		));
+	}
 	let dirty = session
 		.editor
 		.native_active_target()
