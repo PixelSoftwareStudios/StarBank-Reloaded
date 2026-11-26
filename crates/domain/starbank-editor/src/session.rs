@@ -30,7 +30,7 @@ pub struct Session {
 	pub(crate) id_cursor: u64,
 	pub(crate) opening: Arc<[u8]>,
 	pub(crate) token: Arc<()>,
-	opening_ids: Arc<Identities>,
+	pub(crate) opening_ids: Arc<Identities>,
 	saved: Arc<[u8]>,
 	revision: Revision,
 	history: History,

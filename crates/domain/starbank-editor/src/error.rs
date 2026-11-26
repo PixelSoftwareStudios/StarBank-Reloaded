@@ -26,6 +26,10 @@ pub enum EditorError {
 	UnknownKey(OccurrenceId),
 	/// The identifier does not name a value in the current document.
 	UnknownValue(OccurrenceId),
+	/// No current occurrence of the requested kind shares this opening identity.
+	RevertUnavailable(OccurrenceId),
+	/// Reparsed bank XML does not match the editor's occurrence identities.
+	InconsistentProjection,
 	/// The same value appeared twice in one transaction.
 	DuplicateValue(OccurrenceId),
 	/// A value is opaque and can only be changed through raw XML.
@@ -74,6 +78,12 @@ impl fmt::Display for EditorError {
 			Self::UnknownSection(id) => write!(formatter, "unknown section {id}"),
 			Self::UnknownKey(id) => write!(formatter, "unknown key {id}"),
 			Self::UnknownValue(id) => write!(formatter, "unknown value {id}"),
+			Self::RevertUnavailable(id) => {
+				write!(formatter, "no opening counterpart for occurrence {id}")
+			}
+			Self::InconsistentProjection => {
+				formatter.write_str("bank XML does not match editor occurrence identities")
+			}
 			Self::DuplicateValue(id) => write!(formatter, "duplicate edit for value {id}"),
 			Self::OpaqueValue(id) => write!(formatter, "value {id} requires raw XML editing"),
 			Self::EditLimit => formatter.write_str("edit exceeds document limits"),

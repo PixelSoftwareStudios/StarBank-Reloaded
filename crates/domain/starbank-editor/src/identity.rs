@@ -66,7 +66,7 @@ impl Occurrence {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct Identities {
 	by_source: Vec<(u32, OccurrenceId)>,
 	by_session: Vec<(OccurrenceId, Occurrence)>,
@@ -141,6 +141,27 @@ impl Identities {
 	fn store(&mut self, id: OccurrenceId, occurrence: Occurrence) {
 		self.by_source.push((occurrence.source_index(), id));
 		self.by_session.push((id, occurrence));
+	}
+
+	pub(crate) fn from_assignments(
+		mut assignments: Vec<(OccurrenceId, Occurrence)>,
+	) -> Result<Self, EditorError> {
+		assignments.sort_unstable_by_key(|&(id, _)| id);
+		if assignments.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+			return Err(EditorError::InconsistentProjection);
+		}
+		let mut by_source: Vec<_> = assignments
+			.iter()
+			.map(|&(id, occurrence)| (occurrence.source_index(), id))
+			.collect();
+		by_source.sort_unstable_by_key(|&(index, _)| index);
+		if by_source.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+			return Err(EditorError::InconsistentProjection);
+		}
+		Ok(Self {
+			by_source,
+			by_session: assignments,
+		})
 	}
 
 	pub(crate) fn id(&self, occurrence: Occurrence) -> Option<OccurrenceId> {

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod diff;
 mod error;
 mod history;
 mod identity;
@@ -11,6 +12,9 @@ mod protocol;
 mod session;
 mod structure;
 
+pub use diff::{
+	DiffOccurrence, DiffValue, OccurrenceChange, OccurrenceDiff, OccurrenceKind, OpeningDiff,
+};
 pub use error::EditorError;
 pub use identity::{OccurrenceId, ParseOccurrenceIdError};
 pub use lexeme::{LexemeError, is_value_editable, normalize_value};
