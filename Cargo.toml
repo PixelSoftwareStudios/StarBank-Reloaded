@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "apps/starbank-cli",
+    "apps/starbank-desktop/src-tauri",
     "crates/adapters/starbank-mpq",
     "crates/bindings/starbank-wasm",
     "crates/discovery/starbank-map-index",

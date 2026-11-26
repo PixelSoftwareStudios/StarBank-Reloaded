@@ -1,0 +1,12 @@
+{
+  "identifier": "main",
+  "description": "Local StarBank desktop editor window",
+  "local": true,
+  "webviews": ["main"],
+  "permissions": [
+    "allow-open-bank",
+    "allow-dispatch-bank",
+    "allow-export-bank-copy",
+    "allow-can-export-bank"
+  ]
+}

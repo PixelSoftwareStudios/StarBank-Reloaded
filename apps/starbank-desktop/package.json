@@ -1,0 +1,30 @@
+{
+  "name": "@starbank/desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tauri build",
+    "build:webview": "vite build",
+    "dev": "tauri dev",
+    "dev:webview": "vite",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@starbank/engine-client": "workspace:*",
+    "@starbank/ui": "workspace:*",
+    "@tauri-apps/api": "2.12.5",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@tauri-apps/cli": "2.12.6",
+    "@types/node": "24.19.4",
+    "@types/react": "catalog:",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "catalog:",
+    "vite": "8.3.8"
+  }
+}
