@@ -52,4 +52,4 @@ Three paired runs used distinct optimized executables and alternated their run o
 
 ## Open measurements
 
-Desktop and browser startup, idle and peak memory, UI interaction latency, real SC2 corpora, cross-platform measurements, and approved performance budgets remain open.
+Browser startup and interaction latency have a separate local Chromium baseline on synthetic inputs. Desktop startup, process-tree idle and peak memory, real SC2 corpora, cross-platform measurements, and approved performance budgets remain open. [Browser benchmark](BROWSER_PERFORMANCE.md)
