@@ -25,7 +25,8 @@ Depends on: 02.
 
 - [x] Implement bounded UTF-8 and BOM-marked UTF-16 parsing, lossless export, and native-byte-preserving value, structural and signature edits. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
 - [x] Check in and run the bounded lossless-format fuzz target. [Fuzz harness](crates/formats/sc2bank/fuzz/README.md)
-- [ ] Qualify real SC2 inputs, confirm the observed encoding scope, and extend fuzzing to structural edits and sustained runs for REQ-FMT-01, REQ-FMT-02, REQ-FMT-03 and REQ-FMT-04.
+- [x] Run the structural-edit fuzz target across UTF-8 and both supported UTF-16 byte orders. [Fuzz harness](crates/formats/sc2bank/fuzz/README.md)
+- [ ] Qualify real SC2 inputs, confirm the observed encoding scope, and run sustained fuzzing for REQ-FMT-01, REQ-FMT-02, REQ-FMT-03 and REQ-FMT-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-04 — Signature and context
@@ -34,7 +35,8 @@ Depends on: 03.
 
 - [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Compare synthetic vectors with the pinned v2.0 signer.
 - [x] Wire automatic and explicit re-signing, including create-only signed copies of external banks. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
-- [ ] Verify actual game-generated digests and game acceptance for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03. Finish checking the native picker flow for external banks.
+- [x] Verify the macOS native external-signing picker workflow on synthetic banks. [macOS evidence](docs/verification/MACOS_EXTERNAL_SIGNING.md)
+- [ ] Verify actual game-generated digests and game acceptance for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-05 — Editor transactions and validation
@@ -118,7 +120,7 @@ Depends on: 11,12.
 
 - [x] Implement versioned browser preferences, legacy decoding and the shared settings page. Preserve in-flight drafts across settings navigation.
 - [x] Persist native preferences and authorized roots. Share account selection, appearance, automatic backup policy and platform capability information in Settings. Add explicit map-index rebuild. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
-- [ ] Complete the managed backup location and retention controls.
+- [x] Configure a managed backup folder and persist a retention count with a read-only review of older backups. Keep access to earlier managed folders. [Implementation evidence](docs/verification/IMPLEMENTATION.md)
 - [ ] Implement and verify: REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -139,7 +141,8 @@ Depends on: 05,07,08.
 
 - [x] Implement typed local bank commands, versioned JSON, exact patch selectors, dry-run, guarded effects, backup and restore, and the CLI skill.
 - [x] Implement read-only map inspection and qualify the local CLI on macOS and Linux. [CLI guide](apps/starbank-cli/README.md)
-- [ ] Verify native Windows runtime and complete cross-adapter conformance.
+- [x] Compare native protocol, release WASM, and CLI output on the same three synthetic encodings, including exact signing and dry-run behavior. [Adapter parity](docs/verification/ADAPTER_PARITY.md)
+- [ ] Verify native Windows runtime and complete cross-adapter conformance on authorized game data.
 - [ ] Implement and verify: REQ-CLI-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -158,6 +161,7 @@ Depends on: 12,13,14,15.
 Depends on: 03–16.
 
 - [x] Record a repeatable Chromium startup and interaction baseline and run the bounded XML sanitizer and Miri checks. [Browser timing](docs/verification/BROWSER_PERFORMANCE.md) · [Miri evidence](crates/formats/sc2bank/verification/MIRI.md)
+- [x] Measure macOS app-host startup and resources, and check the bounded save-and-restore model. [macOS timing](apps/starbank-desktop/verification/native-performance/NATIVE_PERFORMANCE.md) · [Save and backup model](crates/platform/starbank-fs/verification/save-backup-model/README.md)
 - [ ] Ongoing from first WP; report actual tests, fault injection, corpus parity, measured budgets and formal coverage.
 - [ ] Implement and verify: REQ-PERF-01, REQ-QA-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
