@@ -12,5 +12,12 @@ starbank-core.workspace = true
 sc2bank = { path = "../../formats/sc2bank" }
 sha1.workspace = true
 
+[dev-dependencies]
+starbank-testkit.workspace = true
+
+[[bench]]
+name = "workloads"
+harness = false
+
 [lints]
 workspace = true

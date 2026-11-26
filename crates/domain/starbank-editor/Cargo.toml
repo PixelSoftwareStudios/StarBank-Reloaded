@@ -14,5 +14,12 @@ starbank-core.workspace = true
 starbank-profiles = { path = "../starbank-profiles" }
 starbank-signature = { path = "../starbank-signature" }
 
+[dev-dependencies]
+starbank-testkit.workspace = true
+
+[[bench]]
+name = "workloads"
+harness = false
+
 [lints]
 workspace = true

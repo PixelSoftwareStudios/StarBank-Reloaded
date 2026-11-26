@@ -1,0 +1,10 @@
+[package]
+name = "starbank-testkit"
+description = "Synthetic fixtures and benchmark sampling for StarBank verification"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

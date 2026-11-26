@@ -3382,6 +3382,7 @@ dependencies = [
  "starbank-core",
  "starbank-profiles",
  "starbank-signature",
+ "starbank-testkit",
 ]
 
 [[package]]
@@ -3413,6 +3414,7 @@ dependencies = [
  "serde_json",
  "starbank-mpq",
  "starbank-paths",
+ "starbank-testkit",
  "tempfile",
 ]
 
@@ -3453,6 +3455,7 @@ dependencies = [
  "sc2bank",
  "sha1 0.11.0",
  "starbank-core",
+ "starbank-testkit",
 ]
 
 [[package]]
@@ -3461,6 +3464,10 @@ version = "0.1.0"
 dependencies = [
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "starbank-testkit"
+version = "0.1.0"
 
 [[package]]
 name = "starbank-wasm"
