@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::{ffi::OsStr, fs, process::Command};
 
 #[path = "support/cli.rs"]
 mod cli;
@@ -210,4 +210,151 @@ fn inspection_matches_portable_engine_values_and_signature_status() {
 			assert_eq!(cli["value"], engine["value"]);
 		}
 	}
+}
+
+const ALPHA: &[u8] =
+	include_bytes!("../../../crates/discovery/starbank-map-index/tests/fixtures/alpha.s2ma");
+const RIVAL: &[u8] =
+	include_bytes!("../../../crates/discovery/starbank-map-index/tests/fixtures/rival.s2ma");
+const UNSUPPORTED_ARCHIVE: &[u8] =
+	include_bytes!("../../../crates/adapters/starbank-mpq/tests/fixtures/v1-list.s2ma");
+
+fn map(command_name: &str) -> Command {
+	let mut process = command();
+	process.args(["map", command_name, "--json"]);
+	process
+}
+
+#[test]
+fn inspect_returns_versioned_metadata_without_modifying_the_selected_archive() {
+	let fixture = Fixture::new();
+	let file = fixture.write("Fixture.sC2mAp", ALPHA);
+	let output = map("inspect")
+		.arg(&file)
+		.output()
+		.expect("inspect synthetic map");
+	let result = json(&output, 0);
+	assert_eq!(result["command"], "map_inspect");
+	let report = &result["result"];
+	assert_eq!(report["title"], "Fixture Alpha");
+	assert_eq!(report["title_source"], "script");
+	assert_eq!(report["author"], "Blizzard Entertainment");
+	assert_eq!(
+		report["bank_names"],
+		serde_json::json!(["second", "shared"])
+	);
+	assert_eq!(report["has_script"], true);
+	assert_eq!(report["declared_blizzard"], true);
+	assert!(report["modified_unix_nanos"].as_str().is_some());
+	assert_eq!(
+		report["path"]["display"].as_str(),
+		file.to_str(),
+		"report preserves the selected local path"
+	);
+	assert_eq!(fs::read(&file).expect("read unchanged archive"), ALPHA);
+	assert_eq!(
+		fs::read_dir(&fixture.path)
+			.expect("inspect fixture directory")
+			.count(),
+		1
+	);
+}
+
+#[test]
+fn inspect_rejects_directories_other_formats_and_unsupported_archives() {
+	let fixture = Fixture::new();
+	let directory = fixture.path.join("Directory.SC2Map");
+	fs::create_dir(&directory).expect("create map-named directory");
+	let mut cases = vec![(directory, 3, "invalid_map_selection")];
+	cases.push((
+		fixture.write("WrongExtension.txt", ALPHA),
+		3,
+		"invalid_map_selection",
+	));
+	cases.push((
+		fixture.write("Unsupported.SC2Map", UNSUPPORTED_ARCHIVE),
+		7,
+		"unsupported_map_archive",
+	));
+
+	for (path, status, code) in cases {
+		let output = map("inspect")
+			.arg(&path)
+			.output()
+			.expect("reject selected input");
+		assert_eq!(json(&output, status)["error"]["code"], code);
+		assert!(!String::from_utf8_lossy(&output.stdout).contains("Unsupported.SC2Map"));
+	}
+}
+
+#[cfg(unix)]
+#[test]
+fn inspect_refuses_a_symbolic_link_with_a_map_extension() {
+	use std::os::unix::fs::symlink;
+
+	let fixture = Fixture::new();
+	let file = fixture.write("Real.SC2Map", ALPHA);
+	let alias = fixture.path.join("Alias.SC2Map");
+	symlink(file, &alias).expect("create synthetic link");
+	let output = map("inspect")
+		.arg(alias)
+		.output()
+		.expect("refuse symbolic link");
+	assert_eq!(json(&output, 3)["error"]["code"], "invalid_map_selection");
+}
+
+#[test]
+fn scan_reports_partial_results_and_never_writes_a_cache() {
+	let fixture = Fixture::new();
+	let alpha = fixture.write("Alpha.SC2Map", ALPHA);
+	let rival = fixture.write("nested/Rival.s2ma", RIVAL);
+	let rejected = fixture.write("Other.SC2Mod", UNSUPPORTED_ARCHIVE);
+	let unrelated = fixture.write("Ignored.SC2Bank", b"not XML and unread by the map scan");
+	let before = [&alpha, &rival, &rejected, &unrelated]
+		.map(|path| fs::read(path).expect("read known fixture"));
+	let output = map("scan")
+		.arg("--root")
+		.arg(&fixture.path)
+		.output()
+		.expect("scan synthetic archives without a cache");
+	let report = json(&output, 0);
+	assert_eq!(report["command"], "map_scan");
+	let result = &report["result"];
+	assert_eq!(result["incomplete"], true);
+	let maps = result["maps"].as_array().expect("valid map results");
+	assert_eq!(maps.len(), 2);
+	assert!(maps.iter().any(|map| map["title"] == "Fixture Alpha"));
+	let issues = result["issues"].as_array().expect("typed diagnostics");
+	assert_eq!(issues.len(), 1);
+	assert_eq!(issues[0]["error"]["code"], "unsupported_map_archive");
+	assert_eq!(
+		[&alpha, &rival, &rejected, &unrelated]
+			.map(|path| fs::read(path).expect("verify unchanged fixture")),
+		before
+	);
+	assert_eq!(
+		fs::read_dir(&fixture.path)
+			.expect("inspect fixture directory")
+			.count(),
+		4
+	);
+}
+
+#[test]
+fn scan_uses_a_nonzero_status_when_every_selected_archive_fails() {
+	let fixture = Fixture::new();
+	let unsupported = fixture.write("Unsupported.SC2Map", UNSUPPORTED_ARCHIVE);
+	let output = map("scan")
+		.arg("--root")
+		.arg(&unsupported)
+		.output()
+		.expect("report the archive failure");
+	let report = json(&output, 7);
+	assert_eq!(report["command"], "map_scan");
+	assert_eq!(report["result"]["incomplete"], true);
+	assert_eq!(report["result"]["maps"], serde_json::json!([]));
+	assert_eq!(
+		report["result"]["issues"][0]["error"]["code"],
+		"unsupported_map_archive"
+	);
 }

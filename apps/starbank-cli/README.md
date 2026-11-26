@@ -16,6 +16,8 @@ Build from the repository root with `cargo build --locked -p starbank-cli`. The 
 | `backup create FILE` | Verifies a timestamped adjacent snapshot and records its metadata. |
 | `backup list FILE [--verify]` | Lists recorded adjacent snapshots. `--verify` checks their length and SHA-256. |
 | `backup restore FILE BACKUP --expected-current-sha256 SHA [--dry-run]` | Verifies the selected backup and its target. An actual restore first commits a reversal snapshot. |
+| `map inspect FILE` | Reads declared title, author and bank names from one selected .SC2Map archive. |
+| `map scan --root PATH` | Indexes selected map folders or archives without writing a cache. Repeat `--root` for multiple locations. |
 
 Append `--json` for machine-readable output. Explicit signing context takes all three options `--author HANDLE --player HANDLE --bank-name NAME`. When omitted, the program infers context only from a canonical account/bank path, using the intended destination for writing. Edit and export re-sign when context is known unless `--no-resign` is supplied. With an unverifiable preserved signature, an actual write requires `--allow-stale-signature`.
 
@@ -25,6 +27,12 @@ Adjacent snapshots use a UTC timestamp and a collision suffix when needed. The J
 
 Native file reads and exclusive output creation are available on macOS and Linux. In-place replacement is currently limited to supported local APFS storage. The Windows adapter supports local read-only snapshots and discovery. Windows writes require a qualified replacement backend.
 
+## Map metadata
+
+Map commands read bounded MPQ metadata from explicitly selected local files or folders. Results describe declarations in archive text and headers. Declared author names and bank references are metadata hints. Galaxy scripts are parsed as data. Both commands use read-only archive handles. Scans run with the cache disabled.
+
+`map_inspect` reports `path`, `modified_unix_nanos` as an exact decimal string when available, `title`, `title_source`, `author`, `bank_names`, `has_script` and `declared_blizzard`. When metadata is unavailable, optional fields are null and the bank list can be empty. `map_scan` reports a list of the same records, typed issues and the `incomplete` flag. Partial scans with some successful archives return their records with exit 0. With only failures, a scan returns the first issue's nonzero status. Check `incomplete` before treating results as exhaustive.
+
 ## Versioned JSON
 
 A command report has `schema_version`, `command` and `result` fields. Precondition and operation errors have `schema_version` and an `error` with a stable machine-readable `code`, a message and available diagnostic or recovery fields. Validation can produce a command report with a nonzero exit status. Check the exit status before consuming an intended result.
@@ -33,7 +41,7 @@ A command report has `schema_version`, `command` and `result` fields. Preconditi
 |---|---|
 | 0 | Success, including a prepared dry-run. |
 | 2 | Invalid invocation. |
-| 3 | Invalid bank, edit, signature, context or backup. |
+| 3 | Invalid bank, edit, signature, context, backup or map input. |
 | 4 | File or output I/O failure. |
 | 5 | Fingerprint conflict or existing destination. |
 | 6 | Publication may have occurred and needs inspection. |

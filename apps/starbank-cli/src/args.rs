@@ -75,11 +75,28 @@ pub(crate) enum Command {
 		#[command(subcommand)]
 		command: BackupCommand,
 	},
+	/// Inspect local map archives and caches as data.
+	Map {
+		#[command(subcommand)]
+		command: MapCommand,
+	},
 	/// Find local live and backup bank files.
 	Discover {
 		/// Search a selected bank, account folder, or bank collection.
 		#[arg(long)]
 		root: Option<PathBuf>,
+	},
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum MapCommand {
+	/// Read the metadata of a single selected .SC2Map archive.
+	Inspect { file: PathBuf },
+	/// Read map metadata below explicitly selected roots without writing a cache.
+	Scan {
+		/// Directory or .SC2Map, .SC2Mod, or .s2ma archive. Repeat for multiple roots.
+		#[arg(long, required = true)]
+		root: Vec<PathBuf>,
 	},
 }
 

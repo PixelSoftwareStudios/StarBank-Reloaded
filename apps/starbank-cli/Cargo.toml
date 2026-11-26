@@ -20,6 +20,8 @@ sha2.workspace = true
 starbank-backup = { path = "../../crates/domain/starbank-backup" }
 starbank-editor = { path = "../../crates/domain/starbank-editor" }
 starbank-fs = { path = "../../crates/platform/starbank-fs" }
+starbank-map-index = { path = "../../crates/discovery/starbank-map-index" }
+starbank-mpq = { path = "../../crates/adapters/starbank-mpq" }
 starbank-paths = { path = "../../crates/discovery/starbank-paths" }
 starbank-signature = { path = "../../crates/domain/starbank-signature" }
 

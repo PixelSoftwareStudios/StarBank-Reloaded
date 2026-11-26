@@ -12,6 +12,7 @@ mod diff;
 mod discovery;
 mod failure;
 mod input;
+mod map;
 mod output;
 mod patch;
 mod write_bank;

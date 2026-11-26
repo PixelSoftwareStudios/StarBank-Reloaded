@@ -45,6 +45,11 @@ pub(crate) enum ErrorCode {
 	Io,
 	DiscoveryUnavailable,
 	DiscoveryFailed,
+	InvalidMapSelection,
+	InvalidMapArchive,
+	InvalidMapMetadata,
+	UnsupportedMapArchive,
+	MapScanFailed,
 }
 
 #[derive(Debug, Serialize)]

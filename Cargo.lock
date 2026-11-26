@@ -3344,6 +3344,8 @@ dependencies = [
  "starbank-backup",
  "starbank-editor",
  "starbank-fs",
+ "starbank-map-index",
+ "starbank-mpq",
  "starbank-paths",
  "starbank-signature",
  "tempfile",

@@ -1,6 +1,6 @@
 ---
 name: starbank-cli
-description: Inspect, compare, patch, sign or back up explicitly selected local StarCraft II bank files using the StarBank Reloaded command-line editor. Use for SC2Bank XML operations with exact values, fingerprint checks and dry-run.
+description: Use the StarBank Reloaded CLI to inspect, compare, patch, sign or back up selected local StarCraft II bank files and read selected map metadata. Use for SC2Bank XML operations with exact values, fingerprint checks and dry-run.
 ---
 
 # StarBank CLI
@@ -14,3 +14,5 @@ For edits, create a version 1 JSON patch with the inspected `expected_sha256` an
 Signatures require the exact intended author handle, player handle and bank name unless the target path supplies canonical context. When context is uncertain, report the verification state and obtain the missing fields before signing.
 
 For restore, use `starbank backup list FILE --verify --json` and a fresh inspection of the live bank. Preview the selected adjacent snapshot with `starbank backup restore FILE BACKUP --expected-current-sha256 SHA --dry-run --json`. Recheck the fingerprint when the target changes. An uncertain write has exit status 6. Inspect current effects and recovery artifacts before any retry.
+
+For a selected .SC2Map, use `starbank map inspect FILE --json`. Use `starbank map scan --root PATH --json` only for directories or archives the user selected. Treat declared authors and bank names as metadata hints, and check `incomplete` before treating scan results as exhaustive.

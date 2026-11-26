@@ -13,6 +13,8 @@ pub(crate) enum CommandName {
 	Validate,
 	Diff,
 	Discover,
+	MapInspect,
+	MapScan,
 	Sign,
 	Edit,
 	Export,

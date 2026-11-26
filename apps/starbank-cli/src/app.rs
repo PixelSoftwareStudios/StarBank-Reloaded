@@ -9,6 +9,7 @@ use crate::{
 	diff::BankDiff,
 	discovery::discover,
 	failure::{ErrorCode, Failure, Status},
+	map,
 	output::{self, CommandName},
 	write_bank::{self, Operation, Target},
 };
@@ -96,6 +97,7 @@ fn execute(command: Command, json: bool) -> Result<Status, Failure> {
 			write_bank::write(bank, target, Operation::Export(signing), json)
 		}
 		Command::Backup { command } => backup_command::run(command, json),
+		Command::Map { command } => map::run(command, json),
 		Command::Discover { root } => {
 			let discovery = discover(root.as_deref())?;
 			let report = discovery.report();
