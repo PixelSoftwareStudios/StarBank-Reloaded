@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { BankEditor, type EditorSettings } from "./bank-editor";
 import {
   fileDropHandlers,
@@ -13,11 +13,13 @@ export function EditorPane({
   controller,
   settings,
   onOpenSettings,
+  tools,
 }: {
   name: string;
   controller: BankEditorController;
   settings?: EditorSettings;
   onOpenSettings?: () => void;
+  tools?: ReactNode;
 }) {
   const running = useRef(false);
   const [working, setWorking] = useState(false);
@@ -59,6 +61,7 @@ export function EditorPane({
         run={run}
         settings={settings}
         onOpenSettings={onOpenSettings}
+        tools={tools}
       />
     );
   }
@@ -71,6 +74,7 @@ export function EditorPane({
       <h1 className="text-[1.75rem] leading-tight font-semibold">{name}</h1>
       <div className="editor-open-actions">
         <OpenBankButton controller={controller} disabled={busy} run={run} />
+        {tools}
         <SettingsButton open={onOpenSettings} />
       </div>
       <p className="empty-message" role="status">

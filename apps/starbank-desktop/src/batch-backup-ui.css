@@ -1,0 +1,110 @@
+.batch-backup-tools {
+  display: inline-flex;
+}
+
+.batch-backup-menu {
+  max-inline-size: 17rem;
+}
+
+.batch-backup-unavailable {
+  padding: 0.3rem 0.5rem;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.batch-backup-dialog {
+  box-sizing: border-box;
+  inline-size: min(32rem, calc(100% - 1.5rem));
+  max-block-size: calc(100dvh - 1.5rem);
+  margin: auto;
+  overflow: auto;
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: var(--map-pane-bg);
+  color: var(--shell-fg);
+  font-size: 0.875rem;
+}
+
+.batch-backup-dialog[open] {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.batch-backup-dialog::backdrop {
+  background: rgb(0 0 0 / 48%);
+}
+
+.batch-backup-dialog h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.batch-backup-placement {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.batch-backup-dialog select,
+.batch-backup-dialog button {
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--map-field-bg);
+  color: var(--shell-fg);
+}
+
+.batch-backup-dialog button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.batch-backup-dialog :where(button, select):focus-visible {
+  outline: 2px solid var(--map-focus);
+  outline-offset: -2px;
+}
+
+.batch-backup-actions,
+.batch-backup-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.batch-backup-pagination p {
+  margin-inline-end: auto;
+}
+
+.batch-backup-report {
+  max-block-size: min(46dvh, 16rem);
+  overflow: auto;
+}
+
+.batch-backup-report table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.batch-backup-report td,
+.batch-backup-report th {
+  border-block-end: 1px solid var(--shell-divider);
+  padding: 0.3rem;
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.batch-backup-report thead {
+  position: sticky;
+  top: 0;
+  background: var(--map-pane-bg);
+}
+
+.batch-backup-report small {
+  display: block;
+  color: var(--shell-muted);
+}

@@ -18,9 +18,11 @@ import type {
   EditorTarget,
 } from "@starbank/ui";
 import { AppShell } from "@starbank/ui";
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BackupPicker } from "./backup-picker";
+import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
 import {
   type ManualSigningPrompt,
   ManualSigningSheet,
@@ -94,11 +96,11 @@ function DesktopApp() {
     return `desktop-${nextRequest.current}`;
   }
 
-  async function action(
-    run: () => Promise<EditorActionResult>,
-  ): Promise<EditorActionResult> {
+  async function exclusive<Result>(
+    run: () => Promise<Result>,
+  ): Promise<Result> {
     if (inProgress.current) {
-      return { ok: false, message: "A bank operation is already in progress." };
+      throw new Error("A bank operation is already in progress.");
     }
     inProgress.current = true;
     setNativeNotice(undefined);
@@ -112,10 +114,20 @@ function DesktopApp() {
       ) {
         setOverwriteAvailable(false);
       }
-      return { ok: false, message: messageFor(error) };
+      throw error;
     } finally {
       inProgress.current = false;
       setBusy(false);
+    }
+  }
+
+  async function action(
+    run: () => Promise<EditorActionResult>,
+  ): Promise<EditorActionResult> {
+    try {
+      return await exclusive(run);
+    } catch (error) {
+      return { ok: false, message: messageFor(error) };
     }
   }
 
@@ -260,6 +272,11 @@ function DesktopApp() {
       );
     },
   });
+
+  const selectedMap =
+    inventory.status === "ready"
+      ? inventory.maps.find(({ id }) => id === inventory.selectedMapId)
+      : undefined;
 
   function save(target: EditorTarget, mode: "overwrite" | "backup" | "new") {
     return action(async () => {
@@ -484,6 +501,33 @@ function DesktopApp() {
         editor={controller}
         inventory={inventory}
         preferences={preferences}
+        tools={
+          <BatchBackupTools
+            availability={
+              !exportAvailable
+                ? {
+                    kind: "unavailable",
+                    reason: "Batch backup is unavailable on this platform.",
+                  }
+                : inventory.status === "ready" &&
+                    inventory.bankBrowser?.banks.length
+                  ? { kind: "ready", selectedMap }
+                  : {
+                      kind: "unavailable",
+                      reason: "Load a bank inventory to use batch backup.",
+                    }
+            }
+            onStart={(request) =>
+              exclusive(() =>
+                invoke<BatchBackupReport | null>("create_batch_backup", {
+                  scope: request.scope,
+                  placement: request.placement,
+                }),
+              )
+            }
+            onCancel={() => invoke<void>("cancel_batch_backup")}
+          />
+        }
         workspaceAccessory={
           <OpenRequests
             busy={busy}

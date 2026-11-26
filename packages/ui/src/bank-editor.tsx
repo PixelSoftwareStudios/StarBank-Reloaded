@@ -1,7 +1,7 @@
 import { Tabs } from "@heroui/react/tabs";
 import type { EngineDiff } from "@starbank/engine-client/protocol";
 import type { AppSettings } from "@starbank/platform/settings";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { BankRevealButton } from "./bank-reveal-button";
 import {
   EditorActions,
@@ -75,6 +75,7 @@ export function BankEditor({
   run,
   settings,
   onOpenSettings,
+  tools,
 }: {
   controller: BankEditorController;
   document: BankEditorDocument;
@@ -84,6 +85,7 @@ export function BankEditor({
   run: RunEditorAction;
   settings?: EditorSettings;
   onOpenSettings?: () => void;
+  tools?: ReactNode;
 }) {
   const [draft, setDraft] = useState<EditorDraft>();
   const [profileDraft, setProfileDraft] = useState<EditorProfileDraft>();
@@ -227,6 +229,7 @@ export function BankEditor({
             busy={pending}
             run={run}
           />
+          {tools}
           <SettingsButton open={onOpenSettings} />
         </div>
         <h1 title={document.name}>{document.name}</h1>

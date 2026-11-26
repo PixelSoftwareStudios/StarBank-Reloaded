@@ -43,6 +43,7 @@ export function AppShell({
   editor,
   preferences,
   workspaceAccessory,
+  tools,
 }: {
   name: string;
   inventory?: MapInventory;
@@ -50,6 +51,7 @@ export function AppShell({
   editor?: BankEditorController;
   preferences?: PreferencesController;
   workspaceAccessory?: ReactNode;
+  tools?: ReactNode;
 }) {
   const mapPaneId = useId();
   const [mapPaneWidth, setMapPaneWidth] = useState<number>(
@@ -112,6 +114,7 @@ export function AppShell({
               controller={editor}
               settings={settings}
               onOpenSettings={onOpenSettings}
+              tools={tools}
             />
           ) : (
             <div className="editor-welcome">
@@ -165,6 +168,7 @@ export function AppShell({
   );
 }
 
+export { Dropdown } from "@heroui/react/dropdown";
 export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
 export {
   type BankEditorController,
