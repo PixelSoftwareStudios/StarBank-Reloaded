@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/adapters/starbank-mpq",
     "crates/discovery/starbank-paths",
     "crates/domain/starbank-backup",
     "crates/domain/starbank-editor",
@@ -35,6 +36,10 @@ sha1 = { version = "=0.11.0", default-features = false }
 
 # File and backup integrity
 sha2 = { version = "=0.11.1", default-features = false }
+
+# Local map metadata
+flate2 = { version = "=1.1.11", default-features = false, features = ["rust_backend"] }
+stormlib-rs = { version = "=0.0.3", default-features = false }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
