@@ -1,8 +1,24 @@
-import { Separator } from "@heroui/react/separator";
+import { type CSSProperties, useId, useState } from "react";
+import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
+import { DEFAULT_MAP_PANE_WIDTH, SidebarSplitter } from "./sidebar-splitter";
 
-export function AppShell({ name }: { name: string }) {
+const NO_INVENTORY: MapInventory = { status: "unavailable" };
+
+export function AppShell({
+  name,
+  inventory = NO_INVENTORY,
+  mapOptions,
+}: {
+  name: string;
+  inventory?: MapInventory;
+  mapOptions?: MapOptions;
+}) {
+  const mapPaneId = useId();
+  const [mapPaneWidth, setMapPaneWidth] = useState(DEFAULT_MAP_PANE_WIDTH);
+  const style = { "--map-pane-width": `${mapPaneWidth}%` } as CSSProperties;
+
   return (
-    <div className="starbank-shell">
+    <div className="starbank-shell" style={style}>
       <main className="bank-workspace grid min-w-0 place-items-center px-6 py-8 text-center">
         <div>
           <h1 className="text-[1.75rem] leading-tight font-semibold">{name}</h1>
@@ -12,16 +28,20 @@ export function AppShell({ name }: { name: string }) {
         </div>
       </main>
 
-      <aside
-        className="map-pane min-w-0 p-3.5"
-        aria-labelledby="map-list-title"
-      >
-        <h2 className="text-sm font-semibold" id="map-list-title">
-          Map List
-        </h2>
-        <Separator className="my-2.5" isDecorative />
-        <p className="empty-message text-sm">No maps loaded.</p>
-      </aside>
+      <SidebarSplitter
+        controls={mapPaneId}
+        percent={mapPaneWidth}
+        onResize={setMapPaneWidth}
+      />
+      <MapSidebar id={mapPaneId} inventory={inventory} options={mapOptions} />
     </div>
   );
 }
+
+export {
+  filterMaps,
+  type MapFilters,
+  type MapInventory,
+  type MapListItem,
+  type MapOptions,
+} from "./map-sidebar";
