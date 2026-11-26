@@ -33,26 +33,36 @@ const contentTypes = {
   ".css": "text/css",
   ".wasm": "application/wasm",
 };
-const csp = [
-  "default-src 'none'",
-  "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self'",
-  "worker-src 'self'",
-  "img-src 'self' data:",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join("; ");
+const mountPath = "/starbank/";
 
 async function startServer() {
+  const [rule, ...headerLines] = (
+    await readFile(join(dist, "_headers"), "utf8")
+  )
+    .trimEnd()
+    .split(/\r?\n/);
+  assert.equal(rule, "/*");
+  const staticHeaders = Object.fromEntries(
+    headerLines.map((line) => {
+      const header = /^\s+([^:]+): (.+)$/.exec(line);
+      assert(header, `Malformed static header ${line}`);
+      return [header[1], header[2]];
+    }),
+  );
+  assert(staticHeaders["Content-Security-Policy"]);
+
   const requests = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     requests.push([request.method, url.pathname]);
-    const file = resolve(
-      join(dist, url.pathname === "/" ? "index.html" : url.pathname),
-    );
-    if (request.method !== "GET" || !file.startsWith(resolve(dist) + sep)) {
+    const asset = url.pathname.slice(mountPath.length) || "index.html";
+    const file = resolve(join(dist, asset));
+    if (
+      request.method !== "GET" ||
+      !url.pathname.startsWith(mountPath) ||
+      !file.startsWith(resolve(dist) + sep) ||
+      asset === "_headers"
+    ) {
       response.writeHead(404).end();
       return;
     }
@@ -60,8 +70,8 @@ async function startServer() {
       const data = await readFile(file);
       response
         .writeHead(200, {
+          ...staticHeaders,
           "Cache-Control": "no-store",
-          "Content-Security-Policy": csp,
           "Content-Type":
             contentTypes[extname(file)] ?? "application/octet-stream",
         })
@@ -74,8 +84,10 @@ async function startServer() {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolveListen);
   });
+  const origin = `http://127.0.0.1:${server.address().port}`;
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    origin,
+    url: `${origin}${mountPath}`,
     requests,
     stop: async () => {
       if (!server.listening) return;
@@ -368,7 +380,7 @@ async function verify(name) {
     const windowedPage = await context.newPage();
     try {
       await windowedPage.setViewportSize(viewport);
-      await windowedPage.goto(server.origin);
+      await windowedPage.goto(server.url);
       const { initialRows, scrolledRows } = await verifyWindowedTable(
         windowedPage,
         bankPicker(windowedPage),
@@ -381,7 +393,7 @@ async function verify(name) {
     }
 
     const page = await context.newPage();
-    await page.goto(server.origin);
+    await page.goto(server.url);
     await page.getByRole("button", { name: "Open Bank…" }).waitFor();
     await verifyPreferences(page);
     assert(
