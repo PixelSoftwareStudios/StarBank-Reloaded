@@ -20,6 +20,12 @@ The macOS test harness also launched and terminated a child writer with `SIGKILL
 
 These cases cover observable effects of process termination while the operating system remains running. They do not simulate filesystem system-call failures directly, certify power-loss ordering or provide an automatic rollback decision. The helper test is ignored during ordinary discovery and runs directly as the child process in the qualification case.
 
+### Native short-write failure
+
+A child-only `RLIMIT_FSIZE` fixture on macOS APFS used an 8 KiB buffer and ignored `SIGXFSZ`. The control write advanced by 1 KiB before the retry returned `EFBIG`. The public adapter returned the same native error while writing the stage for both Create New and Replace Expected. The parent verified the opened fingerprint and bytes, the absence of the new destination, and removal of the partial stages. A subsequent verified create confirmed that the directory lease was available. The fixture uses small disposable files and leaves the host's file-size limits unchanged. [Apple resource limits](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/setrlimit.2.html) [Apple write errors](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/write.2.html)
+
+This is an observed kernel write failure. Disk exhaustion, device sync errors, and power-loss ordering require separate evidence.
+
 The earlier host probe used the same APFS type to verify the Darwin interfaces. The current tests exercise the product adapter with the configured writer synchronization, while the late-conflict fixture deliberately ignores the cooperative lease.
 
 ```sh
