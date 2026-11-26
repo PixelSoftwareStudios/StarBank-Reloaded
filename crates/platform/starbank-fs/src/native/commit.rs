@@ -26,10 +26,17 @@ pub fn commit(
 	intent: CommitIntent<'_>,
 	max_bytes: usize,
 ) -> CommitOutcome {
-	match try_commit(path, bytes, intent, max_bytes, || Ok(())) {
+	match try_commit(path, bytes, intent, max_bytes, |_| Ok(())) {
 		Ok(outcome) => outcome,
 		Err(error) => CommitOutcome::RejectedUnchanged(error),
 	}
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CommitPhase {
+	Staged,
+	Published,
+	DirectorySynced,
 }
 
 fn try_commit(
@@ -37,7 +44,7 @@ fn try_commit(
 	bytes: &[u8],
 	intent: CommitIntent<'_>,
 	max_bytes: usize,
-	before_publish: impl FnOnce() -> Result<(), StorageError>,
+	mut checkpoint: impl FnMut(CommitPhase) -> Result<(), StorageError>,
 ) -> Result<CommitOutcome, StorageError> {
 	if bytes.len() > max_bytes {
 		return Err(StorageError::TooLarge { max_bytes });
@@ -86,7 +93,7 @@ fn try_commit(
 	};
 	#[cfg(target_os = "macos")]
 	let flags = darwin::publication_flags(flags);
-	before_publish()?;
+	checkpoint(CommitPhase::Staged)?;
 	let publish = fs::renameat_with(
 		&destination.dir,
 		stage.name(),
@@ -106,6 +113,9 @@ fn try_commit(
 	}
 
 	let verified = (|| {
+		checkpoint(CommitPhase::Published)?;
+		sync(&destination.dir, "sync destination directory")?;
+		checkpoint(CommitPhase::DirectorySynced)?;
 		let fingerprint = verify(&destination, &staged, digest, max_bytes)?;
 		#[cfg(target_os = "macos")]
 		if let Some(original) = &original {
@@ -139,7 +149,6 @@ fn verify(
 	sha256: [u8; 32],
 	max_bytes: usize,
 ) -> Result<Fingerprint, StorageError> {
-	sync(&destination.dir, "sync destination directory")?;
 	let snapshot = destination.read_named(&destination.name, max_bytes)?;
 	let fingerprint = snapshot.fingerprint;
 	if fingerprint.observed.identity != staged.identity
@@ -234,42 +243,4 @@ impl<'expected> Original<'expected> {
 }
 
 #[cfg(all(test, target_os = "macos"))]
-mod tests {
-	use std::{fs, io};
-
-	use super::{CommitIntent, CommitOutcome, StorageError, try_commit};
-	use crate::read_snapshot;
-
-	#[test]
-	fn external_replacement_after_final_check_retains_both_versions() -> io::Result<()> {
-		const ORIGINAL: &[u8] = br#"<Bank version="1"/>"#;
-		const PREPARED: &[u8] = br#"<Bank version="2"/>"#;
-		const EXTERNAL: &[u8] = br#"<Bank version="3"/>"#;
-		const LIMIT: usize = 4096;
-		let temp = tempfile::TempDir::new()?;
-		let dir = temp.path().canonicalize()?;
-		let target = dir.join("Synthetic.SC2Bank");
-		let competing = dir.join("Competing.SC2Bank");
-		fs::write(&target, ORIGINAL)?;
-		fs::write(&competing, EXTERNAL)?;
-		let expected = read_snapshot(&target, LIMIT).expect("original file is observable");
-		let outcome = try_commit(
-			&target,
-			PREPARED,
-			CommitIntent::ReplaceExpected(expected.fingerprint()),
-			LIMIT,
-			|| {
-				fs::rename(&competing, &target)
-					.map_err(|error| StorageError::io("publish competing fixture", error))
-			},
-		)
-		.expect("late conflict must be reported as an outcome");
-		let CommitOutcome::CommitUncertain(issue) = outcome else {
-			panic!("expected an uncertain publication, got {outcome:?}");
-		};
-		assert!(matches!(issue.error(), StorageError::Conflict));
-		assert_eq!(fs::read(&target)?, PREPARED);
-		assert_eq!(fs::read(issue.recovery().path())?, EXTERNAL);
-		Ok(())
-	}
-}
+mod tests;

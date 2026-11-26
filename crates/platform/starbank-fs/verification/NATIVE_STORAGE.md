@@ -12,6 +12,14 @@ On macOS 14.7.2 build 23H311, local APFS, Rust 1.100.0, the native tests use dis
 - Replacement with preserved mode, extended ACL and custom extended attribute, with the original bytes retained at a sibling recovery path.
 - A separate native rename after the last expected-fingerprint check. The adapter reports an uncertain publication and retains the external writer's bytes at the sibling path.
 
+### Publication failures and process termination
+
+The APFS qualification added after `c078263` exercised three checkpoints around actual replacement. A pre-publication injected error returned a known rejection, preserved the opened fingerprint, and removed the owned staging file. Injected errors immediately after publication and after directory sync returned `CommitUncertain` and preserved the displaced bytes. An independent exclusive creator won a competing create. A writer that changed the destination between publication and read-back produced an uncertain result and retained the prior bytes.
+
+The macOS test harness also launched and terminated a child writer with `SIGKILL` after staging, after the native exchange, and after available directory sync. Before each termination an independent writer was refused by the held directory lease. After each termination the target and sibling contained the expected versions and a fresh writer acquired the released lease. The harness uses process pipes and a bounded handshake so the parent can confirm each checkpoint before sending the signal.
+
+These cases cover observable effects of process termination while the operating system remains running. They do not simulate filesystem system-call failures directly, certify power-loss ordering or provide an automatic rollback decision. The helper test is ignored during ordinary discovery and runs directly as the child process in the qualification case.
+
 The earlier host probe used the same APFS type to verify the Darwin interfaces. The current tests exercise the product adapter with the configured writer synchronization, while the late-conflict fixture deliberately ignores the cooperative lease.
 
 ```sh
@@ -19,6 +27,7 @@ tool_bin=$(dirname "$(rustup which --toolchain 1.100.0 rustc)")
 export PATH="$tool_bin:$PATH"
 cargo fmt --all -- --check
 cargo test -p starbank-fs --offline --locked
+cargo nextest run -p starbank-fs --offline --locked
 cargo clippy -p starbank-fs --all-targets --all-features --offline --locked -- -D warnings
 cargo doc -p starbank-fs --no-deps --offline --locked
 cargo check -p starbank-fs --offline --locked --target x86_64-pc-windows-msvc
@@ -33,13 +42,13 @@ The adapter walks directory components without following symlinks and uses direc
 
 The swap preserves a sibling copy even when the caller's retained backup policy is disabled. The receipt names the sibling on success. If a late writer changes the old target, the freshly published bytes may be visible and the displaced writer's version remains as recovery evidence. A post-publish verification or sync failure similarly requires inspection. Callers should not retry an uncertain attempt automatically or treat the sibling as a verified backup. The sibling may have moved during an uncertain exclusive create. No automatic rollback is implemented.
 
-Other filesystems on macOS, Windows native writes, crash and power-loss ordering, special metadata and native lock/share behavior require separate verification. Advisory locking only coordinates writers that honor it. Changing the directory binding or acting after the final fingerprint check can still affect the outcome. The adapter uses observations and recoverable publication so it does not report those ambiguous effects as ordinary retries. These tests do not certify WP-07, and no formal proof or power-loss claim is made.
+Other filesystems on macOS, Windows native writes, host crash and power-loss ordering, special metadata and native lock/share behavior require separate verification. Advisory locking only coordinates writers that honor it. Changing the directory binding or acting after the final fingerprint check can still affect the outcome. The adapter uses observations and recoverable publication so it does not report those ambiguous effects as ordinary retries. These tests do not certify WP-07, and no formal proof or power-loss claim is made.
 
 ## Windows snapshot qualification
 
 The Windows reader accepts ordinary files on a local drive whose opened root reports a local volume GUID path. It walks one component at a time through held directory handles. The open flags block reparse traversal and recall. Observed links, directory targets, alternate data stream syntax, UNC paths, device paths and offline attributes are refused. The leaf is opened for read sharing only, with no write/delete sharing. The reader checks the 128-bit file ID and volume serial number, directory ID, metadata and bounded bytes before issuing a SHA-256 fingerprint. Windows commit intents return an unsupported outcome before opening the destination.
 
-Rust 1.100.0 cross-Clippy compiled the Windows implementation and its test cases. It also passed the cross-target rustdoc build. The Mac host passed all ten existing native regression tests. Windows tests cover local reads, digest and size, identity changes, access under a competing open, hard links, path syntax, and rejected writes. The symbolic-link test requires Windows link-creation permission and runs separately. The Windows MSVC test link could not complete on the Mac host because the MSVC linker was unavailable. A native Windows runner with a local NTFS fixture remains necessary to execute these cases. Generic Wine results cannot qualify NTFS behavior.
+Rust 1.100.0 cross-Clippy compiled the Windows implementation and its test cases. It also passed the cross-target rustdoc build. The Mac host passed the existing native regression cases and the APFS qualification cases above. Windows tests cover local reads, digest and size, identity changes, access under a competing open, hard links, path syntax, and rejected writes. The symbolic-link test requires Windows link-creation permission and runs separately. The Windows MSVC test link could not complete on the Mac host because the MSVC linker was unavailable. A native Windows runner with a local NTFS fixture remains necessary to execute these cases. Generic Wine results cannot qualify NTFS behavior.
 
 ```sh
 cargo clippy -p starbank-fs --all-targets --offline --locked --target x86_64-pc-windows-msvc -- -D warnings
