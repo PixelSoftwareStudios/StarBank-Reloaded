@@ -280,6 +280,7 @@ export function BatchBackupTools({
             <Dropdown.Menu
               aria-label="Bank tools"
               disabledKeys={[
+                "map-repair",
                 ...(!onResignExternal ? ["resign"] : []),
                 ...(!ready ? ["all"] : []),
                 ...(!selectedMap ? ["map"] : []),
@@ -295,10 +296,16 @@ export function BatchBackupTools({
                   );
               }}
             >
+              <Dropdown.Item id="map-repair">
+                Unprotect external map file…
+              </Dropdown.Item>
               <Dropdown.Item id="resign">Re-sign external bank…</Dropdown.Item>
               <Dropdown.Item id="all">Back up all bank files</Dropdown.Item>
               <Dropdown.Item id="map">Back up selected map</Dropdown.Item>
             </Dropdown.Menu>
+            <p className="batch-backup-unavailable">
+              Map repair is unavailable until archive writes are qualified.
+            </p>
             {externalSigningUnavailable && (
               <p className="batch-backup-unavailable">
                 {externalSigningUnavailable}
