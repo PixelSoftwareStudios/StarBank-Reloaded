@@ -322,8 +322,9 @@ fn scan_reports_partial_results_and_never_writes_a_cache() {
 	let result = &report["result"];
 	assert_eq!(result["incomplete"], true);
 	let maps = result["maps"].as_array().expect("valid map results");
-	assert_eq!(maps.len(), 2);
+	assert_eq!(maps.len(), 3);
 	assert!(maps.iter().any(|map| map["title"] == "Fixture Alpha"));
+	assert!(maps.iter().any(|map| map["title"] == "Synthetic – alpha"));
 	let issues = result["issues"].as_array().expect("typed diagnostics");
 	assert_eq!(issues.len(), 1);
 	assert_eq!(issues[0]["error"]["code"], "unsupported_map_archive");
@@ -343,18 +344,18 @@ fn scan_reports_partial_results_and_never_writes_a_cache() {
 #[test]
 fn scan_uses_a_nonzero_status_when_every_selected_archive_fails() {
 	let fixture = Fixture::new();
-	let unsupported = fixture.write("Unsupported.SC2Map", UNSUPPORTED_ARCHIVE);
+	let malformed = fixture.write("Malformed.SC2Map", b"MPQ\x1a");
 	let output = map("scan")
 		.arg("--root")
-		.arg(&unsupported)
+		.arg(&malformed)
 		.output()
 		.expect("report the archive failure");
-	let report = json(&output, 7);
+	let report = json(&output, 3);
 	assert_eq!(report["command"], "map_scan");
 	assert_eq!(report["result"]["incomplete"], true);
 	assert_eq!(report["result"]["maps"], serde_json::json!([]));
 	assert_eq!(
 		report["result"]["issues"][0]["error"]["code"],
-		"unsupported_map_archive"
+		"invalid_map_archive"
 	);
 }
