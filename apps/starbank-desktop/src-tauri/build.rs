@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"discard_external_signing_source",
 			"can_reveal_bank",
 			"reveal_active_bank",
-			"confirm_discard_bank",
+			"confirm_bank_navigation",
 			"save_active_bank",
 			"save_bank_as",
 			"list_active_backups",

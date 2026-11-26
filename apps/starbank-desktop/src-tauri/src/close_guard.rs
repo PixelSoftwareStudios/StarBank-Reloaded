@@ -324,6 +324,20 @@ async fn ask(window: &WebviewWindow, dirty: bool, has_draft: bool, can_save: boo
 	} else {
 		"The current bank has unsaved changes."
 	};
+	let title = if offer_save {
+		"Save changes before closing?"
+	} else {
+		"Discard changes and close?"
+	};
+	ask_unsaved(window, title, description, offer_save).await
+}
+
+pub(crate) async fn ask_unsaved(
+	window: &WebviewWindow,
+	title: &str,
+	description: &str,
+	offer_save: bool,
+) -> CloseChoice {
 	let buttons = if offer_save {
 		MessageButtons::YesNoCancelCustom(
 			SAVE_LABEL.into(),
@@ -335,11 +349,7 @@ async fn ask(window: &WebviewWindow, dirty: bool, has_draft: bool, can_save: boo
 	};
 	let prompt = AsyncMessageDialog::new()
 		.set_parent(window)
-		.set_title(if offer_save {
-			"Save changes before closing?"
-		} else {
-			"Discard changes and close?"
-		})
+		.set_title(title)
 		.set_description(description)
 		.set_level(MessageLevel::Warning)
 		.set_buttons(buttons);

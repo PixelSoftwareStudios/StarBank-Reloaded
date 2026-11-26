@@ -46,7 +46,7 @@ import type {
 import {
   canExportBank,
   canRevealBank,
-  confirmDiscardBank,
+  confirmBankNavigation,
   decodeBankXml,
   dispatchBank,
   encodeBankXml,
@@ -282,11 +282,6 @@ function DesktopApp() {
     };
   }
 
-  async function confirmNativeReplacement(): Promise<boolean> {
-    const current = document?.projection;
-    return !current?.dirty || confirmDiscardBank(activeTarget(current));
-  }
-
   function openFrom(source: OpenBankSource, bankId?: string) {
     return action(async () => {
       if (hasDraft) {
@@ -295,11 +290,26 @@ function DesktopApp() {
           message: "Apply or discard the current draft first.",
         };
       }
-      if (!(await confirmNativeReplacement())) return { ok: true };
-      const id = requestId();
+      let discardRequestId: string | undefined;
+      const current = document?.projection;
+      if (current?.dirty) {
+        const mode = overwriteAvailable
+          ? "overwrite"
+          : exportAvailable
+            ? "new"
+            : undefined;
+        const target = activeTarget(current);
+        const choice = await confirmBankNavigation(target, mode !== undefined);
+        if (choice === "discard") discardRequestId = target.requestId;
+        else if (choice === "save" && mode) {
+          const saved = await saveCurrent(current, mode);
+          if (!saved.ok || !saved.message) return saved;
+        } else return { ok: true };
+      }
+      const id = discardRequestId ?? requestId();
       const control = engineRequest(
         id,
-        document?.projection.dirty
+        discardRequestId
           ? { kind: "open", payload: { discard_current: true } }
           : { kind: "open" },
       );
@@ -342,29 +352,34 @@ function DesktopApp() {
       : inventory;
 
   function save(target: EditorTarget, mode: "overwrite" | "backup" | "new") {
-    return action(async () => {
-      const nativeTarget = activeTarget(target);
-      const saved =
-        mode === "new"
-          ? await saveBankAs(nativeTarget)
-          : await saveActiveBank(nativeTarget, mode === "backup");
-      if (!saved) return { ok: true };
-      await adopt(
-        saved.name,
-        decodeEngineReply(saved.control, nativeTarget.requestId),
-        saved.breadcrumbs,
-      );
-      setOverwriteAvailable(saved.can_overwrite === true);
-      if (mode === "new") setSelectedBankId(undefined);
-      else setBackupGeneration((value) => value + 1);
-      return {
-        ok: true,
-        message:
-          mode === "backup"
-            ? `Saved ${saved.name} with a backup.`
-            : `Saved ${saved.name}.`,
-      };
-    });
+    return action(() => saveCurrent(target, mode));
+  }
+
+  async function saveCurrent(
+    target: EditorTarget,
+    mode: "overwrite" | "backup" | "new",
+  ): Promise<EditorActionResult> {
+    const nativeTarget = activeTarget(target);
+    const saved =
+      mode === "new"
+        ? await saveBankAs(nativeTarget)
+        : await saveActiveBank(nativeTarget, mode === "backup");
+    if (!saved) return { ok: true };
+    await adopt(
+      saved.name,
+      decodeEngineReply(saved.control, nativeTarget.requestId),
+      saved.breadcrumbs,
+    );
+    setOverwriteAvailable(saved.can_overwrite === true);
+    if (mode === "new") setSelectedBankId(undefined);
+    else setBackupGeneration((value) => value + 1);
+    return {
+      ok: true,
+      message:
+        mode === "backup"
+          ? `Saved ${saved.name} with a backup.`
+          : `Saved ${saved.name}.`,
+    };
   }
 
   function browseBackups(target: EditorTarget) {

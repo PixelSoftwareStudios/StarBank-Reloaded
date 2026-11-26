@@ -58,7 +58,19 @@ fn dirty_open_requires_in_scope_one_use_native_consent() -> io::Result<()> {
 		.expect("edited target");
 	assert!(active.dirty);
 
-	for permit in [None, Some((opening.document_id, opening.revision))] {
+	for permit in [
+		None,
+		Some(DiscardPermit {
+			request_id: "open".into(),
+			document_id: opening.document_id,
+			revision: opening.revision,
+		}),
+		Some(DiscardPermit {
+			request_id: "older-open".into(),
+			document_id: active.document_id.clone(),
+			revision: active.revision,
+		}),
+	] {
 		session.discard = permit;
 		let open = session
 			.open_path(DISCARD, &replacement)
@@ -71,7 +83,11 @@ fn dirty_open_requires_in_scope_one_use_native_consent() -> io::Result<()> {
 		assert!(session.discard.is_none());
 	}
 
-	session.discard = Some((active.document_id.clone(), active.revision));
+	session.discard = Some(DiscardPermit {
+		request_id: "open".into(),
+		document_id: active.document_id,
+		revision: active.revision,
+	});
 	let open = session
 		.open_path(DISCARD, &replacement)
 		.expect("authorized replacement");

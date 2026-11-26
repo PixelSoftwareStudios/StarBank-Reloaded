@@ -92,7 +92,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::external_sign::discard_external_signing_source,
 			crate::reveal::can_reveal_bank,
 			crate::reveal::reveal_active_bank,
-			crate::save::confirm_discard_bank,
+			crate::save::navigation::confirm_bank_navigation,
 			crate::save::save_active_bank,
 			crate::save::save_bank_as,
 			crate::backup::list_active_backups,

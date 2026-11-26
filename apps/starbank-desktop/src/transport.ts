@@ -144,8 +144,14 @@ export interface BackupChoices {
   unavailableLocations: number;
 }
 
-export function confirmDiscardBank(target: ActiveBankTarget): Promise<boolean> {
-  return invoke<boolean>("confirm_discard_bank", { target });
+export function confirmBankNavigation(
+  target: ActiveBankTarget,
+  canSave: boolean,
+) {
+  return invoke<"save" | "discard" | "cancel">("confirm_bank_navigation", {
+    target,
+    canSave,
+  });
 }
 
 export function saveActiveBank(

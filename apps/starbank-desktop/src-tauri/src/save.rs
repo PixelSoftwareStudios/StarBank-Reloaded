@@ -15,7 +15,10 @@ use crate::commands::{CommandError, DesktopEngine, OpenedBank, is_request};
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name, destination_context};
 use crate::settings::{AutomaticBackup, SettingsStore};
 
+pub(crate) mod navigation;
 mod open;
+
+use navigation::DiscardPermit;
 
 #[cfg(test)]
 mod tests;
@@ -30,7 +33,7 @@ pub(crate) struct DesktopSession {
 	pub(crate) selected: Option<SelectedBank>,
 	pub(crate) backups: Option<NativeBackupCatalog>,
 	pub(crate) backup_selection: Option<backup::BackupSelection>,
-	discard: Option<(String, Revision)>,
+	discard: Option<DiscardPermit>,
 }
 
 pub(crate) struct SelectedBank {
@@ -140,33 +143,6 @@ impl DesktopSession {
 				&& starbank_fs::check_replace_scope(path).is_ok(),
 		})
 	}
-}
-
-#[tauri::command]
-pub(crate) async fn confirm_discard_bank(
-	window: WebviewWindow,
-	state: State<'_, DesktopEngine>,
-	target: ActiveTarget,
-) -> Result<bool, CommandError> {
-	let _dialog = state.dialog()?;
-	let expected = {
-		let session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-		let (_, expected) = session.selected_for(&target)?;
-		expected
-	};
-	if !confirm(
-		&window,
-		"Discard unsaved bank changes?",
-		"Opening a different bank will discard the changes in this editor.",
-	)
-	.await
-	{
-		return Ok(false);
-	}
-	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-	let _selection = session.selected_for(&target)?;
-	session.discard = Some((target.document_id, expected));
-	Ok(true)
 }
 
 #[tauri::command]

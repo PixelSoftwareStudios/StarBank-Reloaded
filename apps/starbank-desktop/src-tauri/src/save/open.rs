@@ -44,12 +44,12 @@ impl DesktopSession {
 		}
 		let request: OpenControl =
 			serde_json::from_str(control).map_err(|_| CommandError::InvalidControl)?;
-		let discard_current = self.discard.take().is_some_and(|(id, revision)| {
+		let discard_current = self.discard.take().is_some_and(|permit| {
 			request.command.payload.discard_current
-				&& self
-					.editor
-					.native_active_target()
-					.is_some_and(|active| active.document_id == id && active.revision == revision)
+				&& request.request_id == permit.request_id
+				&& self.editor.native_active_target().is_some_and(|active| {
+					active.document_id == permit.document_id && active.revision == permit.revision
+				})
 		});
 		let (name, observed) =
 			selection::read_bank(path, Limits::default()).map_err(CommandError::File)?;

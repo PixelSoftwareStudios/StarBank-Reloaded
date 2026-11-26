@@ -20,7 +20,7 @@
     "allow-discard-external-signing-source",
     "allow-can-reveal-bank",
     "allow-reveal-active-bank",
-    "allow-confirm-discard-bank",
+    "allow-confirm-bank-navigation",
     "allow-save-active-bank",
     "allow-save-bank-as",
     "allow-list-active-backups",
