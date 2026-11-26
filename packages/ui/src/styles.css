@@ -12,6 +12,8 @@
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "./editor.css";
 
+@import "./inventory-browser.css";
+
 @source "./";
 
 :root {

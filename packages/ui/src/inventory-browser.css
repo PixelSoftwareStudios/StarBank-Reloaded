@@ -1,0 +1,158 @@
+.inventory-actions,
+.inventory-bank-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.inventory-actions {
+  margin-block-start: 0.5rem;
+}
+
+.inventory-root,
+.inventory-map-context {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--shell-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+
+.inventory-root {
+  flex-basis: 100%;
+}
+
+.inventory-actions button,
+.inventory-bank-filters button,
+.inventory-more {
+  border: 1px solid var(--shell-divider);
+  border-radius: 0.25rem;
+  background: var(--map-field-bg);
+  padding: 0.2rem 0.45rem;
+  color: var(--shell-fg);
+  font-size: 0.8125rem;
+}
+
+.inventory-bank-list button {
+  display: block;
+  width: 100%;
+  border-radius: 0.25rem;
+  padding: 0.3rem 0.45rem;
+  text-align: start;
+  font-size: 0.875rem;
+}
+
+.inventory-actions button:hover:where(:not(:disabled)),
+.inventory-bank-filters button:hover,
+.inventory-more:hover {
+  border-color: var(--map-focus);
+}
+
+.inventory-actions button:disabled,
+.inventory-bank-list button:disabled {
+  color: var(--shell-muted);
+  cursor: not-allowed;
+}
+
+.inventory-actions button:focus-visible,
+.inventory-bank-filters button:focus-visible,
+.inventory-bank-list button:focus-visible,
+.inventory-more:focus-visible {
+  outline: 2px solid var(--map-focus);
+  outline-offset: -2px;
+}
+
+.inventory-bank-filters button[aria-pressed="true"] {
+  background: var(--map-selected-bg);
+  font-weight: 600;
+}
+
+.inventory-maps,
+.inventory-map-bank,
+.inventory-banks {
+  min-height: 0;
+  overflow: auto;
+}
+
+.inventory-map-bank {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.inventory-banks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-block-start: 1px solid var(--shell-divider);
+  padding-block-start: 0.5rem;
+}
+
+.inventory-banks > :not(.inventory-bank-list) {
+  flex-shrink: 0;
+}
+
+.inventory-bank-list {
+  min-height: 0;
+  max-height: 28dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.inventory-bank-list button:hover:where(:not(:disabled)) {
+  background: var(--map-hover-bg);
+}
+
+.inventory-bank-list button[aria-current="true"] {
+  background: var(--map-selected-bg);
+}
+
+.inventory-map-author,
+.inventory-bank-name,
+.inventory-bank-scope,
+.inventory-bank-match {
+  display: block;
+}
+
+.inventory-map-author,
+.inventory-bank-scope,
+.inventory-bank-match {
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.inventory-bank-name,
+.inventory-bank-scope {
+  overflow-wrap: anywhere;
+}
+
+.inventory-notice {
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.inventory-progress {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.inventory-progress progress {
+  width: 100%;
+  accent-color: var(--map-focus);
+}
+
+@media (min-width: 42rem) {
+  .inventory-maps > .map-list {
+    height: 100%;
+  }
+
+  .inventory-map-bank {
+    grid-template-rows: minmax(3rem, 2fr) minmax(7rem, 3fr);
+  }
+
+  .inventory-bank-list {
+    max-height: none;
+  }
+}
