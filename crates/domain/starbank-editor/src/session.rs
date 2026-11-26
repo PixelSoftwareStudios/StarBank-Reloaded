@@ -175,11 +175,18 @@ impl Session {
 				value: text.as_ref(),
 			})
 			.collect();
+		self.commit_value_edits(&edits)
+	}
+
+	pub(crate) fn commit_value_edits(
+		&mut self,
+		edits: &[ValueEdit<'_>],
+	) -> Result<Revision, EditorError> {
 		if edits.is_empty() {
 			return Ok(self.revision);
 		}
 		let bytes =
-			serialize(&self.document, &edits, self.limits).map_err(EditorError::Serialize)?;
+			serialize(&self.document, edits, self.limits).map_err(EditorError::Serialize)?;
 		if bytes == self.document.source() {
 			return Ok(self.revision);
 		}

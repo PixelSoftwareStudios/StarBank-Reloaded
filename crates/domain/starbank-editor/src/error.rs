@@ -3,7 +3,7 @@ use std::fmt;
 use sc2bank::{ParseError, SerializeError, StructuralEditError};
 use starbank_core::Revision;
 
-use crate::{LexemeError, OccurrenceId};
+use crate::{LexemeError, OccurrenceId, ProfileSessionError};
 
 /// A rejected editor operation. The current document remains unchanged.
 #[derive(Debug)]
@@ -62,6 +62,8 @@ pub enum EditorError {
 	InconsistentHistory,
 	/// The requested export could not be signed.
 	Signing(starbank_signature::ResignError),
+	/// A profile edit could not be matched or applied to the active session.
+	Profile(ProfileSessionError),
 	/// The save receipt belongs to a different open session.
 	WrongSession,
 }
@@ -99,6 +101,7 @@ impl fmt::Display for EditorError {
 				formatter.write_str("current document does not match its history")
 			}
 			Self::Signing(source) => source.fmt(formatter),
+			Self::Profile(source) => source.fmt(formatter),
 			Self::WrongSession => {
 				formatter.write_str("prepared export belongs to another document")
 			}
@@ -116,6 +119,7 @@ impl std::error::Error for EditorError {
 			Self::Parse(source) => Some(source),
 			Self::Serialize(source) => Some(source),
 			Self::Signing(source) => Some(source),
+			Self::Profile(source) => Some(source),
 			_ => None,
 		}
 	}
