@@ -6,6 +6,18 @@ repo_root=$(CDPATH= cd -- "$fuzz_dir/../../../.." && pwd)
 toolchain=nightly-2026-11-04
 expected_cargo_fuzz='cargo-fuzz 0.13.2'
 target=${1:-lossless}
+duration=${2-20}
+if [ "$#" -gt 2 ]; then
+    printf 'Usage: %s [lossless|structural] [seconds]\n' "$0" >&2
+    exit 2
+fi
+case "$duration" in
+    [1-9]|[1-9][0-9]|[1-5][0-9][0-9]|600) ;;
+    *)
+        printf 'Expected a fuzz duration of 1 to 600 seconds.\n' >&2
+        exit 2
+        ;;
+esac
 case "$target" in
     lossless|structural) ;;
     *)
@@ -66,13 +78,43 @@ if target == "structural":
                 (corpus_dir / filename).write_bytes(content)
                 generated += 1
     print(f"Generated {generated} structural seeds")
+else:
+    lexical = (
+        "\ufeff<?xml version='1.0' encoding='UTF-16'?>\r\n"
+        "<!--雪🙂--><Bank xmlns:x='urn:fixture'><Section name='雨'><Key name='K'>"
+        "<Value string='é &amp; &#x41; 🚀'/></Key></Section>"
+        "<x:Extra><![CDATA[untouched]]></x:Extra></Bank>"
+    )
+    generated = 0
+    for direction, byte_order in (("le", "little"), ("be", "big")):
+        codec = f"utf-16-{direction}"
+        bom = "\ufeff".encode(codec)
+        encoded = lexical.encode(codec)
+        specimens = {
+            "generic": encoded,
+            "explicit": lexical.replace(
+                "encoding='UTF-16'", f"encoding='UTF-16{direction.upper()}'"
+            ).encode(codec),
+            "odd": encoded[:-1],
+            "conflicting-label": lexical.replace(
+                "encoding='UTF-16'", "encoding='UTF-8'"
+            ).encode(codec),
+            "unpaired-high": bom + (0xD800).to_bytes(2, byte_order) + encoded[len(bom):],
+            "unpaired-low": bom + (0xDC00).to_bytes(2, byte_order) + encoded[len(bom):],
+        }
+        for label, content in specimens.items():
+            filename = f"utf16-{direction}-{label}.seed"
+            with (corpus_dir / filename).open("xb") as seed:
+                seed.write(content)
+            generated += 1
+    print(f"Generated {generated} raw UTF-16 seeds")
 PY
 
 status=0
 cargo "+$toolchain" fuzz run --fuzz-dir "$fuzz_dir" --features fuzzing \
     --target-dir "$repo_root/target/starbank-format-fuzz" --sanitizer address \
     "$target" "$run_dir/corpus" -- \
-    -seed=1 -max_len=4096 -len_control=0 -max_total_time=20 -rss_limit_mb=1024 -timeout=5 \
+    -seed=1 -max_len=4096 -len_control=0 -max_total_time="$duration" -rss_limit_mb=1024 -timeout=5 \
     -print_funcs=0 -print_final_stats=1 \
     "-artifact_prefix=$run_dir/artifacts/" || status=$?
 cmp Cargo.lock "$run_dir/Cargo.lock"

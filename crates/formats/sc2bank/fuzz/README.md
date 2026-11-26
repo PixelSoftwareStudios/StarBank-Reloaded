@@ -13,9 +13,11 @@ rustup toolchain install nightly-2026-11-04 --profile minimal
 cargo +1.100.0 install cargo-fuzz --version '=0.13.2' --locked
 sh crates/formats/sc2bank/fuzz/run.sh lossless
 sh crates/formats/sc2bank/fuzz/run.sh structural
+sh crates/formats/sc2bank/fuzz/run.sh lossless 90
+sh crates/formats/sc2bank/fuzz/run.sh structural 90
 ```
 
-The script defaults to `lossless`. It verifies each synthetic fixture against its manifest's byte count and SHA-256 before copying it to a fresh temporary corpus. The structural run adds 60 generated seeds covering both target variants of each operation in all three encodings. It uses a fixed libFuzzer seed, a 4,096-byte input cap, a 20-second fuzzing budget, a five-second per-input timeout, and a 1,024 MiB RSS cutoff. The scalar and structural targets use at most 256 and 96 input bytes per edit, respectively. LibFuzzer reports final counts and writes its generated corpus and any failure artifacts to the printed temporary directory. The harness uses the workspace lockfile and builds only with the explicit `fuzzing` feature.
+The script defaults to `lossless` and 20 seconds. Pass a duration from 1 to 600 seconds as the second argument. It verifies each synthetic fixture against its manifest's byte count and SHA-256 before copying it to a fresh temporary corpus. The scalar run adds 12 generated raw UTF-16 seeds covering both byte orders, generic and explicit declarations, odd lengths, unpaired surrogates and conflicting declarations. The structural run adds its 60 generated seeds covering both target variants of each operation in all three encodings. The script uses a fixed libFuzzer seed, a 4,096-byte input cap, a five-second per-input timeout, and a 1,024 MiB RSS cutoff. The scalar and structural targets use at most 256 and 96 input bytes per edit, respectively. LibFuzzer reports final counts and writes its generated corpus and any failure artifacts to the printed temporary directory. The harness uses the workspace lockfile and builds only with the explicit `fuzzing` feature.
 
 ## Recorded smoke
 
@@ -23,4 +25,8 @@ On November 26, 2026, the script ran against `b6c4a6ef56dde5ff5226f15026eff1a1d9
 
 On November 27, 2026, `run.sh structural` ran against `e2cf03533264146e23815f38f1353c2d5c829555` with the structural harness applied. On macOS 14.7.2 arm64, rustc `1.101.0-nightly (708c94ef0)`, cargo-fuzz 0.13.2 and libfuzzer-sys 0.4.13 completed 70,622 inputs in 21 seconds. The run loaded 70 synthetic seeds and reported 455 MiB peak RSS. It exited successfully with zero assertion failures, sanitizer reports or crash artifacts. The workspace lockfile was unchanged.
 
-Sustained runs and separate fuzz targets for the other formats remain pending.
+## Recorded 90-second runs
+
+On November 27, 2026, both unchanged targets ran from a clean archive of `3855597143f3d4c3677b01e1b953905a1f6fb38c` on macOS 14.7.2 arm64. The scratch runner used the same seeds and 90-second budgets as the commands above. AddressSanitizer and libFuzzer completed 267,922 scalar executions from 22 seeds and 271,068 structural executions from 70 seeds, each in 91 seconds. Both exited successfully with no assertion failure, sanitizer report or failure artifact. The workspace lockfile stayed byte-identical. Rustc `1.101.0-nightly (708c94ef0)`, cargo-fuzz 0.13.2 and libfuzzer-sys 0.4.13 were used.
+
+Longer sanitizer campaigns and targets for the other formats remain pending.
