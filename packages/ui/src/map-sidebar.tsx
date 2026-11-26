@@ -1,4 +1,3 @@
-import { Separator } from "@heroui/react/separator";
 import { useId, useMemo, useState } from "react";
 import {
   BankBrowser,
@@ -176,7 +175,7 @@ export function MapSidebar({
         <h2 className="text-sm font-semibold" id={titleId}>
           Map List
         </h2>
-        <Separator className="my-2.5" isDecorative />
+        <hr className="map-divider my-2.5" aria-hidden="true" />
         <label className="map-search">
           <span className="sr-only">Search maps</span>
           <input
@@ -281,7 +280,7 @@ export function MapSidebar({
       </div>
 
       <div className="map-options">
-        <Separator className="mb-2.5" isDecorative />
+        <hr className="map-divider mb-2.5" aria-hidden="true" />
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Quick Options</legend>
           <label>
