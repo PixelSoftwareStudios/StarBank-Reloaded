@@ -7,6 +7,7 @@ export interface BankListItem {
   name: string;
   mapIds: readonly string[];
   playerHandle?: string | null;
+  scopeId?: string | null;
   authorHandle?: string | null;
   displayPath?: string;
 }
@@ -30,17 +31,52 @@ export interface InventoryControls {
   onCancel?: () => void;
 }
 
+const ALL_ACCOUNTS = "";
+
+function scopeKey(bank: BankListItem) {
+  if (bank.scopeId) return `scope:${bank.scopeId}`;
+  if (bank.playerHandle) return `player:${bank.playerHandle}`;
+  return undefined;
+}
+
+export function bankScopeChoices(banks: readonly BankListItem[]) {
+  const scopes = new Map<string, string>();
+  for (const bank of banks) {
+    const key = scopeKey(bank);
+    if (key && !scopes.has(key))
+      scopes.set(key, bank.playerHandle || "Account");
+  }
+
+  const counts = new Map<string, number>();
+  for (const label of scopes.values()) {
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  const indexes = new Map<string, number>();
+  return Array.from(scopes, ([key, label]) => {
+    if ((counts.get(label) ?? 0) <= 1) return { key, label };
+    const next = (indexes.get(label) ?? 0) + 1;
+    indexes.set(label, next);
+    return { key, label: `${label} (${next})` };
+  });
+}
+
 export function filterBanks(
   banks: readonly BankListItem[],
   filter: BankFilter,
+  scope = ALL_ACCOUNTS,
 ) {
+  const inScope =
+    scope === ALL_ACCOUNTS
+      ? banks
+      : banks.filter((bank) => scopeKey(bank) === scope);
   switch (filter.kind) {
     case "all":
-      return banks;
+      return inScope;
     case "unmatched":
-      return banks.filter((bank) => bank.mapIds.length === 0);
+      return inScope.filter((bank) => bank.mapIds.length === 0);
     case "map":
-      return banks.filter((bank) => bank.mapIds.includes(filter.mapId));
+      return inScope.filter((bank) => bank.mapIds.includes(filter.mapId));
   }
 }
 
@@ -114,17 +150,44 @@ export function BankBrowser({
   model,
   filter,
   currentMapName,
+  selectedAccount,
+  onAccountChange,
   onFilterChange,
 }: {
   model: BankBrowserModel;
   filter: BankFilter;
   currentMapName?: string;
+  selectedAccount: string;
+  onAccountChange: (scope: string) => void;
   onFilterChange: (filter: "all" | "unmatched") => void;
 }) {
   const heading = "Banks";
+  const choices = useMemo(() => bankScopeChoices(model.banks), [model.banks]);
+  const account =
+    choices.length > 1 && choices.some(({ key }) => key === selectedAccount)
+      ? selectedAccount
+      : ALL_ACCOUNTS;
   return (
     <section className="inventory-banks" aria-label={heading}>
-      <h3 className="text-sm font-semibold">{heading}</h3>
+      <div className="inventory-bank-heading">
+        <h3 className="text-sm font-semibold">{heading}</h3>
+        {choices.length > 1 && (
+          <label className="inventory-account">
+            <span className="sr-only">Bank account or player</span>
+            <select
+              value={account}
+              onChange={(event) => onAccountChange(event.currentTarget.value)}
+            >
+              <option value={ALL_ACCOUNTS}>All accounts</option>
+              {choices.map(({ key, label }) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
       <fieldset className="inventory-bank-filters">
         <legend className="sr-only">Bank file filters</legend>
         <button
@@ -148,9 +211,10 @@ export function BankBrowser({
         </p>
       )}
       <BankList
-        key={filter.kind === "map" ? `map:${filter.mapId}` : filter.kind}
+        key={JSON.stringify([filter, account])}
         model={model}
         filter={filter}
+        account={account}
       />
     </section>
   );
@@ -159,22 +223,26 @@ export function BankBrowser({
 function BankList({
   model,
   filter,
+  account,
 }: {
   model: BankBrowserModel;
   filter: BankFilter;
+  account: string;
 }) {
   const [limit, setLimit] = useState(BANK_PAGE_SIZE);
   const banks = useMemo(
-    () => filterBanks(model.banks, filter),
-    [model.banks, filter],
+    () => filterBanks(model.banks, filter, account),
+    [model.banks, filter, account],
   );
   if (banks.length === 0) {
     const message =
-      filter.kind === "unmatched"
-        ? "No unmatched banks found."
-        : filter.kind === "map"
-          ? "No banks associated with this map."
-          : "No bank files found.";
+      account !== ALL_ACCOUNTS
+        ? "No banks match this account and filter."
+        : filter.kind === "unmatched"
+          ? "No unmatched banks found."
+          : filter.kind === "map"
+            ? "No banks associated with this map."
+            : "No bank files found.";
     return (
       <p className="empty-message text-sm" role="status">
         {message}
