@@ -8,8 +8,13 @@ import {
   useState,
 } from "react";
 
+import {
+  confirmWindowClose,
+  decodeCloseProbe,
+  MAX_NATIVE_U32,
+} from "./transport";
+
 const REQUEST_EVENT = "bank-close-requested";
-const MAX_GENERATION = 0xffff_ffff;
 
 interface CloseOptions {
   busy: boolean;
@@ -23,12 +28,6 @@ interface DraftState {
   hasDraft: boolean;
 }
 
-interface CloseProbe {
-  ticket: number;
-}
-
-type CloseChoice = "save" | "discard" | "cancel";
-
 export function useNativeCloseGuard(options: CloseOptions) {
   const current = useRef(options);
   const draft = useRef<DraftState>({ generation: 0, hasDraft: false });
@@ -41,7 +40,7 @@ export function useNativeCloseGuard(options: CloseOptions) {
 
   const reportDraft = useCallback((hasDraft: boolean) => {
     draft.current = {
-      generation: Math.min(draft.current.generation + 1, MAX_GENERATION),
+      generation: Math.min(draft.current.generation + 1, MAX_NATIVE_U32),
       hasDraft,
     };
     current.current.onDraft(hasDraft);
@@ -49,7 +48,7 @@ export function useNativeCloseGuard(options: CloseOptions) {
 
   useEffect(() => {
     let mounted = true;
-    const listening = listen<CloseProbe>(REQUEST_EVENT, ({ payload }) => {
+    const listening = listen<unknown>(REQUEST_EVENT, ({ payload }) => {
       if (!mounted || running.current) return;
       if (current.current.busy) {
         current.current.onNotice(
@@ -57,9 +56,9 @@ export function useNativeCloseGuard(options: CloseOptions) {
         );
         return;
       }
-      const { ticket } = payload;
-      if (!Number.isInteger(ticket) || ticket <= 0 || ticket > MAX_GENERATION)
-        return;
+      const probe = decodeCloseProbe(payload);
+      if (!probe) return;
+      const { ticket } = probe;
       const observed = draft.current;
       const save = current.current.save;
       running.current = true;
@@ -74,20 +73,18 @@ export function useNativeCloseGuard(options: CloseOptions) {
           });
         let approved = false;
         try {
-          const choice = await invoke<CloseChoice>("confirm_window_close", {
-            report: {
-              ticket,
-              draftGeneration: observed.generation,
-              hasDraft: observed.hasDraft,
-              canSave: save !== undefined,
-            },
+          const choice = await confirmWindowClose({
+            ticket,
+            draftGeneration: observed.generation,
+            hasDraft: observed.hasDraft,
+            canSave: save !== undefined,
           });
           if (choice !== "discard" && choice !== "save") return;
           approved = true;
           const currentDraft = () =>
             mounted &&
             draft.current === observed &&
-            observed.generation < MAX_GENERATION;
+            observed.generation < MAX_NATIVE_U32;
           const canProceed =
             currentDraft() &&
             (choice === "discard" || (save !== undefined && (await save())));

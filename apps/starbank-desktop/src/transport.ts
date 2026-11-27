@@ -123,11 +123,11 @@ export function exportExternalSignedBank(
 }
 
 export function canExportBank(): Promise<boolean> {
-  return invoke<boolean>("can_export_bank");
+  return invokeChecked(v.boolean(), "can_export_bank", {});
 }
 
 export function canRevealBank(): Promise<boolean> {
-  return invoke<boolean>("can_reveal_bank");
+  return invokeChecked(v.boolean(), "can_reveal_bank", {});
 }
 
 export function revealActiveBank(target: ActiveBankTarget): Promise<void> {
@@ -422,5 +422,54 @@ export async function readInventory(
     return result;
   } finally {
     receiving = false;
+  }
+}
+
+export const MAX_NATIVE_U32 = 0xffff_ffff;
+const nativeRequestId = v.pipe(
+  count,
+  v.minValue(1),
+  v.maxValue(MAX_NATIVE_U32),
+);
+const openRequests = v.array(
+  v.object({ id: nativeRequestId, name: v.string() }),
+);
+const closeProbe = v.object({ ticket: nativeRequestId });
+const closeChoice = v.picklist(["save", "discard", "cancel"]);
+
+export type OpenRequest = v.InferOutput<typeof openRequests>[number];
+interface CloseReport {
+  ticket: number;
+  draftGeneration: number;
+  hasDraft: boolean;
+  canSave: boolean;
+}
+
+export function readOpenRequests() {
+  return invokeChecked(openRequests, "list_open_requests", {});
+}
+
+export function openRequestedBank(id: number, control: string) {
+  return invokeChecked(optionalFileReply, "open_requested_bank", {
+    id,
+    control,
+  });
+}
+
+export function decodeCloseProbe(payload: unknown) {
+  const result = v.safeParse(closeProbe, payload);
+  return result.success ? result.output : undefined;
+}
+
+export async function confirmWindowClose(report: CloseReport) {
+  try {
+    return await invokeChecked(closeChoice, "confirm_window_close", { report });
+  } catch (error) {
+    await invoke("complete_window_close", {
+      ticket: report.ticket,
+      draftGeneration: report.draftGeneration,
+      proceed: false,
+    }).catch(() => {});
+    throw error;
   }
 }
