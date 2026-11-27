@@ -2,6 +2,10 @@
 
 Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
 
+## Current native copy scope
+
+Windows create-only Save As, Export Copy and external signing are enabled in qualified local NTFS directories below the drive root. At `0ab8ef3`, all 257 Windows native tests and 100 desktop tests passed, including seven real CLI write cases and the native copy callbacks. Windows replacement, managed desktop backups/restore, implicit close saves and interactive picker qualification remain unavailable or unverified. The full run passed ten of eleven jobs: both APFS exhaustion cases passed, but image teardown did not finish within its bounded ownership checks. [Native integration](../../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md#qualified-transaction-and-create-only-activation) · [Hosted run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46058400674)
+
 ## Hosted CI at `3cd3696`
 
 All 11 jobs passed on November 27, 2026, at `3cd36969b16c733b0bb063d2aee4da4443420571`. Windows x64 passed 240 default Rust tests, the opt-in NTFS probe, and all five serial single-instance transport cases. The headless cases verified the dormant component with synthetic subprocesses. Desktop activation, distinct-logon denial and installed Explorer open flows remain open. [Workflow run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46002526907) · [Windows transport evidence](../../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#hosted-native-qualification)
