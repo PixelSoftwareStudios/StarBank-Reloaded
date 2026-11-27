@@ -262,21 +262,23 @@ export function TableEditor({
               No matching sections.
             </p>
           )}
-          {filteredSections.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={item.id === section?.id ? "true" : undefined}
-              onClick={() => {
-                setSectionId(item.id);
-                selectionAnchor.current = undefined;
-                setSelectedRows(new Set());
-                setBulkValue("");
-              }}
-            >
-              {item.name || "Unnamed section"}
-            </button>
-          ))}
+          <div className="editor-section-list">
+            {filteredSections.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-current={item.id === section?.id ? "true" : undefined}
+                onClick={() => {
+                  setSectionId(item.id);
+                  selectionAnchor.current = undefined;
+                  setSelectedRows(new Set());
+                  setBulkValue("");
+                }}
+              >
+                {item.name || "Unnamed section"}
+              </button>
+            ))}
+          </div>
         </nav>
       )}
       <div className="editor-table-scroll">

@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 import {
   type AccountScopeSelection,
@@ -162,14 +163,15 @@ export function MapSidebar({
   }
 
   return (
-    <aside className="map-pane min-w-0 p-3.5" id={id} aria-labelledby={titleId}>
+    <aside className="map-pane min-w-0 p-3" id={id} aria-labelledby={titleId}>
       <header>
         <h2 className="text-sm font-semibold" id={titleId}>
           Map List
         </h2>
-        <hr className="map-divider my-2.5" />
+        <hr className="map-divider my-2" />
         <label className="map-search">
           <span className="sr-only">Search maps</span>
+          <Search aria-hidden="true" />
           <input
             ref={search}
             aria-keyshortcuts={ready ? SEARCH_SHORTCUT : undefined}
@@ -279,7 +281,7 @@ export function MapSidebar({
       </div>
 
       <div className="map-options">
-        <hr className="map-divider mb-2.5" />
+        <hr className="map-divider mb-2" />
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Quick Options</legend>
           <label>

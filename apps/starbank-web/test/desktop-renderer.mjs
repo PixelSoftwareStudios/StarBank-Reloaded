@@ -458,6 +458,8 @@ async function verifyRenderer(browser, canOverwrite) {
   const context = await browser.newContext({
     offline: true,
     serviceWorkers: "block",
+    viewport: { width: 850, height: 500 },
+    colorScheme: canOverwrite ? "dark" : "light",
   });
   const engine = new WasmBankEngine();
   try {
@@ -490,10 +492,18 @@ async function verifyRenderer(browser, canOverwrite) {
       page,
       /Synthetic Map.*1 bank without a recorded backup/,
     ).waitFor();
+    const firstMap = await button(page, /Synthetic Map/).boundingBox();
+    const firstBank = await button(page, /Synthetic\.SC2Bank/).boundingBox();
+    const options = await page.locator(".map-options").boundingBox();
+    assert(firstMap && firstBank && options);
+    assert(firstMap.y + firstMap.height <= firstBank.y);
+    assert(firstBank.y < options.y);
     await button(page, "Open Bank…").click();
     await page
       .getByRole("heading", { name: initialName, exact: true })
       .waitFor();
+    const footer = await page.locator(".editor-footer").boundingBox();
+    assert(footer && footer.y + footer.height < 500);
     if (canOverwrite) await verifyToolsMenu(page);
     await editGold(page, "002");
     await verifyBackupCopy(page, bridge, canOverwrite);

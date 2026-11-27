@@ -22,11 +22,15 @@
 
 .settings-page-header {
   justify-content: space-between;
+  padding-block-end: 0.625rem;
+  border-block-end: 1px solid var(--shell-divider);
 }
 
 .settings-page h1 {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .settings-page-group {
@@ -58,9 +62,10 @@
 .settings-page .settings-retention-input,
 .settings-page button {
   max-width: 100%;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--shell-divider);
-  border-radius: 0.25rem;
+  min-block-size: var(--control-height);
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   background: var(--map-field-bg);
   color: inherit;
   font-size: 0.875rem;
@@ -109,10 +114,6 @@
   }
 }
 
-.editor-open-actions {
-  gap: 0.5rem;
-}
-
 .editor-table-layout[data-layout="unified"] {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -139,7 +140,7 @@
     --workspace-bg: light-dark(#f7f8fa, #141518);
     --map-pane-bg: light-dark(#fff, #1a1b1f);
     --shell-fg: light-dark(#202127, #f0f0f4);
-    --shell-muted: light-dark(#525765, #b2b3bd);
+    --shell-muted: light-dark(#525765, #a9aeb9);
     --shell-divider: light-dark(#d8dae0, #36373e);
     --map-field-bg: light-dark(#f7f8fa, #24252a);
     --map-hover-bg: light-dark(#edf1f8, #252b33);

@@ -12,6 +12,22 @@
   text-align: center;
 }
 
+.editor-welcome-frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100%;
+  min-block-size: 17rem;
+  padding: 0.875rem;
+}
+
+.editor-welcome-frame .editor-welcome {
+  min-block-size: 0;
+}
+
+.editor-welcome-frame .editor-header-bar {
+  justify-content: end;
+}
+
 .document-editor {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -48,21 +64,26 @@
 
 .editor-header {
   display: grid;
-  gap: 0.375rem;
+  gap: 0.3125rem;
 }
 
 .editor-header h1 {
+  margin-block-start: 0.25rem;
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 1.75rem;
   font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 .editor-open-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 0.375rem;
 }
 
 .editor-map-metadata {
@@ -73,6 +94,7 @@
   color: var(--shell-muted);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .editor-map-bank-choice {
@@ -115,6 +137,7 @@
 
 .editor-views .tabs__tab {
   width: auto;
+  min-block-size: var(--control-height);
   white-space: nowrap;
   color: var(--shell-muted);
 }
@@ -139,7 +162,7 @@
 
 .editor-table-layout {
   display: grid;
-  grid-template-columns: minmax(5.5rem, 22%) minmax(0, 1fr);
+  grid-template-columns: minmax(6.25rem, 22%) minmax(0, 1fr);
   block-size: 100%;
   min-width: 0;
   overflow: hidden;
@@ -160,7 +183,13 @@
 
 .editor-sections h2 {
   font-weight: 600;
-  padding: 0.35rem 0;
+  padding: 0.3rem 0 0.4rem;
+}
+
+.editor-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
 .editor-sections button {
@@ -168,12 +197,19 @@
   width: 100%;
   text-align: start;
   overflow-wrap: anywhere;
-  border-radius: 0.25rem;
-  padding: 0.3rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  padding: 0.25rem 0.4rem;
+}
+
+.editor-sections button:hover {
+  background: var(--map-hover-bg);
 }
 
 .editor-sections button[aria-current="true"] {
   background: var(--map-selected-bg);
+  border-inline-start-color: var(--selection-edge);
+  font-weight: 600;
 }
 
 .editor-table-scroll table {
@@ -184,7 +220,7 @@
 
 .editor-table-scroll th,
 .editor-table-scroll td {
-  padding: 0.3rem;
+  padding: 0.235rem 0.375rem;
   overflow-wrap: anywhere;
   text-align: start;
   border-block-end: 1px solid var(--shell-divider);
@@ -195,17 +231,26 @@
 }
 
 .editor-table-scroll thead :where(th:nth-child(2)) {
-  width: 20%;
+  width: 17%;
 }
 
 .editor-table-scroll tbody th {
   font-weight: 400;
 }
 
+.editor-table-scroll :where(tbody) td:nth-child(2) {
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.editor-table-scroll tbody tr:hover {
+  background: var(--subtle-surface);
+}
+
 .editor-table-scroll thead {
   position: sticky;
   top: 0;
-  background: var(--workspace-bg);
+  background: var(--subtle-surface);
   z-index: 1;
 }
 
@@ -217,10 +262,11 @@
 .editor-table-scroll input:not([type="checkbox"]) {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--shell-divider);
-  border-radius: 0.25rem;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   background: var(--map-field-bg);
-  padding: 0.25rem 0.4rem;
+  padding: 0.2rem 0.45rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .editor-table-scroll input[aria-invalid="true"] {
@@ -257,6 +303,8 @@
 .editor-raw .cm-editor {
   border: 1px solid var(--shell-divider);
   background: var(--map-field-bg);
+  border-radius: var(--control-radius);
+  overflow: hidden;
 }
 
 .editor-raw .cm-scroller {
@@ -307,8 +355,18 @@
 }
 
 .editor-status span {
+  font-size: 0.75rem;
+}
+
+.editor-status span::before {
+  content: "";
   display: inline-block;
-  margin-inline-start: 0.5rem;
+  inline-size: 0.25rem;
+  block-size: 0.25rem;
+  margin-inline: 0.5rem 0.375rem;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.15em;
 }
 
 .editor-footer {
@@ -325,10 +383,10 @@
 }
 
 .editor-button {
-  min-height: 1.875rem;
-  border: 1px solid var(--shell-divider);
-  border-radius: 0.3125rem;
-  padding: 0.2rem 0.55rem;
+  min-height: var(--control-height);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
+  padding: 0.2rem 0.6rem;
   color: var(--shell-fg);
   background: var(--map-field-bg);
 }
@@ -341,6 +399,7 @@
 
 .editor-button:hover:where(:not(:disabled)) {
   border-color: var(--map-focus);
+  background: var(--map-hover-bg);
 }
 
 .editor-button:focus-visible,
@@ -362,7 +421,11 @@
   font-weight: 600;
 }
 
-.editor-save-split:has(.editor-save-menu) > .editor-primary {
+.editor-button.editor-primary:hover:where(:not(:disabled)) {
+  background: color-mix(in srgb, var(--editor-primary-bg), white 11%);
+}
+
+.editor-save-split:has(.editor-save-menu) > .editor-primary:first-child {
   border-start-end-radius: 0;
   border-end-end-radius: 0;
 }
@@ -370,9 +433,16 @@
 .editor-save-split .editor-save-menu {
   height: auto;
   min-width: 1.75rem;
-  border-inline-start: 1px solid currentColor;
+  border-inline-start-color: color-mix(in srgb, currentColor 32%, transparent);
   border-start-start-radius: 0;
   border-end-start-radius: 0;
+}
+
+.editor-save-menu svg {
+  display: block;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  margin-inline: auto;
 }
 
 .editor-action-popover {
@@ -545,9 +615,10 @@
 .editor-section-filter {
   width: 100%;
   margin-block-end: 0.25rem;
-  border: 1px solid var(--shell-divider);
-  border-radius: 0.25rem;
-  padding: 0.25rem 0.4rem;
+  min-block-size: var(--control-height);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
+  padding: 0.2rem 0.45rem;
   background: var(--map-field-bg);
 }
 
@@ -574,4 +645,36 @@
 .editor-name-sort:focus-visible {
   outline: 2px solid var(--map-focus);
   outline-offset: -2px;
+}
+
+@media (max-width: 31rem) {
+  .editor-table-layout:not([data-layout="unified"]) {
+    grid-template: auto minmax(0, 1fr) / minmax(0, 1fr);
+  }
+
+  .editor-sections {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    padding: 0 0 0.4rem;
+    border: 0;
+    border-block-end: 1px solid var(--shell-divider);
+  }
+
+  .editor-sections :is(.empty-message, .editor-section-list) {
+    grid-column: 1 / -1;
+  }
+
+  .editor-section-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-block: 0.15rem;
+  }
+
+  .editor-sections button {
+    width: auto;
+    white-space: nowrap;
+  }
 }

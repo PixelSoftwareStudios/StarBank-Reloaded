@@ -72,27 +72,33 @@ export function EditorPane({
 
   return (
     <div
-      className="editor-welcome"
+      className="editor-welcome-frame"
       {...fileDropHandlers(controller.onOpenFile, busy, run)}
     >
-      <h1 className="text-[1.75rem] leading-tight font-semibold">
-        {mapContext?.map.name ?? name}
-      </h1>
-      {mapContext && <MapContextDetails context={mapContext} disabled={busy} />}
-      <div className="editor-open-actions">
-        <OpenBankButton controller={controller} disabled={busy} run={run} />
-        {tools}
-        <SettingsButton open={onOpenSettings} />
+      <div className="editor-header-bar">
+        <div className="editor-open-actions">
+          <OpenBankButton controller={controller} disabled={busy} run={run} />
+          {tools}
+          <SettingsButton open={onOpenSettings} />
+        </div>
       </div>
-      <p className="empty-message" role="status">
-        {busy
-          ? "Opening bank…"
-          : notice ||
-            controller.status ||
-            (mapContext && mapContext.choices.length === 0
-              ? "No bank files associated with this map."
-              : "No bank open.")}
-      </p>
+      <div className="editor-welcome">
+        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
+          {mapContext?.map.name ?? name}
+        </h1>
+        {mapContext && (
+          <MapContextDetails context={mapContext} disabled={busy} />
+        )}
+        <p className="empty-message" role="status">
+          {busy
+            ? "Opening bank…"
+            : notice ||
+              controller.status ||
+              (mapContext && mapContext.choices.length === 0
+                ? "No bank files associated with this map."
+                : "No bank open.")}
+        </p>
+      </div>
     </div>
   );
 }

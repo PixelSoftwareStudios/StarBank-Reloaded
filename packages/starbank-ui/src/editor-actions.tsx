@@ -1,6 +1,6 @@
 import { Dropdown } from "@heroui/react/dropdown";
 import { Separator } from "@heroui/react/separator";
-import { Settings, Wrench } from "lucide-react";
+import { ChevronDown, Settings, Wrench } from "lucide-react";
 import { type DragEvent, Fragment, type Ref, useRef } from "react";
 import type {
   BankEditorController,
@@ -287,7 +287,7 @@ export function EditorActions({
                   aria-label="More save options"
                   isDisabled={disabled}
                 >
-                  <span aria-hidden="true">▾</span>
+                  <ChevronDown aria-hidden="true" />
                 </Dropdown.Trigger>
               </EditorTooltip>
               <Dropdown.Popover
