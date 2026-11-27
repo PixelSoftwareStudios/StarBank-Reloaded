@@ -46,4 +46,4 @@ pub use unsupported::read_snapshot;
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub use unsupported::{check_replace_scope, commit};
 #[cfg(windows)]
-pub use windows::{WindowsFileIdentity, read_snapshot};
+pub use windows::{WindowsDirectoryIdentity, WindowsFileIdentity, read_snapshot};

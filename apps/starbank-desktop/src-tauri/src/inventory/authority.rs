@@ -6,7 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 #[cfg(windows)]
-use starbank_fs::WindowsFileIdentity as FrozenLeafIdentity;
+use starbank_fs::{WindowsDirectoryIdentity, WindowsFileIdentity as FrozenLeafIdentity};
 
 use crate::selection::BANK_EXTENSION;
 
@@ -127,11 +127,25 @@ pub(super) struct DirectoryIdentity {
 	device: u64,
 	#[cfg(unix)]
 	inode: u64,
-	#[cfg(not(unix))]
+	#[cfg(windows)]
+	volume: u64,
+	#[cfg(windows)]
+	file_id: [u8; 16],
+	#[cfg(not(any(unix, windows)))]
 	created: std::time::SystemTime,
 }
 
 impl DirectoryIdentity {
+	#[cfg(windows)]
+	pub(super) fn read(path: &Path) -> Option<Self> {
+		let identity = WindowsDirectoryIdentity::read(path).ok()?;
+		Some(Self {
+			volume: identity.volume_serial(),
+			file_id: identity.file_id(),
+		})
+	}
+
+	#[cfg(not(windows))]
 	pub(super) fn read(path: &Path) -> Option<Self> {
 		let metadata = checked_metadata(path)?;
 		if !metadata.is_dir() {
@@ -140,6 +154,7 @@ impl DirectoryIdentity {
 		Self::from_metadata(&metadata)
 	}
 
+	#[cfg(not(windows))]
 	fn from_metadata(metadata: &fs::Metadata) -> Option<Self> {
 		#[cfg(unix)]
 		{

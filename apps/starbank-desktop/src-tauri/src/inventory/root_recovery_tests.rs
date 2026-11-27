@@ -176,3 +176,106 @@ fn assert_passive_scans_are_blocked(inventory: &InventoryService) {
 		assert!(snapshot.banks.is_empty() && snapshot.maps.is_empty());
 	}
 }
+
+#[cfg(windows)]
+#[test]
+fn same_creation_time_cannot_reauthorize_a_replaced_windows_directory() -> io::Result<()> {
+	use std::os::windows::fs::{FileTimesExt as _, OpenOptionsExt as _};
+
+	use windows_sys::Win32::Storage::FileSystem::{
+		FILE_FLAG_BACKUP_SEMANTICS, FILE_WRITE_ATTRIBUTES,
+	};
+
+	let fixture = tempfile::tempdir()?;
+	let root = fixture.path().canonicalize()?;
+	let config = root.join("inventory.json");
+	let selected = root.join("Authorized");
+	let retained = root.join("Retained original");
+	fs::create_dir(&selected)?;
+	let bank = selected.join("Synthetic.SC2Bank");
+	fs::write(&bank, b"<Bank/>")?;
+	let inventory = InventoryService::default().with_root_record(Some(config.clone()));
+	let before = inventory
+		.scan_with_roots(ScanMode::Manual(selected.clone()), &[])
+		.expect("select original directory");
+	assert_eq!(before.status, InventoryStatus::Ready);
+	let original_record = fs::read(&config)?;
+	let before = serde_json::to_value(before)?;
+	let id = before["banks"][0]["id"].as_str().expect("bank ID");
+	assert_eq!(
+		inventory
+			.authorize_bank(id)
+			.expect("authorized bank")
+			.path(),
+		bank
+	);
+
+	fs::rename(&selected, &retained)?;
+	fs::create_dir(&selected)?;
+	fs::write(&bank, b"<Bank/>")?;
+	let created = fs::metadata(&retained)?.created()?;
+	fs::OpenOptions::new()
+		.access_mode(FILE_WRITE_ATTRIBUTES)
+		.custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+		.open(&selected)?
+		.set_times(fs::FileTimes::new().set_created(created))?;
+	assert_eq!(fs::metadata(&selected)?.created()?, created);
+	assert!(matches!(
+		inventory.authorize_bank(id),
+		Err(InventoryError::StaleBank)
+	));
+
+	let restarted = InventoryService::default().with_root_record(Some(config.clone()));
+	let rejected = restarted
+		.scan_with_roots(ScanMode::Refresh, &[])
+		.expect("redacted stale directory state");
+	assert_eq!(rejected.status, InventoryStatus::Failed);
+	assert_eq!(rejected.reason, Some(InventoryReason::InvalidFolder));
+	assert!(rejected.manual && rejected.banks.is_empty());
+	assert_eq!(fs::read(config)?, original_record);
+	Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn legacy_windows_root_record_requires_explicit_reapproval() -> io::Result<()> {
+	use std::os::windows::ffi::OsStrExt as _;
+
+	let fixture = tempfile::tempdir()?;
+	let root = fixture.path().canonicalize()?;
+	let config = root.join("inventory.json");
+	let selected = root.join("Previously selected");
+	fs::create_dir(&selected)?;
+	fs::write(selected.join("Synthetic.SC2Bank"), b"<Bank/>")?;
+	let old_record = serde_json::to_vec(&serde_json::json!({
+		"version": 1,
+		"platform": "windows",
+		"manual": {
+			"native_path": selected.as_os_str().encode_wide().collect::<Vec<_>>(),
+			"identity": {"created": fs::metadata(&selected)?.created()?},
+		},
+	}))?;
+	fs::write(&config, &old_record)?;
+
+	let inventory = InventoryService::default().with_root_record(Some(config.clone()));
+	assert_passive_scans_are_blocked(&inventory);
+	assert_eq!(fs::read(&config)?, old_record);
+	let confirmed = inventory
+		.scan_with_roots(ScanMode::Manual(selected), &[])
+		.expect("explicit recovery");
+	assert_eq!(confirmed.status, InventoryStatus::Ready);
+	assert_eq!(confirmed.reason, None);
+	assert_eq!(confirmed.banks.len(), 1);
+	let new_record: serde_json::Value = serde_json::from_slice(&fs::read(&config)?)?;
+	let identity = &new_record["manual"]["identity"];
+	assert!(identity["volume"].is_u64());
+	assert_eq!(identity["file_id"].as_array().map(Vec::len), Some(16));
+
+	let restarted = InventoryService::default().with_root_record(Some(config));
+	let restored = restarted
+		.scan_with_roots(ScanMode::Refresh, &[])
+		.expect("reapproved scope persisted");
+	assert_eq!(restored.status, InventoryStatus::Ready);
+	assert_eq!(restored.banks.len(), 1);
+	Ok(())
+}

@@ -32,7 +32,7 @@ use crate::{FileSnapshot, Fingerprint, StorageError};
 
 mod identity;
 
-pub use identity::WindowsFileIdentity;
+pub use identity::{WindowsDirectoryIdentity, WindowsFileIdentity};
 
 const SPECIAL_ATTRIBUTES: u32 = FILE_ATTRIBUTE_DEVICE
 	| FILE_ATTRIBUTE_OFFLINE
