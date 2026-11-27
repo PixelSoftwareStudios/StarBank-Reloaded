@@ -4,7 +4,12 @@ import {
   readBankFile,
 } from "starbank-ui/browser";
 import { EngineWorkerClient } from "starbank-ui/engine";
-import { decodeEngineReply, engineRequest } from "starbank-ui/engine/protocol";
+import {
+  decodeEngineReply,
+  engineReplyError,
+  engineRequest,
+  SnapshotRefreshRequired,
+} from "starbank-ui/engine/protocol";
 import { describe, expect, test, vi } from "vitest";
 
 const BANK_LIMIT = 16;
@@ -18,6 +23,54 @@ const ready = {
     maxControlBytes: REQUEST_LIMIT,
   },
 };
+
+test("only a newer correlated revision of the same document can offer refresh", () => {
+  const target = {
+    document_id: "document-1",
+    expected_revision: "9007199254740993",
+  };
+  function reply(
+    document_id: string | null,
+    revision: string | null,
+    request_id = "edit",
+  ) {
+    return JSON.stringify({
+      schema_version: 1,
+      request_id,
+      document_id,
+      revision,
+      result: {
+        kind: "error",
+        payload: { code: "stale_revision", message: "Refresh its snapshot." },
+      },
+    });
+  }
+  const observed = decodeEngineReply(
+    reply("document-1", "9007199254740994"),
+    "edit",
+  );
+  const recovery = engineReplyError(observed, target);
+  expect(recovery).toBeInstanceOf(SnapshotRefreshRequired);
+  expect(recovery).toMatchObject({
+    target: {
+      document_id: "document-1",
+      expected_revision: "9007199254740994",
+    },
+  });
+  for (const invalid of [
+    reply("document-2", "9007199254740994"),
+    reply("document-1", "9007199254740993"),
+    reply("document-1", "9007199254740992"),
+    reply(null, null),
+  ]) {
+    const error = engineReplyError(decodeEngineReply(invalid, "edit"), target);
+    expect(error).not.toBeInstanceOf(SnapshotRefreshRequired);
+    expect(error?.message).not.toContain("Refresh");
+  }
+  expect(() =>
+    decodeEngineReply(reply("document-1", "9007199254740994", "other"), "edit"),
+  ).toThrow();
+});
 
 class TestWorker extends EventTarget {
   readonly requests: unknown[] = [];

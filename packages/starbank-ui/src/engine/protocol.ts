@@ -257,6 +257,48 @@ const replySchema = v.object({
 
 export type EngineReply = v.InferOutput<typeof replySchema>;
 
+export class SnapshotRefreshRequired extends Error {
+  constructor(
+    readonly target: EngineTarget,
+    cause?: unknown,
+  ) {
+    super("Refresh the editor to check the current bank revision.", { cause });
+    this.name = "SnapshotRefreshRequired";
+  }
+}
+
+export function revisionAtLeast(actual: string, expected: string): boolean {
+  return (
+    actual.length > expected.length ||
+    (actual.length === expected.length && actual >= expected)
+  );
+}
+
+export function engineReplyError(
+  reply: EngineReply,
+  target?: EngineTarget,
+): Error | undefined {
+  if (reply.result.kind !== "error") return;
+  if (
+    target &&
+    reply.result.payload.code === "stale_revision" &&
+    reply.document_id === target.document_id &&
+    reply.revision !== null &&
+    reply.revision !== target.expected_revision &&
+    revisionAtLeast(reply.revision, target.expected_revision)
+  ) {
+    return new SnapshotRefreshRequired({
+      document_id: reply.document_id,
+      expected_revision: reply.revision,
+    });
+  }
+  if (reply.result.payload.code === "stale_revision")
+    return new Error(
+      "The bank engine reported a change without a matching editor revision.",
+    );
+  return new Error(reply.result.payload.message);
+}
+
 export function engineRequest(
   requestId: string,
   command: EngineCommand,
