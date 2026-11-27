@@ -16,6 +16,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
+import { rawSyntaxDiagnostics } from "./raw-diagnostics";
 
 const externalUpdate = Annotation.define<boolean>();
 const editorTheme = EditorView.theme({
@@ -105,6 +106,7 @@ export default function RawEditor({
       extensions: [
         EditorState.lineSeparator.of(lineSeparator(currentValue.current)),
         xml(),
+        rawSyntaxDiagnostics,
         lineNumbers(),
         drawSelection(),
         history(),

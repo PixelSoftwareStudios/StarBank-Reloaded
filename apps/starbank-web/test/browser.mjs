@@ -10,6 +10,7 @@ import {
 } from "./local-bank-library.mjs";
 import { verifyNumericCaret } from "./numeric-caret.mjs";
 import { verifyAcceptedOpenRecovery } from "./open-recovery.mjs";
+import { verifyRawSyntaxDiagnostics } from "./raw-syntax-diagnostics.mjs";
 import { verifySaveMenu } from "./save-menu.mjs";
 import { verifySimpleDraftRecovery } from "./simple-draft-recovery.mjs";
 import { verifySnapshotRefresh } from "./snapshot-refresh.mjs";
@@ -600,6 +601,10 @@ async function verify(name) {
       await rawPositionPage.setViewportSize({ width: 850, height: 500 });
       await rawPositionPage.goto(server.url);
       await verifyRawViewPosition(rawPositionPage);
+      await verifyRawSyntaxDiagnostics(
+        rawPositionPage,
+        bankPicker(rawPositionPage),
+      );
     } finally {
       await rawPositionPage.close();
     }
