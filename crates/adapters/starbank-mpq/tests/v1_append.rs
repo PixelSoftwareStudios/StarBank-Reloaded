@@ -306,6 +306,88 @@ fn requires_all_and_only_intended_added_names_and_payloads() -> Result<(), Box<d
 	Ok(())
 }
 
+#[test]
+fn rejects_changed_added_hash_slots_and_block_records() -> Result<(), Box<dyn Error>> {
+	const HASH_METADATA: usize = 8;
+	const HASH_BLOCK_INDEX: usize = 12;
+	const BLOCK_OFFSET: usize = 0;
+	const BLOCK_PACKED_BYTES: usize = 4;
+	const BLOCK_FILE_BYTES: usize = 8;
+	const BLOCK_FLAGS: usize = 12;
+	let retained_count = word(SOURCE, 28);
+	let plan = V1AppendPlan::prepare(SOURCE, &ADDITIONS)?;
+	plan.verify(OUTPUT)?;
+	for (field, replacement) in [
+		(HASH_METADATA, 0x0409),                // Nonneutral locale.
+		(HASH_METADATA, 0x0001_0000),           // Nonneutral platform.
+		(HASH_METADATA, 0x0100_0000),           // Reserved hash flags.
+		(HASH_BLOCK_INDEX, 0),                  // Alias a retained member.
+		(HASH_BLOCK_INDEX, retained_count + 1), // Alias the other addition.
+		(HASH_BLOCK_INDEX, retained_count + 2), // Outside the block table.
+	] {
+		let mut changed = OUTPUT.to_vec();
+		edit_table(&mut changed, Table::Hash, |table| {
+			let slot = table
+				.as_chunks_mut::<RECORD_BYTES>()
+				.0
+				.iter_mut()
+				.find(|slot| word(&slot[..], HASH_BLOCK_INDEX) == retained_count)
+				.expect("first added member hash slot");
+			slot[field..field + 4].copy_from_slice(&replacement.to_le_bytes());
+		});
+		assert!(
+			plan.verify(&changed).is_err(),
+			"hash field {field}, value {replacement}"
+		);
+	}
+	for field in [
+		BLOCK_OFFSET,
+		BLOCK_PACKED_BYTES,
+		BLOCK_FILE_BYTES,
+		BLOCK_FLAGS,
+	] {
+		let mut changed = OUTPUT.to_vec();
+		edit_table(&mut changed, Table::Block, |table| {
+			let offset = retained_count as usize * RECORD_BYTES + field;
+			let replacement = word(table, offset) ^ 1;
+			table[offset..offset + 4].copy_from_slice(&replacement.to_le_bytes());
+		});
+		assert!(plan.verify(&changed).is_err(), "added block field {field}");
+	}
+	Ok(())
+}
+
+#[test]
+fn finds_existing_localized_names_beyond_an_empty_lookup_slot() -> Result<(), Box<dyn Error>> {
+	const BLOCK_INDEX_FIELD: usize = 12;
+	let mut hidden = SOURCE.to_vec();
+	edit_table(&mut hidden, Table::Hash, |table| {
+		let slots = table.as_chunks_mut::<RECORD_BYTES>().0;
+		let original = slots
+			.iter()
+			.position(|slot| word(&slot[..], BLOCK_INDEX_FIELD) == 0)
+			.expect("original script hash slot");
+		let relocated = (1..slots.len())
+			.map(|step| (original + step) % slots.len())
+			.find(|index| word(&slots[*index][..], BLOCK_INDEX_FIELD) == u32::MAX)
+			.expect("empty hash slot after the original");
+		slots[relocated] = slots[original];
+		slots[relocated][8..10].copy_from_slice(&0x0409_u16.to_le_bytes());
+		slots[original].fill(u8::MAX);
+	});
+	let mut ordinary = MetadataArchive::open(Cursor::new(&hidden))?;
+	assert!(ordinary.read(MetadataEntry::MapScript)?.is_none());
+	let additions = [V1Addition {
+		name: "mapscript.GALAXY",
+		bytes: b"x",
+	}];
+	assert!(matches!(
+		V1AppendPlan::prepare(&hidden, &additions),
+		Err(V1AppendError::Addition(V1AdditionIssue::ExistingMember))
+	));
+	Ok(())
+}
+
 enum Table {
 	Hash,
 	Block,
