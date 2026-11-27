@@ -87,11 +87,17 @@ pub(crate) fn write(
 ) -> Result<Status, Failure> {
 	let limits = Limits::default();
 	let source = input::read(&bank.file, limits.document_bytes)?;
+	let patch = match &operation {
+		Operation::Edit(path, _) => {
+			Some(Patch::read_for_bank(path, source.fingerprint().sha256())?)
+		}
+		_ => None,
+	};
 	let context_path = target.path.as_deref().unwrap_or(&bank.file);
 	let context = signing_context(context_path, bank.context)?;
 	let mut session = Session::open(source.bytes(), limits, context.clone())?;
-	if let Operation::Edit(path, _) = &operation {
-		Patch::read(path)?.apply(&mut session, source.fingerprint().sha256())?;
+	if let Some(patch) = patch {
+		patch.apply(&mut session)?;
 	}
 
 	let flags = operation.signing_args();

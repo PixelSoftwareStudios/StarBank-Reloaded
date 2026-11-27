@@ -3,6 +3,7 @@
 use std::{fs, path::Path};
 
 use serde_json::{Value, json as object};
+use sha2::{Digest as _, Sha256};
 
 #[path = "support/cli.rs"]
 mod cli;
@@ -133,6 +134,46 @@ fn patches_require_the_current_digest_and_known_fields_and_fail_atomically() {
 	assert_eq!(json(&invalid_batch, 3)["error"]["code"], "invalid_edit");
 	assert!(!destination.exists());
 	assert_eq!(fs::read_to_string(&source).expect("read source"), SOURCE);
+}
+
+#[test]
+fn edit_checks_the_observed_fingerprint_before_parsing_replaced_bank_bytes() {
+	const MALFORMED_BANK: &[u8] = b"<Bank><Section";
+	let fixture = Fixture::new();
+	let source = fixture.write("Source.sc2bank", SOURCE);
+	let destination = fixture.path.join("Destination.sc2bank");
+	let operation = object!({
+		"op": "set_value", "section": 0, "key": 1, "value": 0, "lexeme": "7",
+	});
+	let patch = edit_patch(operation.clone(), &digest(&source), &fixture);
+	fs::write(&source, MALFORMED_BANK).expect("replace observed source");
+	let args = || {
+		let mut command = bank_command("edit", &source);
+		command
+			.arg("--patch")
+			.arg(&patch)
+			.arg("--output")
+			.arg(&destination);
+		command
+	};
+
+	let preview = args()
+		.arg("--dry-run")
+		.output()
+		.expect("preview stale edit");
+	assert_eq!(json(&preview, 5)["error"]["code"], "input_changed");
+	let stale = args().output().expect("apply stale edit");
+	assert_eq!(json(&stale, 5)["error"]["code"], "input_changed");
+
+	let current_sha256 = hex::encode(Sha256::digest(MALFORMED_BANK));
+	edit_patch(operation, &current_sha256, &fixture);
+	let matching = args().output().expect("apply matching edit");
+	assert_eq!(json(&matching, 3)["error"]["code"], "invalid_bank");
+	assert!(!destination.exists());
+	assert_eq!(
+		fs::read(&source).expect("read replaced source"),
+		MALFORMED_BANK
+	);
 }
 
 const CONTEXT: [&str; 6] = [

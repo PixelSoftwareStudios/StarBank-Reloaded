@@ -83,4 +83,4 @@ The schema also accepts structural operations. Every position refers to the orig
 | `rename_value` | `section`, `key`, `value`, `name` |
 | `set_value_type` | `section`, `key`, `value`, `kind`, `lexeme` |
 
-The maximum patch size is 1 MiB with at most 4,096 operations. Unknown patch fields, duplicate value edits and stale fingerprints are rejected before a write.
+The maximum patch size is 1 MiB with at most 4,096 operations. Unknown patch fields, duplicate value edits and stale fingerprints are rejected before a write. A fingerprint mismatch returns exit 5 with `input_changed` even if the newly observed bank bytes no longer parse.

@@ -113,7 +113,10 @@ enum ResolvedOp<'input> {
 }
 
 impl Patch {
-	pub(crate) fn read(path: &Path) -> Result<Self, Failure> {
+	pub(crate) fn read_for_bank(
+		path: &Path,
+		observed_sha256: &[u8; SHA256_BYTES],
+	) -> Result<Self, Failure> {
 		let file = input::read(path, MAX_PATCH_BYTES)?;
 		let patch: Self = serde_json::from_slice(file.bytes())
 			.map_err(|_| invalid("The patch does not match the versioned JSON schema."))?;
@@ -127,26 +130,21 @@ impl Patch {
 		if patch.operations.is_empty() || patch.operations.len() > MAX_PATCH_OPERATIONS {
 			return Err(invalid("The patch must contain between 1 and 4,096 edits."));
 		}
-		Ok(patch)
-	}
-
-	pub(crate) fn apply(
-		&self,
-		session: &mut Session,
-		current_sha256: &[u8; SHA256_BYTES],
-	) -> Result<(), Failure> {
 		let mut expected_sha256 = [0; SHA256_BYTES];
-		hex::decode_to_slice(&self.expected_sha256, &mut expected_sha256).map_err(|_| {
+		hex::decode_to_slice(&patch.expected_sha256, &mut expected_sha256).map_err(|_| {
 			invalid("The patch requires a 64-character hexadecimal SHA-256 digest.")
 		})?;
-		if current_sha256 != &expected_sha256 {
+		if observed_sha256 != &expected_sha256 {
 			return Err(Failure::new(
 				Status::Conflict,
 				ErrorCode::InputChanged,
 				"The bank bytes no longer match the patch fingerprint.",
 			));
 		}
+		Ok(patch)
+	}
 
+	pub(crate) fn apply(&self, session: &mut Session) -> Result<(), Failure> {
 		// Resolve every position in the fingerprinted input before structural changes move it.
 		let operations = self
 			.operations
