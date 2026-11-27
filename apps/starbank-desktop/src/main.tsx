@@ -93,6 +93,7 @@ interface AcceptedOpen {
   readonly breadcrumbs?: readonly string[];
   readonly canOverwrite: boolean;
   readonly bankId?: string;
+  readonly completedOperation?: string;
 }
 
 function DesktopApp() {
@@ -448,22 +449,33 @@ function DesktopApp() {
       );
       const opened = await source(JSON.stringify(control));
       if (!opened) return { ok: true };
-      const reply = decodeEngineReply(opened.control, id);
-      const { target } = requireSnapshot(reply);
-      if (target.id === previous?.projection.id) {
-        throw new Error("The bank engine did not acknowledge a new document.");
-      }
-      const opening = {
-        previous,
-        target: { document_id: target.id, expected_revision: target.revision },
-        name: opened.name,
-        breadcrumbs: opened.breadcrumbs,
-        canOverwrite: opened.can_overwrite === true,
-        bankId,
-      };
-      acceptedOpen.current = opening;
-      return displayOpening(opening, async () => reply);
+      return acceptOpening(opened, id, previous, bankId);
     });
+  }
+
+  function acceptOpening(
+    opened: FileDialogReply,
+    id: string,
+    previous: DesktopDocument | null,
+    bankId: string | undefined,
+    completedOperation?: string,
+  ): Promise<EditorActionResult> {
+    const reply = decodeEngineReply(opened.control, id);
+    const { target } = requireSnapshot(reply);
+    if (target.id === previous?.projection.id) {
+      throw new Error("The bank engine did not acknowledge a new document.");
+    }
+    const opening: AcceptedOpen = {
+      previous,
+      target: { document_id: target.id, expected_revision: target.revision },
+      name: opened.name,
+      breadcrumbs: opened.breadcrumbs,
+      canOverwrite: opened.can_overwrite === true,
+      bankId,
+      completedOperation,
+    };
+    acceptedOpen.current = opening;
+    return displayOpening(opening, async () => reply);
   }
 
   async function displayOpening(
@@ -507,7 +519,10 @@ function DesktopApp() {
       setOverwriteAvailable(opening.canOverwrite);
       setSelectedBankId(opening.bankId);
       publishDocument(next);
-      return { ok: true, message: `Opened ${opening.name}.` };
+      return {
+        ok: true,
+        message: opening.completedOperation ?? `Opened ${opening.name}.`,
+      };
     } catch (error) {
       if (!stillOpening()) throw error;
       const target =
@@ -522,11 +537,16 @@ function DesktopApp() {
       const updated = { ...opening, target };
       acceptedOpen.current = updated;
       setOpenRecovery(updated);
+      const reason = currentDraft.current
+        ? "Discard the previous bank draft before finishing."
+        : opening.completedOperation
+          ? "Its XML could not be displayed."
+          : "The bank was accepted, but its XML could not be displayed.";
       return {
         ok: false,
-        message: currentDraft.current
-          ? "Discard the previous bank draft before finishing."
-          : "The bank was accepted, but its XML could not be displayed.",
+        message: opening.completedOperation
+          ? `${opening.completedOperation} ${reason}`
+          : reason,
       };
     }
   }
@@ -616,17 +636,20 @@ function DesktopApp() {
       setConflictPrompt({
         compare: () => compareBankConflict(activeTarget(target)),
         reopen: async (reviewId) => {
+          const previous = activeDocument(target);
           const nativeTarget = activeTarget(target);
           const opened = await reopenBankConflict(nativeTarget, reviewId);
           if (!opened) return;
-          await adopt(
-            opened.name,
-            decodeEngineReply(opened.control, nativeTarget.requestId),
-            opened.breadcrumbs,
-          );
-          setOverwriteAvailable(opened.can_overwrite === true);
           setBackupGeneration((value) => value + 1);
-          finish({ ok: false, message: `Reopened ${opened.name} from disk.` });
+          const message = `Reopened ${opened.name} from disk.`;
+          const result = await acceptOpening(
+            opened,
+            nativeTarget.requestId,
+            previous,
+            selectedBankId,
+            message,
+          );
+          finish({ ok: false, message: result.message ?? message });
         },
         saveAs: exportAvailable
           ? async () => {
@@ -673,19 +696,17 @@ function DesktopApp() {
           message: name ? `Saved backup copy ${name}.` : undefined,
         };
       }
+      const previous = activeDocument(target);
       const restored = await restoreActiveBank(nativeTarget, selection.id);
       if (!restored) return { ok: true };
-      await adopt(
-        restored.name,
-        decodeEngineReply(restored.control, nativeTarget.requestId),
-        restored.breadcrumbs,
-      );
-      setOverwriteAvailable(restored.can_overwrite === true);
       setBackupGeneration((value) => value + 1);
-      return {
-        ok: true,
-        message: `Restored ${restored.name} and saved a reversal backup.`,
-      };
+      return acceptOpening(
+        restored,
+        nativeTarget.requestId,
+        previous,
+        selectedBankId,
+        `Restored ${restored.name} on disk and saved a reversal backup.`,
+      );
     });
   }
 

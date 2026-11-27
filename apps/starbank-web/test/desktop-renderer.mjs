@@ -15,6 +15,13 @@ const initialBank = Buffer.from(
   '<Bank version="1"><Section name="Player"><Key name="Gold"><Value int="001"/></Key></Section></Bank>',
 );
 const verifiedBackupId = 1;
+const conflictReviewId = "1";
+const changedDiskBank = Buffer.from(
+  initialBank.toString().replace('"001"', '"006"'),
+);
+const restoredBank = Buffer.from(
+  initialBank.toString().replace('"001"', '"003"'),
+);
 const storageRefusal = "Synthetic storage refusal.";
 const frameHeaderBytes = 5;
 const controlLengthOffset = 1;
@@ -134,11 +141,13 @@ function createBridge(engine, canOverwrite) {
   const unexpected = [];
   let navigation;
   let openCount = 0;
+  let openName = initialName;
   let saved = false;
   let malformedBackupList = false;
   let supersedeNextEdit = false;
   let failNextEditProjection = false;
   let failNextOpenProjection = false;
+  let restoreNextBackup = false;
   let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
@@ -207,6 +216,38 @@ function createBridge(engine, canOverwrite) {
     return reply;
   }
 
+  function acceptBankOpen(request, bytes) {
+    const reply = dispatch(engine, JSON.stringify(request), bytes);
+    if (failNextOpenProjection) {
+      failNextOpenProjection = false;
+      const accepted = JSON.parse(reply.control);
+      assert.equal(accepted.result.kind, "snapshot");
+      failedOpenTarget = {
+        document_id: accepted.document_id,
+        expected_revision: accepted.revision,
+      };
+    }
+    return {
+      value: {
+        name: openName,
+        can_overwrite: canOverwrite,
+        control: reply.control,
+      },
+    };
+  }
+
+  function replaceFromDisk(target, bytes) {
+    dirtySnapshot(target);
+    return acceptBankOpen(
+      {
+        schema_version: 1,
+        request_id: target.requestId,
+        command: { kind: "open", payload: { discard_current: true } },
+      },
+      bytes,
+    );
+  }
+
   function invoke(command, args) {
     if (command === "dispatch_bank") {
       return {
@@ -269,27 +310,10 @@ function createBridge(engine, canOverwrite) {
           request.command.payload = { discard_current: true };
           saved = false;
         }
-        const reply = dispatch(engine, JSON.stringify(request), initialBank);
-        if (failNextOpenProjection) {
-          failNextOpenProjection = false;
-          const accepted = JSON.parse(reply.control);
-          assert.equal(accepted.result.kind, "snapshot");
-          failedOpenTarget = {
-            document_id: accepted.document_id,
-            expected_revision: accepted.revision,
-          };
-        }
         openCount += 1;
-        return {
-          value: {
-            name:
-              openCount === 1
-                ? initialName
-                : `Replacement-${openCount}.SC2Bank`,
-            can_overwrite: canOverwrite,
-            control: reply.control,
-          },
-        };
+        openName =
+          openCount === 1 ? initialName : `Replacement-${openCount}.SC2Bank`;
+        return acceptBankOpen(request, initialBank);
       }
       case "active_backup_status":
         return {
@@ -333,8 +357,35 @@ function createBridge(engine, canOverwrite) {
           },
         };
       case "restore_active_bank":
+        assert.equal(args.backupId, verifiedBackupId);
+        if (restoreNextBackup) {
+          restoreNextBackup = false;
+          return replaceFromDisk(args.target, restoredBank);
+        }
         dirtySnapshot(args.target);
         return { value: null };
+      case "compare_bank_conflict":
+        dirtySnapshot(args.target);
+        return {
+          value: {
+            id: conflictReviewId,
+            firstDifferenceLine: 1,
+            startLine: 1,
+            editor: {
+              text: initialBank.toString().replace('"001"', '"004"'),
+              omitsStart: false,
+              omitsEnd: false,
+            },
+            onDisk: {
+              text: changedDiskBank.toString(),
+              omitsStart: false,
+              omitsEnd: false,
+            },
+          },
+        };
+      case "reopen_bank_conflict":
+        assert.equal(args.reviewId, conflictReviewId);
+        return replaceFromDisk(args.target, changedDiskBank);
       case "confirm_bank_navigation":
         assert(navigation);
         dirtySnapshot(args.target);
@@ -345,6 +396,8 @@ function createBridge(engine, canOverwrite) {
         if (navigation.outcome === "cancel") return { value: null };
         if (navigation.outcome === "fail")
           return { error: { active_write_rejected: storageRefusal } };
+        if (navigation.outcome === "external")
+          return { error: "external_bank_changed" };
         assert.equal(navigation.outcome, "success");
         snapshot.result.payload.dirty = false;
         saved = true;
@@ -376,6 +429,9 @@ function createBridge(engine, canOverwrite) {
     },
     failNextOpenProjection() {
       failNextOpenProjection = true;
+    },
+    acceptNextRestore() {
+      restoreNextBackup = true;
     },
     wireRequests,
     corruptBackupList() {
@@ -683,13 +739,14 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   });
 }
 
-async function finishAcceptedOpen(page, bridge, expectedName) {
+async function finishAcceptedOpen(page, bridge, expectedName, value = "001") {
   const finish = button(page, "Finish opening bank");
   const lastRead = bridge.wireRequests.at(-1);
   assert.equal(lastRead.command.kind, "raw_text");
   const before = bridge.wireRequests.length;
   const opens = bridge.callsFor("open_bank");
   await finish.click();
+  await finish.waitFor({ state: "hidden" });
   await page
     .getByRole("heading", { name: expectedName, exact: true })
     .waitFor();
@@ -703,7 +760,7 @@ async function finishAcceptedOpen(page, bridge, expectedName) {
     assert.equal(read.expected_revision, lastRead.expected_revision);
   }
   assert.deepEqual(bridge.callsFor("open_bank"), opens);
-  assert.equal(await goldField(page).inputValue(), "001");
+  assert.equal(await goldField(page).inputValue(), value);
 }
 
 async function verifyAcceptedOpen(page, bridge, canOverwrite) {
@@ -730,6 +787,58 @@ async function verifyAcceptedOpen(page, bridge, canOverwrite) {
   await finishAcceptedOpen(page, bridge, "Replacement-2.SC2Bank");
   assert.deepEqual(bridge.callsFor("save_active_bank"), []);
   assert.deepEqual(bridge.callsFor("save_bank_as"), []);
+}
+
+async function verifyAcceptedConflictReopen(page, bridge, name) {
+  await editGold(page, "004");
+  const opens = bridge.callsFor("open_bank");
+  bridge.choose("save", "external");
+  bridge.failNextOpenProjection();
+  await button(page, "Open Bank…").click();
+  const conflict = page.getByRole("dialog", { name: "Bank changed on disk" });
+  await button(conflict, "Compare").click();
+  await button(conflict, "Reopen from Disk…").click();
+  await conflict.waitFor({ state: "hidden" });
+  await button(page, "Finish opening bank").waitFor();
+  await page.getByRole("cell", { name: "004", exact: true }).waitFor();
+  assert(await button(page, "Open Bank…").isDisabled());
+  assert(await button(page, "Save").isDisabled());
+  assert.deepEqual(bridge.callsFor("open_bank"), opens);
+  const reopens = bridge.callsFor("reopen_bank_conflict");
+  assert.equal(reopens.length, 1);
+  const saves = bridge.callsFor("save_active_bank");
+  assert.equal(saves.length, 1);
+  await finishAcceptedOpen(page, bridge, name, "006");
+  assert.deepEqual(bridge.callsFor("reopen_bank_conflict"), reopens);
+  assert.deepEqual(bridge.callsFor("save_active_bank"), saves);
+  assert.deepEqual(bridge.callsFor("open_bank"), opens);
+}
+
+async function verifyAcceptedBackupRestore(page, bridge, name) {
+  await editGold(page, "009");
+  bridge.acceptNextRestore();
+  bridge.failNextOpenProjection();
+  await button(page, "More save options").click();
+  await page.getByRole("menuitem", { name: "Restore Backup…" }).click();
+  const restore = page.getByRole("dialog", { name: "Restore Bank Backup" });
+  await button(restore, "Review Restore…").click();
+  await button(restore, "Restore…").click();
+  await restore.waitFor({ state: "hidden" });
+  await button(page, "Finish opening bank").waitFor();
+  await page
+    .getByRole("status")
+    .filter({
+      hasText: `Restored ${name} on disk and saved a reversal backup.`,
+    })
+    .waitFor();
+  await page.getByRole("cell", { name: "009", exact: true }).waitFor();
+  assert(await button(page, "Save").isDisabled());
+  const restores = bridge.callsFor("restore_active_bank");
+  assert.equal(restores.length, 1);
+  const saves = bridge.callsFor("save_active_bank");
+  await finishAcceptedOpen(page, bridge, name, "003");
+  assert.deepEqual(bridge.callsFor("restore_active_bank"), restores);
+  assert.deepEqual(bridge.callsFor("save_active_bank"), saves);
 }
 
 async function verifyMalformedBackupList(page, bridge) {
@@ -892,6 +1001,9 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
     await page.goto(origin);
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
+      const currentName = "Replacement-2.SC2Bank";
+      await verifyAcceptedConflictReopen(page, bridge, currentName);
+      await verifyAcceptedBackupRestore(page, bridge, currentName);
       assert.deepEqual(bridge.unexpected, []);
       assert.deepEqual(errors, []);
       assert.deepEqual(rejected, []);
