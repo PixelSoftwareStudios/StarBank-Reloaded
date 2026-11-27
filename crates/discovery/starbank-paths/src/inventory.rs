@@ -296,9 +296,8 @@ pub(crate) fn open_child(
 #[cfg(unix)]
 struct FileIdentity(u64, u64);
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[cfg(windows)]
-struct FileIdentity(u64, [u8; 16]);
+type FileIdentity = crate::WindowsFileIdentity;
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[cfg(not(any(unix, windows)))]
@@ -322,9 +321,7 @@ fn file_identity(
 	_metadata: &Metadata,
 	path: &Path,
 ) -> Result<FileIdentity, PathError> {
-	let (volume, id) =
-		crate::windows::file_identity(dir, name).map_err(|source| PathError::io(path, source))?;
-	Ok(FileIdentity(volume, id))
+	crate::windows::file_identity(dir, name).map_err(|source| PathError::io(path, source))
 }
 
 #[cfg(not(any(unix, windows)))]

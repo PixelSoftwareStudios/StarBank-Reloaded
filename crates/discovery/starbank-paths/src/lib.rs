@@ -18,3 +18,5 @@ pub use inventory::{
 };
 pub use resolver::{AutoDetectedRoot, get_sc2_root_path};
 pub use selection::{BankRoot, PathSelection, PlayerScope, SelectionKind, is_valid_bank_path};
+#[cfg(windows)]
+pub use windows::{WindowsFileIdentity, open_windows_file_for_read};

@@ -180,6 +180,14 @@ impl Enumerator<'_> {
 					continue;
 				}
 			};
+			if is_archive(&child) {
+				match Fingerprint::at(&self.scope, &child) {
+					Ok(Some(fingerprint)) => self.add_archive(&child, fingerprint)?,
+					Ok(None) => {}
+					Err(source) => self.result.path_error(&self.root.join(&child), source),
+				}
+				continue;
+			}
 			let metadata = match self.scope.symlink_metadata(&child) {
 				Ok(metadata) => metadata,
 				Err(source) => {
@@ -187,10 +195,8 @@ impl Enumerator<'_> {
 					continue;
 				}
 			};
-			if metadata.is_dir() && !is_archive(&child) {
+			if metadata.is_dir() {
 				self.directory(&child, depth + 1)?;
-			} else if metadata.is_file() && is_archive(&child) {
-				self.add_archive(&child, Fingerprint::of(&metadata))?;
 			}
 		}
 		Ok(())
@@ -207,11 +213,9 @@ impl Enumerator<'_> {
 			);
 			return Ok(());
 		}
-		match self.scope.symlink_metadata(relative) {
-			Ok(metadata) if metadata.is_file() => {
-				self.add_archive(relative, Fingerprint::of(&metadata))
-			}
-			Ok(_) => {
+		match Fingerprint::at(&self.scope, relative) {
+			Ok(Some(fingerprint)) => self.add_archive(relative, fingerprint),
+			Ok(None) => {
 				self.result.path_error(
 					&self.root.join(relative),
 					io::Error::new(

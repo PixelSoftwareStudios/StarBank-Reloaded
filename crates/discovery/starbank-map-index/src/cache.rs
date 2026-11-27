@@ -6,7 +6,7 @@ use std::{
 	time::UNIX_EPOCH,
 };
 
-use cap_std::fs::Metadata;
+use cap_std::fs::{Dir, File, Metadata};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
@@ -94,10 +94,13 @@ pub(crate) struct Fingerprint {
 	pub(crate) len: u64,
 	pub(crate) modified_nanos: Option<i128>,
 	identity: Option<(u64, u64)>,
+	#[cfg(windows)]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	windows_identity: Option<(u64, [u8; 16])>,
 }
 
 impl Fingerprint {
-	pub(crate) fn of(metadata: &Metadata) -> Self {
+	fn of(metadata: &Metadata) -> Self {
 		Self {
 			len: metadata.len(),
 			modified_nanos: metadata.modified().ok().map(|modified| {
@@ -108,7 +111,52 @@ impl Fingerprint {
 				}
 			}),
 			identity: physical_identity(metadata),
+			#[cfg(windows)]
+			windows_identity: None,
 		}
+	}
+
+	pub(crate) fn at(scope: &Dir, relative: &Path) -> io::Result<Option<Self>> {
+		#[cfg(windows)]
+		{
+			starbank_paths::WindowsFileIdentity::observe(scope, relative)
+				.map(|observation| observation.map(Self::with_windows_identity))
+		}
+		#[cfg(not(windows))]
+		{
+			let metadata = scope.symlink_metadata(relative)?;
+			Ok(metadata.is_file().then(|| Self::of(&metadata)))
+		}
+	}
+
+	pub(crate) fn opened(file: &File) -> io::Result<Option<Self>> {
+		#[cfg(windows)]
+		{
+			starbank_paths::WindowsFileIdentity::observe_opened(file)
+				.map(|observation| observation.map(Self::with_windows_identity))
+		}
+		#[cfg(not(windows))]
+		{
+			let metadata = file.metadata()?;
+			Ok(metadata.is_file().then(|| Self::of(&metadata)))
+		}
+	}
+
+	#[cfg(windows)]
+	fn with_windows_identity(
+		(metadata, identity): (Metadata, Option<starbank_paths::WindowsFileIdentity>),
+	) -> Self {
+		Self {
+			windows_identity: identity.map(starbank_paths::WindowsFileIdentity::parts),
+			..Self::of(&metadata)
+		}
+	}
+
+	fn cache_key<'a>(&self, path: &'a Path) -> Option<&'a str> {
+		self.modified_nanos?;
+		#[cfg(windows)]
+		self.windows_identity?;
+		path.to_str()
 	}
 }
 
@@ -120,8 +168,6 @@ fn physical_identity(metadata: &Metadata) -> Option<(u64, u64)> {
 
 #[cfg(not(unix))]
 fn physical_identity(_metadata: &Metadata) -> Option<(u64, u64)> {
-	// Windows cache checks use size and modification time as their available
-	// fingerprint. A replacement preserving both can match the cached record.
 	None
 }
 
@@ -172,15 +218,12 @@ impl Cache {
 	}
 
 	pub(crate) fn get(&self, path: &Path, fingerprint: &Fingerprint) -> Option<&MapMetadata> {
-		fingerprint.modified_nanos?;
-		let entry = self.records.get(path.to_str()?)?;
+		let entry = self.records.get(fingerprint.cache_key(path)?)?;
 		(&entry.fingerprint == fingerprint).then_some(&entry.metadata)
 	}
 
 	pub(crate) fn insert(&mut self, path: &Path, fingerprint: Fingerprint, metadata: MapMetadata) {
-		if let Some(path) = path.to_str()
-			&& fingerprint.modified_nanos.is_some()
-		{
+		if let Some(path) = fingerprint.cache_key(path) {
 			self.records.insert(
 				path.to_owned(),
 				CacheRecord {

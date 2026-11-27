@@ -1,7 +1,15 @@
 use std::{fs, io, path::Path};
 
-use cap_std::fs::{Dir, File, OpenOptions};
+#[cfg(not(windows))]
+use cap_std::fs::OpenOptions;
+use cap_std::fs::{Dir, File};
 
+#[cfg(windows)]
+pub(crate) fn archive(scope: &Dir, relative: &Path) -> io::Result<File> {
+	starbank_paths::open_windows_file_for_read(scope, relative)
+}
+
+#[cfg(not(windows))]
 pub(crate) fn archive(scope: &Dir, relative: &Path) -> io::Result<File> {
 	let mut options = OpenOptions::new();
 	options.read(true);

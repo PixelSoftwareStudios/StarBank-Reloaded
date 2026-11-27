@@ -434,25 +434,22 @@ fn process_one(
 		));
 	}
 	let mut file = crate::open::archive(&work.scope, &work.relative).map_err(IndexIssueKind::Io)?;
-	let opened = file.metadata().map_err(IndexIssueKind::Io)?;
-	if !opened.is_file() || Fingerprint::of(&opened) != work.fingerprint {
+	let opened = Fingerprint::opened(&file).map_err(IndexIssueKind::Io)?;
+	if opened.as_ref() != Some(&work.fingerprint) {
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
 	let metadata = read_archive(&mut file)?;
-	let checked = file.metadata().map_err(IndexIssueKind::Io)?;
+	let checked = Fingerprint::opened(&file).map_err(IndexIssueKind::Io)?;
 	check_current_archive(work)?;
-	if Fingerprint::of(&checked) != work.fingerprint {
+	if checked.as_ref() != Some(&work.fingerprint) {
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
 	Ok((metadata, false))
 }
 
 fn check_current_archive(work: &ArchiveWork) -> Result<(), IndexIssueKind> {
-	let current = work
-		.scope
-		.symlink_metadata(&work.relative)
-		.map_err(IndexIssueKind::Io)?;
-	if !current.is_file() || Fingerprint::of(&current) != work.fingerprint {
+	let current = Fingerprint::at(&work.scope, &work.relative).map_err(IndexIssueKind::Io)?;
+	if current.as_ref() != Some(&work.fingerprint) {
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
 	Ok(())
