@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapInventory, MapListItem } from "starbank-ui";
 import { useInventoryBackupStatuses } from "./inventory-backup-status";
-import type { FileDialogReply } from "./transport";
+import { fileDialogReply, invokeChecked } from "./transport";
 
 interface InventorySnapshot {
   generation: string;
@@ -53,7 +53,7 @@ type InventoryQuery =
   | "select_inventory_folder";
 
 export function openInventoryBank(id: string, control: string) {
-  return invoke<FileDialogReply>("open_bank_id", { id, control });
+  return invokeChecked(fileDialogReply, "open_bank_id", { id, control });
 }
 
 export function useInventory({

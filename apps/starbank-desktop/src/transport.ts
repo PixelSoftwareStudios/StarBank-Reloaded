@@ -3,6 +3,7 @@ import type {
   EngineSignatureStatus,
   EngineSigningContext,
 } from "starbank-engine-client/protocol";
+import * as v from "valibot";
 
 const HEADER_BYTES = 5;
 const CONTROL_ONLY = 0;
@@ -12,12 +13,31 @@ const UNPAIRED_SURROGATE = /[\uD800-\uDFFF]/u;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
-export interface FileDialogReply {
-  name: string;
-  control: string;
-  can_overwrite?: boolean;
-  breadcrumbs?: readonly string[];
-}
+export const fileDialogReply = v.object({
+  name: v.string(),
+  control: v.string(),
+  can_overwrite: v.optional(v.boolean()),
+  breadcrumbs: v.optional(v.array(v.string())),
+});
+
+const optionalFileReply = v.nullable(fileDialogReply);
+const count = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
+const backupChoices = v.object({
+  records: v.array(
+    v.object({
+      id: count,
+      name: v.string(),
+      timestamp: v.string(),
+      placement: v.picklist(["adjacent", "managed"]),
+      health: v.picklist(["verified", "missing", "unverified"]),
+    }),
+  ),
+  rejectedMetadata: count,
+  unavailableLocations: count,
+});
+
+export type FileDialogReply = v.InferOutput<typeof fileDialogReply>;
+export type BackupChoices = v.InferOutput<typeof backupChoices>;
 
 interface NativeReply {
   control: string;
@@ -25,7 +45,19 @@ interface NativeReply {
 }
 
 export function pickBank(control: string): Promise<FileDialogReply | null> {
-  return invoke<FileDialogReply | null>("open_bank", { control });
+  return invokeChecked(optionalFileReply, "open_bank", { control });
+}
+
+export async function invokeChecked<Schema extends v.GenericSchema>(
+  schema: Schema,
+  command: string,
+  args: Record<string, unknown>,
+): Promise<v.InferOutput<Schema>> {
+  const result = v.safeParse(schema, await invoke<unknown>(command, args));
+  if (!result.success) {
+    throw new Error("StarBank received an invalid desktop response.");
+  }
+  return result.output;
 }
 
 export type ManualResignAction = {
@@ -67,7 +99,7 @@ export function exportBankCopy(
   control: string,
   suggestedName: string,
 ): Promise<FileDialogReply | null> {
-  return invoke<FileDialogReply | null>("export_bank_copy", {
+  return invokeChecked(optionalFileReply, "export_bank_copy", {
     control,
     suggestedName,
   });
@@ -130,35 +162,22 @@ export interface ActiveBankTarget {
   revision: string;
 }
 
-export interface BackupChoice {
-  id: number;
-  name: string;
-  timestamp: string;
-  placement: "adjacent" | "managed";
-  health: "verified" | "missing" | "unverified";
-}
-
-export interface BackupChoices {
-  records: readonly BackupChoice[];
-  rejectedMetadata: number;
-  unavailableLocations: number;
-}
-
 export function confirmBankNavigation(
   target: ActiveBankTarget,
   canSave: boolean,
 ) {
-  return invoke<"save" | "discard" | "cancel">("confirm_bank_navigation", {
-    target,
-    canSave,
-  });
+  return invokeChecked(
+    v.picklist(["save", "discard", "cancel"]),
+    "confirm_bank_navigation",
+    { target, canSave },
+  );
 }
 
 export function saveActiveBank(
   target: ActiveBankTarget,
   withBackup: boolean,
 ): Promise<FileDialogReply | null> {
-  return invoke<FileDialogReply | null>("save_active_bank", {
+  return invokeChecked(optionalFileReply, "save_active_bank", {
     target,
     withBackup,
   });
@@ -167,13 +186,13 @@ export function saveActiveBank(
 export function saveBankAs(
   target: ActiveBankTarget,
 ): Promise<FileDialogReply | null> {
-  return invoke<FileDialogReply | null>("save_bank_as", { target });
+  return invokeChecked(optionalFileReply, "save_bank_as", { target });
 }
 
 export function listActiveBackups(
   target: ActiveBankTarget,
 ): Promise<BackupChoices> {
-  return invoke<BackupChoices>("list_active_backups", { target });
+  return invokeChecked(backupChoices, "list_active_backups", { target });
 }
 
 export function exportActiveBackup(
@@ -202,7 +221,7 @@ export function restoreActiveBank(
   target: ActiveBankTarget,
   backupId: number,
 ): Promise<FileDialogReply | null> {
-  return invoke<FileDialogReply | null>("restore_active_bank", {
+  return invokeChecked(optionalFileReply, "restore_active_bank", {
     target,
     backupId,
   });
@@ -234,7 +253,7 @@ export function compareBankConflict(target: ActiveBankTarget) {
 }
 
 export function reopenBankConflict(target: ActiveBankTarget, reviewId: string) {
-  return invoke<FileDialogReply | null>("reopen_bank_conflict", {
+  return invokeChecked(optionalFileReply, "reopen_bank_conflict", {
     target,
     reviewId,
   });

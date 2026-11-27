@@ -108,6 +108,7 @@ function createBridge(engine, canOverwrite) {
   let navigation;
   let openCount = 0;
   let saved = false;
+  let malformedBackupList = false;
 
   function dirtySnapshot(target) {
     const reply = JSON.parse(
@@ -190,6 +191,9 @@ function createBridge(engine, canOverwrite) {
         };
       case "list_active_backups":
         dirtySnapshot(args.target);
+        if (malformedBackupList) {
+          return { value: { ...backups, unavailableLocations: -1 } };
+        }
         return { value: backups };
       case "export_active_backup":
         dirtySnapshot(args.target);
@@ -251,6 +255,9 @@ function createBridge(engine, canOverwrite) {
     unexpected,
     choose(choice, outcome) {
       navigation = { choice, outcome };
+    },
+    corruptBackupList() {
+      malformedBackupList = true;
     },
     callsFor(command) {
       return calls
@@ -500,6 +507,22 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   });
 }
 
+async function verifyMalformedBackupList(page, bridge) {
+  await editGold(page, "004");
+  bridge.corruptBackupList();
+  await button(page, "More save options").click();
+  await page.getByRole("menuitem", { name: "Restore Backup…" }).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "StarBank received an invalid desktop response." })
+    .waitFor();
+  assert.equal(await goldField(page).inputValue(), "004");
+  assert.equal(
+    await page.getByRole("dialog", { name: "Restore Bank Backup" }).count(),
+    0,
+  );
+}
+
 async function verifyRenderer(browser, canOverwrite) {
   const context = await browser.newContext({
     offline: true,
@@ -556,6 +579,7 @@ async function verifyRenderer(browser, canOverwrite) {
     await verifyBackupCopy(page, bridge, canOverwrite);
     if (canOverwrite) await verifyBackupRestoreReview(page, bridge);
     await verifyBankNavigation(page, bridge, canOverwrite);
+    if (canOverwrite) await verifyMalformedBackupList(page, bridge);
     assert.deepEqual(bridge.unexpected, []);
     assert.deepEqual(errors, []);
     assert.deepEqual(rejected, []);

@@ -10,13 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "starbank-engine-client": "workspace:*",
-    "starbank-platform": "workspace:*",
-    "starbank-ui": "workspace:*",
     "@tauri-apps/api": "2.12.5",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tailwindcss": "catalog:"
+    "starbank-engine-client": "workspace:*",
+    "starbank-platform": "workspace:*",
+    "starbank-ui": "workspace:*",
+    "tailwindcss": "catalog:",
+    "valibot": "1.5.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.5",
