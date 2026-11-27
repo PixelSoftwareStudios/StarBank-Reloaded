@@ -3,6 +3,7 @@
 use super::super::super::{
 	DirectoryScope, Observation, read_snapshot,
 	rename_qualification::{prepare_reduced_fixture, with_reduced_token},
+	stage_security::diagnostics::verify_backing_access,
 };
 use super::super::{CommitPhase, Scope, try_create_scoped};
 use super::{CleanupFailure, PrivateStageSecurity, Stage, State, dispose};
@@ -29,11 +30,14 @@ mod access;
 const ROOT_ENV: &str = "STARBANK_ENOSPC_NTFS_ROOT";
 const VOLUME_ENV: &str = "STARBANK_ENOSPC_NTFS_VOLUME";
 const MARKER_ENV: &str = "STARBANK_ENOSPC_NTFS_MARKER";
+const BACKING_SDDL_ENV: &str = "STARBANK_ENOSPC_NTFS_BACKING_SDDL";
 const MARKER_FILE: &str = ".starbank-ntfs-enospc";
 const MARKER_BYTES: usize = 32;
 const LABEL_PREFIX: &str = "SBENOSPC-";
 const LABEL_NONCE_BYTES: usize = 8;
 const NAME_UNITS: u32 = 64;
+// GetVolumeInformationByHandleW reports this flag for a read-only volume.
+const FILE_READ_ONLY_VOLUME: u32 = 0x0008_0000;
 const MIB: usize = 1024 * 1024;
 const VOLUME_BYTES: usize = 128 * MIB;
 const MINIMUM_VOLUME_BYTES: usize = 112 * MIB;
@@ -146,7 +150,8 @@ fn verify_volume(scope: &DirectoryScope, volume: &str, label: &str) -> Result<()
 
 	let mut filesystem = [0; NAME_UNITS as usize];
 	let mut actual_label = [0; NAME_UNITS as usize];
-	// SAFETY: the held root handle and both exact writable Windows name buffers are live.
+	let mut flags = 0;
+	// SAFETY: the held root handle and all writable Windows output buffers are live.
 	let ok = unsafe {
 		GetVolumeInformationByHandleW(
 			scope.parent.as_raw_handle(),
@@ -154,7 +159,7 @@ fn verify_volume(scope: &DirectoryScope, volume: &str, label: &str) -> Result<()
 			NAME_UNITS,
 			ptr::null_mut(),
 			ptr::null_mut(),
-			ptr::null_mut(),
+			&mut flags,
 			filesystem.as_mut_ptr(),
 			NAME_UNITS,
 		)
@@ -171,6 +176,9 @@ fn verify_volume(scope: &DirectoryScope, volume: &str, label: &str) -> Result<()
 	};
 	assert!(matches_name(&filesystem, "NTFS"), "fixture must be NTFS");
 	assert!(matches_name(&actual_label, label), "fixture label mismatch");
+	let read_only = flags & FILE_READ_ONLY_VOLUME != 0;
+	eprintln!("NTFS disk-full fixture: mounted volume read_only={read_only}, flags={flags:#010x}");
+	assert!(!read_only, "fixture volume must allow writes");
 	Ok(())
 }
 
@@ -180,6 +188,9 @@ fn exercise_disk_full(
 	owned_scope: &DirectoryScope,
 ) -> Result<(), Box<dyn Error>> {
 	assert_mount_is_bound(mount)?;
+	let backing_sddl = env::var(BACKING_SDDL_ENV)
+		.map_err(|_| io::Error::other("missing verified backing VHD descriptor"))?;
+	verify_backing_access(&backing_sddl)?;
 	let target = prepared.join(TARGET_NAME);
 	let original = prepared.join(ORIGINAL_NAME);
 	// prepare_reduced_fixture has already read back the actual user-only DACL on this directory.

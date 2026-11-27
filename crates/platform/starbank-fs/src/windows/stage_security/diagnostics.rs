@@ -2,7 +2,7 @@
 
 use super::{
 	EffectiveToken, LocalAllocation, MAX_OBSERVED_ACES, MAX_TOKEN_BYTES, SID_HEADER_BYTES,
-	SecurityObservation, win32,
+	SecurityDescriptor, SecurityObservation, win32,
 };
 use crate::StorageError;
 use std::{
@@ -15,18 +15,79 @@ use std::{
 use windows_sys::Win32::{
 	Foundation::ERROR_SUCCESS,
 	Security::{
-		ACE_HEADER,
+		ACE_HEADER, AccessCheck,
 		Authorization::{GetSecurityInfo, SE_FILE_OBJECT},
-		GetAce, GetSecurityDescriptorSacl, GetTokenInformation, INHERIT_ONLY_ACE, IsValidAcl,
-		LABEL_SECURITY_INFORMATION, SE_DACL_PROTECTED, SYSTEM_MANDATORY_LABEL_ACE,
-		TOKEN_MANDATORY_LABEL, TOKEN_MANDATORY_POLICY, TokenIntegrityLevel, TokenMandatoryPolicy,
+		GENERIC_MAPPING, GetAce, GetSecurityDescriptorSacl, GetTokenInformation, INHERIT_ONLY_ACE,
+		IsValidAcl, LABEL_SECURITY_INFORMATION, PRIVILEGE_SET, SE_DACL_PROTECTED,
+		SYSTEM_MANDATORY_LABEL_ACE, TOKEN_MANDATORY_LABEL, TOKEN_MANDATORY_POLICY,
+		TokenIntegrityLevel, TokenMandatoryPolicy,
 	},
-	Storage::FileSystem::FILE_ALL_ACCESS,
+	Storage::FileSystem::{
+		FILE_ALL_ACCESS, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
+	},
 };
 
 const MANDATORY_LABEL_ACE_TYPE: u8 = 0x11;
+const BACKING_SDDL_MAX_BYTES: usize = 4096;
 // Revision 1, one subauthority, SECURITY_MANDATORY_LABEL_AUTHORITY (S-1-16).
 const INTEGRITY_SID_HEADER: [u8; SID_HEADER_BYTES] = [1, 1, 0, 0, 0, 0, 0, 16];
+
+pub(in crate::windows) fn verify_backing_access(sddl: &str) -> Result<(), StorageError> {
+	if sddl.len() > BACKING_SDDL_MAX_BYTES || !sddl.is_ascii() || sddl.as_bytes().contains(&0) {
+		return Err(StorageError::UnsafeMetadata(
+			"invalid backing VHD descriptor encoding",
+		));
+	}
+	let descriptor = SecurityDescriptor::from_sddl(sddl)?;
+	let observation = SecurityObservation::from_descriptor(&descriptor)?;
+	let token = EffectiveToken::current()?;
+	let user = token.user()?;
+	let exact_user_full_access = observation.control & SE_DACL_PROTECTED != 0
+		&& matches!(observation.dacl.as_slice(), [ace]
+			if ace.sid == user && ace.mask == FILE_ALL_ACCESS && ace.flags == 0);
+	if !exact_user_full_access {
+		return Err(StorageError::UnsafeMetadata(
+			"the backing VHD descriptor did not match the reduced user",
+		));
+	}
+	let mapping = GENERIC_MAPPING {
+		GenericRead: FILE_GENERIC_READ,
+		GenericWrite: FILE_GENERIC_WRITE,
+		GenericExecute: FILE_GENERIC_EXECUTE,
+		GenericAll: FILE_ALL_ACCESS,
+	};
+	let mut privileges = PRIVILEGE_SET::default();
+	let mut privilege_size = size_of::<PRIVILEGE_SET>() as u32;
+	let (mut granted, mut permitted) = (0, 0);
+	// SAFETY: the captured readback descriptor and effective impersonation token are live,
+	// the file mask is concrete, and all output buffers match the SDK types and sizes.
+	win32(
+		"check reduced actor access to the backing VHD descriptor",
+		unsafe {
+			AccessCheck(
+				descriptor.as_ptr(),
+				token.0.as_raw_handle(),
+				FILE_ALL_ACCESS,
+				&mapping,
+				&mut privileges,
+				&mut privilege_size,
+				&mut granted,
+				&mut permitted,
+			)
+		},
+	)?;
+	let full_access = permitted != 0 && granted & FILE_ALL_ACCESS == FILE_ALL_ACCESS;
+	eprintln!(
+		"NTFS backing descriptor AccessCheck: exact_user_full_access={exact_user_full_access} allowed={} granted={granted:#010x}",
+		permitted != 0
+	);
+	if !full_access {
+		return Err(StorageError::UnsafeMetadata(
+			"backing VHD descriptor refused the reduced actor",
+		));
+	}
+	Ok(())
+}
 
 pub(in crate::windows) fn report_token() {
 	match EffectiveToken::current().and_then(|token| token_integrity(&token)) {

@@ -21,8 +21,8 @@ use windows_sys::{
 	Wdk::{
 		Foundation::OBJECT_ATTRIBUTES,
 		Storage::FileSystem::{
-			FILE_OPEN, FILE_OPEN_NO_RECALL, FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT,
-			NtCreateFile,
+			FILE_DIRECTORY_FILE, FILE_OPEN, FILE_OPEN_NO_RECALL, FILE_OPEN_REPARSE_POINT,
+			FILE_SYNCHRONOUS_IO_NONALERT, NtCreateFile,
 		},
 	},
 	Win32::{
@@ -42,9 +42,10 @@ const READ_BASE: u32 = DIRECTORY_ACCESS | READ_CONTROL;
 const OPTIONS: u32 = FILE_OPEN_NO_RECALL | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT;
 const SHARING: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
-enum QualityOfService {
+enum OpenVariant {
 	MatchedCap,
-	Absent,
+	WithoutQos,
+	ExplicitDirectory,
 }
 
 pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn Error>> {
@@ -62,9 +63,13 @@ pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn 
 	check_component(leaf)?;
 
 	report_token();
-	for (name, qos) in [
-		("full matched cap", QualityOfService::MatchedCap),
-		("full without QoS", QualityOfService::Absent),
+	for (name, variant) in [
+		("full matched cap", OpenVariant::MatchedCap),
+		("full without QoS", OpenVariant::WithoutQos),
+		(
+			"full with explicit directory intent",
+			OpenVariant::ExplicitDirectory,
+		),
 	] {
 		drop(probe(
 			name,
@@ -72,7 +77,7 @@ pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn 
 			leaf,
 			scoped.identity,
 			CAP_ACCESS,
-			qos,
+			variant,
 		)?);
 	}
 	drop(probe(
@@ -81,7 +86,7 @@ pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn 
 		leaf,
 		scoped.identity,
 		DIRECTORY_ACCESS,
-		QualityOfService::MatchedCap,
+		OpenVariant::MatchedCap,
 	)?);
 	if let Some(read) = probe(
 		"read plus READ_CONTROL",
@@ -89,7 +94,7 @@ pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn 
 		leaf,
 		scoped.identity,
 		READ_BASE,
-		QualityOfService::MatchedCap,
+		OpenVariant::MatchedCap,
 	)? {
 		report_descriptor(&read);
 	}
@@ -105,7 +110,7 @@ pub(super) fn report(path: &Path, owned: &DirectoryScope) -> Result<(), Box<dyn 
 			leaf,
 			scoped.identity,
 			DIRECTORY_ACCESS | right,
-			QualityOfService::MatchedCap,
+			OpenVariant::MatchedCap,
 		)?);
 	}
 	Ok(())
@@ -117,7 +122,7 @@ fn probe(
 	leaf: &OsStr,
 	expected: Identity,
 	access: u32,
-	qos: QualityOfService,
+	variant: OpenVariant,
 ) -> Result<Option<File>, Box<dyn Error>> {
 	let mut units: Vec<_> = leaf.encode_wide().collect();
 	let byte_len = u16::try_from(units.len() * size_of::<u16>())?;
@@ -133,7 +138,11 @@ fn probe(
 		ContextTrackingMode: u8::from(SECURITY_STATIC_TRACKING),
 		EffectiveOnly: false,
 	};
-	let qos_matches_cap = matches!(qos, QualityOfService::MatchedCap);
+	let qos_matches_cap = !matches!(variant, OpenVariant::WithoutQos);
+	let options = match variant {
+		OpenVariant::ExplicitDirectory => OPTIONS | FILE_DIRECTORY_FILE,
+		_ => OPTIONS,
+	};
 	let attributes = OBJECT_ATTRIBUTES {
 		Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
 		RootDirectory: parent.as_raw_handle(),
@@ -161,7 +170,7 @@ fn probe(
 			FILE_ATTRIBUTE_NORMAL,
 			SHARING,
 			FILE_OPEN,
-			OPTIONS,
+			options,
 			ptr::null(),
 			0,
 		)
@@ -174,7 +183,9 @@ fn probe(
 	// SAFETY: initialized to STATUS_PENDING; NtCreateFile may replace it with a final status.
 	let io_status = unsafe { completion.Anonymous.Status };
 	eprintln!(
-		"NTFS access probe {name}: access={access:#010x} options={OPTIONS:#010x} 		 share={SHARING:#04x} anonymous_qos={qos_matches_cap} status={status:#010x} 		 io_status={io_status:#010x}"
+		"NTFS access probe {name}: access={access:#010x} options={options:#010x} \
+		 share={SHARING:#04x} anonymous_qos={qos_matches_cap} status={status:#010x} \
+		 io_status={io_status:#010x}"
 	);
 	if status != STATUS_SUCCESS {
 		return Ok(None);
