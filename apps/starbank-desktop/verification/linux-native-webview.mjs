@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { chooseGtkExportDestination } from "./linux-gtk-save.mjs";
 
 const loopback = "127.0.0.1";
 const commandTimeout = 5_000;
@@ -171,7 +172,7 @@ const queue = 'aside[aria-label="File open requests"]';
 const gold = 'table input[aria-label="Gold value"]';
 const xml = '[aria-label="Bank XML"]';
 
-async function verifyEditor(command, first, second) {
+async function verifyEditor(command, first, second, exportCopy) {
   const evaluate = (script, ...args) =>
     command("/execute/sync", "POST", { script, args });
   const content = (selector) =>
@@ -190,6 +191,8 @@ async function verifyEditor(command, first, second) {
       const [selector, name] = arguments;
       return Array.from(document.querySelectorAll(selector)).find((element) =>
         element.getClientRects().length > 0 && !element.disabled &&
+        element.getAttribute("aria-disabled") !== "true" &&
+        !element.hasAttribute("data-disabled") &&
         (name === null || element.textContent.trim() === name)
       ) ?? null;
     `,
@@ -300,6 +303,19 @@ async function verifyEditor(command, first, second) {
   await waitFor("normalized value in the native Raw projection", async () =>
     (await content(xml))?.includes('int="1234"'),
   );
+  await click('button[aria-label="More save options"]', null);
+  await click('[role="menuitem"]', "Export copy…");
+  await exportCopy();
+  await waitFor(
+    "a verified export receipt with the dirty document retained",
+    async () =>
+      (await content(".editor-status"))?.includes("Exported Copy.sc2bank.") &&
+      (await content(".document-editor h1")) === first &&
+      (await content(".editor-dirty-status")) ===
+        "Unsaved changes in 1 section" &&
+      (await content(xml))?.includes('int="1234"') &&
+      (await queuedName(second)) === second,
+  );
   await clickButton("Undo");
   await waitFor(
     "the original clean revision",
@@ -332,7 +348,7 @@ async function run(application) {
   let session;
   let verificationError;
   try {
-    const environment = { ...process.env };
+    const environment = { ...process.env, GTK_USE_PORTAL: "0" };
     for (const directory of ["CONFIG", "CACHE", "DATA"]) {
       const path = join(scratch, directory.toLowerCase());
       await mkdir(path);
@@ -377,6 +393,20 @@ async function run(application) {
         request(driver.origin, session + path, method, body),
       first,
       second,
+      async () => {
+        const destination = join(scratch, "Copy.sc2bank");
+        await chooseGtkExportDestination(destination);
+        await waitFor("the exported bank file", async () => {
+          try {
+            return (await readFile(destination)).equals(bank("1234"));
+          } catch (error) {
+            if (error.code === "ENOENT") return false;
+            throw error;
+          }
+        });
+        for (const [name, bytes] of inputs)
+          assert.deepEqual(await readFile(join(scratch, name)), bytes);
+      },
     );
     for (const [name, bytes] of inputs)
       assert.deepEqual(await readFile(join(scratch, name)), bytes);
@@ -406,7 +436,7 @@ async function run(application) {
   }
   if (verificationError) throw verificationError;
   console.log(
-    "Linux native open, Table draft guard, Raw adoption, undo, and queued reopen passed.",
+    "Linux native open, Table draft guard, Raw adoption, GTK export copy, undo, and queued reopen passed.",
   );
 }
 
