@@ -8,6 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"dispatch_bank",
 			"export_bank_copy",
 			"can_export_bank",
+			"can_create_bank_copy",
 			"list_open_requests",
 			"dismiss_open_request",
 			"open_requested_bank",

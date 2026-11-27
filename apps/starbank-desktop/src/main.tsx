@@ -50,6 +50,7 @@ import { OpenRequests, openRequestedBank } from "./open-requests";
 import { resignOpenBank } from "./resign-bank";
 import type { ActiveBankTarget, FileDialogReply } from "./transport";
 import {
+  canCreateBankCopy,
   canExportBank,
   canRevealBank,
   compareBankConflict,
@@ -133,7 +134,8 @@ function DesktopApp() {
   const [selectedBankId, setSelectedBankId] = useState<string>();
   const [backupGeneration, setBackupGeneration] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [exportAvailable, setExportAvailable] = useState(false);
+  const [legacyExportAvailable, setLegacyExportAvailable] = useState(false);
+  const [createCopyAvailable, setCreateCopyAvailable] = useState(false);
   const [revealAvailable, setRevealAvailable] = useState(false);
   const [overwriteAvailable, setOverwriteAvailable] = useState(false);
   const [backupPrompt, setBackupPrompt] = useState<BackupPrompt>();
@@ -142,12 +144,17 @@ function DesktopApp() {
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
-  const backupPreferences = useBackupPreferences(exportAvailable);
+  const backupPreferences = useBackupPreferences(legacyExportAvailable);
   const { theme, textSize } = preferences.settings;
   const backupStatus = useActiveBackupStatus(
     document?.projection,
     backupGeneration,
   );
+  const saveBeforeLeaving = overwriteAvailable
+    ? "overwrite"
+    : legacyExportAvailable && createCopyAvailable
+      ? "new"
+      : undefined;
 
   const closeGuard = useNativeCloseGuard({
     busy,
@@ -161,12 +168,9 @@ function DesktopApp() {
       !refreshTarget &&
       !openRecovery &&
       !verifiedReopen &&
-      (overwriteAvailable || exportAvailable)
+      saveBeforeLeaving
         ? async () => {
-            const result = await save(
-              document.projection,
-              overwriteAvailable ? "overwrite" : "new",
-            );
+            const result = await save(document.projection, saveBeforeLeaving);
             if (result.message) setNativeNotice(result.message);
             return result.ok && result.message !== undefined;
           }
@@ -179,7 +183,8 @@ function DesktopApp() {
   }, [theme, textSize]);
 
   useEffect(() => {
-    void canExportBank().then(setExportAvailable, () => {});
+    void canExportBank().then(setLegacyExportAvailable, () => {});
+    void canCreateBankCopy().then(setCreateCopyAvailable, () => {});
     void canRevealBank().then(setRevealAvailable, () => {});
   }, []);
 
@@ -489,16 +494,14 @@ function DesktopApp() {
       let discardRequestId: string | undefined;
       const current = document?.projection;
       if (current?.dirty) {
-        const mode = overwriteAvailable
-          ? "overwrite"
-          : exportAvailable
-            ? "new"
-            : undefined;
         const target = activeTarget(current);
-        const choice = await confirmBankNavigation(target, mode !== undefined);
+        const choice = await confirmBankNavigation(
+          target,
+          saveBeforeLeaving !== undefined,
+        );
         if (choice === "discard") discardRequestId = target.requestId;
-        else if (choice === "save" && mode) {
-          const saved = await saveCurrent(current, mode);
+        else if (choice === "save" && saveBeforeLeaving) {
+          const saved = await saveCurrent(current, saveBeforeLeaving);
           if (!saved.ok || !saved.message) return saved;
         } else return { ok: true };
       }
@@ -776,7 +779,7 @@ function DesktopApp() {
           );
           finish({ ok: false, message: result.message ?? message });
         },
-        saveAs: exportAvailable
+        saveAs: createCopyAvailable
           ? async () => {
               const saved = await saveRevision(target, "new");
               if (saved.ok && saved.message !== undefined) {
@@ -960,11 +963,11 @@ function DesktopApp() {
     onSave: overwriteAvailable
       ? (target) => save(target, "overwrite")
       : undefined,
-    onSaveAs: exportAvailable ? (target) => save(target, "new") : undefined,
+    onSaveAs: createCopyAvailable ? (target) => save(target, "new") : undefined,
     onSaveWithBackup: overwriteAvailable
       ? (target) => save(target, "backup")
       : undefined,
-    onBackupHistory: exportAvailable ? browseBackups : undefined,
+    onBackupHistory: legacyExportAvailable ? browseBackups : undefined,
     canRestoreBackup: overwriteAvailable,
     onReveal: revealAvailable
       ? (target) =>
@@ -986,7 +989,7 @@ function DesktopApp() {
           errorMessage: messageFor,
         }),
       ),
-    onExport: exportAvailable
+    onExport: createCopyAvailable
       ? (target) =>
           action(async () => {
             const { projection } = activeDocument(target);
@@ -1059,7 +1062,10 @@ function DesktopApp() {
   return (
     <>
       <AppShell
-        platformInfo={__STARBANK_PLATFORM_INFO__}
+        platformInfo={{
+          ...__STARBANK_PLATFORM_INFO__,
+          canCreateBankCopy: createCopyAvailable,
+        }}
         name={APP_NAME}
         editor={controller}
         openRecovery={
@@ -1093,7 +1099,7 @@ function DesktopApp() {
         inventory={inventoryWithBackupStatus}
         preferences={preferences}
         backupSettings={
-          exportAvailable && (
+          legacyExportAvailable && (
             <>
               <BackupPreferencesFields
                 preferences={backupPreferences.preferences}
@@ -1141,7 +1147,10 @@ function DesktopApp() {
               writeRecovery ? () => setWriteRecoveryVisible(true) : undefined
             }
             onResignExternal={
-              exportAvailable && !busy && !verifiedReopen && !closeGuard.pending
+              createCopyAvailable &&
+              !busy &&
+              !verifiedReopen &&
+              !closeGuard.pending
                 ? () => {
                     void action(() =>
                       resignExternalBank({
@@ -1155,14 +1164,14 @@ function DesktopApp() {
             externalSigningUnavailable={
               verifiedReopen
                 ? REOPEN_REQUIRED
-                : exportAvailable
+                : createCopyAvailable
                   ? undefined
                   : "Signed copy export is unavailable on this platform."
             }
             availability={
               verifiedReopen
                 ? { kind: "unavailable", reason: REOPEN_REQUIRED }
-                : !exportAvailable
+                : !legacyExportAvailable
                   ? {
                       kind: "unavailable",
                       reason: "Batch backup is unavailable on this platform.",

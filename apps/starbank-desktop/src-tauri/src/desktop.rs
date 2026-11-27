@@ -93,6 +93,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::commands::dispatch_bank,
 			crate::export::export_bank_copy,
 			crate::export::can_export_bank,
+			crate::export::can_create_bank_copy,
 			open_requests::list_open_requests,
 			open_requests::dismiss_open_request,
 			open_requests::open_requested_bank,

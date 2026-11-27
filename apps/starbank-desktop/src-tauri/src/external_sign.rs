@@ -12,7 +12,7 @@ use tauri::{Manager as _, State, WebviewWindow};
 use crate::recovery::{RecoveryOperation, WriteContext, uncertain_result};
 use crate::{
 	commands::{CommandError, DesktopEngine},
-	export::can_export_bank,
+	export::can_create_bank_copy,
 	resign::{CheckedSignature, ManualContext},
 	save::write_rejected,
 	selection::{
@@ -185,7 +185,7 @@ pub(crate) async fn pick_external_bank_to_resign(
 	window: WebviewWindow,
 	engine: State<'_, DesktopEngine>,
 ) -> Result<Option<ExternalSigningSource>, CommandError> {
-	if !can_export_bank() {
+	if !can_create_bank_copy() {
 		return Err(CommandError::Unavailable);
 	}
 	let _dialog = engine.dialog()?;
@@ -233,7 +233,7 @@ pub(crate) async fn export_external_signed_bank(
 	id: String,
 	context: Option<ManualContext>,
 ) -> Result<Option<String>, CommandError> {
-	if !can_export_bank() {
+	if !can_create_bank_copy() {
 		return Err(CommandError::Unavailable);
 	}
 	let _dialog = engine.dialog()?;

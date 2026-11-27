@@ -11,6 +11,14 @@ import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 const dist = fileURLToPath(
   new URL("../../starbank-desktop/dist", import.meta.url),
 );
+const buildPlatformLabel =
+  new Map([
+    ["darwin", "macOS"],
+    ["macos", "macOS"],
+    ["linux", "Linux"],
+    ["windows", "Windows"],
+    ["win32", "Windows"],
+  ]).get(process.env.TAURI_ENV_PLATFORM ?? process.platform) ?? "Desktop";
 const origin = "https://starbank-desktop.test";
 const wasm = new URL("../src/generated/starbank_wasm_bg.wasm", import.meta.url);
 const initialName = "Synthetic.SC2Bank";
@@ -26,6 +34,10 @@ const restoredBank = Buffer.from(
   initialBank.toString().replace('"001"', '"003"'),
 );
 const storageRefusal = "Synthetic storage refusal.";
+const savedCopyName = "Saved Copy.SC2Bank";
+const exportedCopyName = "Exported Copy.SC2Bank";
+const signedCopyName = "Signed Copy.SC2Bank";
+const externalSigningSourceId = "fixture-external-bank";
 const frameHeaderBytes = 5;
 const controlLengthOffset = 1;
 const settings = {
@@ -139,7 +151,7 @@ function dispatchFrame(engine, packet, beforeDispatch, afterDispatch) {
   return Array.from(output);
 }
 
-function createBridge(engine, canOverwrite) {
+function createBridge(engine, canOverwrite, copyCapability) {
   const calls = [];
   const unexpected = [];
   let navigation;
@@ -307,7 +319,9 @@ function createBridge(engine, canOverwrite) {
       case "list_open_requests":
         return { value: [] };
       case "can_export_bank":
-        return { value: true };
+        return { value: copyCapability === undefined };
+      case "can_create_bank_copy":
+        return copyCapability ?? { value: true };
       case "can_reveal_bank":
         return { value: false };
       case "refresh_inventory":
@@ -365,6 +379,28 @@ function createBridge(engine, canOverwrite) {
       case "export_active_backup":
         dirtySnapshot(args.target);
         return { value: "Backup Copy.SC2Bank" };
+      case "export_bank_copy": {
+        const { control, bytes } = dispatch(engine, args.control);
+        assert.equal(JSON.parse(control).result.kind, "prepared");
+        assert.deepEqual(
+          Buffer.from(bytes),
+          Buffer.from(initialBank.toString().replace('"001"', '"002"')),
+        );
+        return { value: { name: exportedCopyName, control } };
+      }
+      case "pick_external_bank_to_resign":
+        return {
+          value: {
+            id: externalSigningSourceId,
+            name: "External.SC2Bank",
+            requires_context: false,
+            signature_status: "valid",
+          },
+        };
+      case "export_external_signed_bank":
+        return { value: signedCopyName };
+      case "discard_external_signing_source":
+        return {};
       case "review_active_backup":
         dirtySnapshot(args.target);
         return {
@@ -434,7 +470,7 @@ function createBridge(engine, canOverwrite) {
         saved = true;
         return {
           value: {
-            name: canOverwrite ? initialName : "Saved Copy.SC2Bank",
+            name: canOverwrite ? initialName : savedCopyName,
             can_overwrite: canOverwrite,
             control: JSON.stringify(snapshot),
           },
@@ -529,6 +565,10 @@ async function bindRenderer(page, bridge) {
         );
         if (command === "confirm_bank_navigation")
           window.fixtureNavigationReplies += 1;
+        if (command === "can_create_bank_copy")
+          window.fixtureCopyCapabilityReplied = true;
+        if (command === "save_bank_as")
+          window.fixtureSaveAsReplies = (window.fixtureSaveAsReplies ?? 0) + 1;
         if (reply.error) throw reply.error;
         return binary ? Uint8Array.from(reply.value).buffer : reply.value;
       },
@@ -1261,7 +1301,196 @@ async function refreshEditorOnly(page, bridge) {
   assert.equal(reads[0].expected_revision, reads[1].expected_revision);
 }
 
-async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
+async function verifyCreateOnlyCopyActions(page, bridge, toolsMenu, external) {
+  await external.press("Enter");
+  await page
+    .getByRole("status")
+    .filter({ hasText: `Saved verified signed copy ${signedCopyName}.` })
+    .waitFor();
+  await toolsMenu.waitFor({ state: "hidden" });
+  assert.deepEqual(bridge.callsFor("pick_external_bank_to_resign"), [{}]);
+  assert.deepEqual(bridge.callsFor("export_external_signed_bank"), [
+    { id: externalSigningSourceId, context: null },
+  ]);
+  assert.deepEqual(bridge.callsFor("discard_external_signing_source"), [
+    { id: externalSigningSourceId },
+  ]);
+
+  const dirty = page.getByRole("status").filter({ hasText: "Unsaved changes" });
+  await dirty.waitFor();
+  const sourceRevision = bridge.wireRequests.findLast(
+    ({ command }) => command.kind === "raw_text",
+  );
+  await button(page, "More save options").click();
+  await page
+    .getByRole("menuitem", { name: "Export copy…", exact: true })
+    .click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: `Exported ${exportedCopyName}.` })
+    .waitFor();
+  const exports = bridge.callsFor("export_bank_copy");
+  assert.equal(exports.length, 1);
+  const [{ control, suggestedName }] = exports;
+  const request = JSON.parse(control);
+  assert.equal(suggestedName, initialName);
+  assert.deepEqual(request.command, { kind: "prepare" });
+  assert.equal(request.document_id, sourceRevision.document_id);
+  assert.equal(request.expected_revision, sourceRevision.expected_revision);
+  assert(await dirty.isVisible());
+  assert.equal(await goldField(page).inputValue(), "002");
+  assert(await page.getByRole("heading", { name: initialName }).isVisible());
+
+  bridge.choose("save", "success");
+  const saveAs = button(page, "Save As…");
+  await saveAs.click();
+  await page
+    .getByRole("heading", { name: savedCopyName, exact: true })
+    .waitFor();
+  await dirty.waitFor({ state: "hidden" });
+  assert.equal(bridge.callsFor("save_bank_as").length, 1);
+
+  const gold = goldField(page);
+  await gold.fill("9,007,199,254,740,993");
+  await gold.press("Control+s");
+  await page.waitForFunction(() => window.fixtureSaveAsReplies === 2);
+  await saveAs.click({ trial: true });
+  const saves = bridge.callsFor("save_bank_as");
+  assert.equal(saves.length, 2);
+  assert.notEqual(saves[0].target.revision, saves[1].target.revision);
+  await page.getByRole("tab", { name: "Raw View" }).click();
+  await page
+    .getByRole("textbox", { name: "Bank XML" })
+    .filter({ hasText: 'int="9007199254740993"' })
+    .waitFor();
+}
+
+async function verifyCreateOnlyRenderer(page, bridge, canCreateCopy) {
+  await page.waitForFunction(
+    () => window.fixtureCopyCapabilityReplied === true,
+  );
+  await openBank(page);
+  await editGold(page, "002");
+
+  await button(page, "Settings").click();
+  const settingsPanel = page.getByRole("region", { name: "Settings" });
+  const platform = settingsPanel
+    .getByRole("term")
+    .filter({ hasText: /^Platform$/u });
+  assert.equal(
+    await platform.locator("..").getByRole("definition").textContent(),
+    buildPlatformLabel,
+  );
+  assert.equal(await settingsPanel.getByLabel("Automatic backup").count(), 0);
+  assert.equal(
+    await settingsPanel.getByText("Managed backup folder").count(),
+    0,
+  );
+  if (buildPlatformLabel === "Windows") {
+    await settingsPanel
+      .getByText(
+        canCreateCopy
+          ? "Save As and file export require an unused filename on a local NTFS volume. Overwrite is unavailable in this Windows build."
+          : "Bank editing is available in memory. Disk save and file export are unavailable in this Windows build.",
+        { exact: true },
+      )
+      .waitFor();
+  }
+  await button(settingsPanel, "Back to editor").click();
+
+  const open = button(page, "Open Bank…");
+  bridge.choose("save", "success");
+  await open.click();
+  await page.waitForFunction(() => window.fixtureNavigationReplies === 1);
+  await open.click({ trial: true });
+  assert.equal(bridge.callsFor("confirm_bank_navigation")[0].canSave, false);
+  assert.equal(bridge.callsFor("open_bank").length, 1);
+
+  bridge.chooseClose("save");
+  await page.waitForFunction(
+    () => typeof window.fixtureCloseProbe === "function",
+  );
+  await page.evaluate(() => window.fixtureCloseProbe({ ticket: 1 }));
+  await open.click({ trial: true });
+  const [{ report }] = bridge.callsFor("confirm_window_close");
+  assert.equal(report.canSave, false);
+  assert.equal(report.hasDraft, false);
+  assert.deepEqual(bridge.callsFor("complete_window_close"), [
+    { ticket: 1, draftGeneration: report.draftGeneration, proceed: false },
+  ]);
+  assert.deepEqual(bridge.callsFor("save_bank_as"), []);
+  assert.equal(await goldField(page).inputValue(), "002");
+
+  assert.equal(await button(page, "Save").count(), 0);
+  assert.equal(await button(page, "Save As…").count(), Number(canCreateCopy));
+  await button(page, "More save options").click();
+  const menu = page.getByRole("menu");
+  assert.equal(
+    await menu
+      .getByRole("menuitem", {
+        name: /^(Save \(Overwrite\)|Save w\/ Backup|Restore Backup…|Bank Backups…)$/u,
+      })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await menu
+      .getByRole("menuitem", { name: "Export copy…", exact: true })
+      .count(),
+    Number(canCreateCopy),
+  );
+  await page.keyboard.press("Escape");
+  await menu.waitFor({ state: "hidden" });
+
+  await button(page, "Tools").press("Enter");
+  const toolsMenu = page.getByRole("menu");
+  const external = toolsMenu.getByRole("menuitem", {
+    name: "Re-sign external bank…",
+    exact: true,
+  });
+  await external.waitFor();
+  assert.equal(await external.isEnabled(), canCreateCopy);
+  for (const name of ["Back up all bank files", "Back up selected map"]) {
+    assert(
+      await toolsMenu.getByRole("menuitem", { name, exact: true }).isDisabled(),
+    );
+  }
+  if (canCreateCopy) {
+    await verifyCreateOnlyCopyActions(page, bridge, toolsMenu, external);
+  } else {
+    await page.keyboard.press("Escape");
+    await goldField(page).press("Control+s");
+    for (const command of [
+      "save_bank_as",
+      "export_bank_copy",
+      "pick_external_bank_to_resign",
+      "export_external_signed_bank",
+    ]) {
+      assert.deepEqual(bridge.callsFor(command), []);
+    }
+  }
+
+  for (const command of [
+    "save_active_bank",
+    "list_active_backups",
+    "restore_active_bank",
+    "review_active_backup",
+    "export_active_backup",
+    "create_batch_backup",
+    "read_backup_preferences",
+    "choose_backup_location",
+    "set_backup_retention",
+  ]) {
+    assert.deepEqual(bridge.callsFor(command), []);
+  }
+}
+
+async function verifyRenderer(
+  browser,
+  canOverwrite,
+  openRecovery = false,
+  copyCapability,
+) {
   const context = await browser.newContext({
     offline: true,
     serviceWorkers: "block",
@@ -1292,9 +1521,23 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
     page.setDefaultTimeout(10_000);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const bridge = createBridge(engine, canOverwrite);
+    const bridge = createBridge(engine, canOverwrite, copyCapability);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (copyCapability !== undefined) {
+      await verifyCreateOnlyRenderer(
+        page,
+        bridge,
+        copyCapability.value === true,
+      );
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} ${buildPlatformLabel} desktop bundle verified independent create-only capability (${JSON.stringify(copyCapability)}).`,
+      );
+      return;
+    }
     if (openRecovery === "close_probe") {
       await verifyEmptyEngineCloseProbe(page, bridge);
       assert.deepEqual(bridge.unexpected, []);
@@ -1374,6 +1617,14 @@ try {
   await verifyRenderer(browser, true, true);
   await verifyRenderer(browser, true, "verified_write");
   await verifyRenderer(browser, true, "close_probe");
+  for (const capability of [
+    { value: true },
+    { value: false },
+    { value: "true" },
+    { error: "Synthetic create-copy capability refusal." },
+  ]) {
+    await verifyRenderer(browser, false, undefined, capability);
+  }
 } finally {
   await browser.close();
 }

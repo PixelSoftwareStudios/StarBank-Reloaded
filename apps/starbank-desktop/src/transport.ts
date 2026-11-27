@@ -129,6 +129,10 @@ export function canExportBank(): Promise<boolean> {
   return invokeChecked(v.boolean(), "can_export_bank", {});
 }
 
+export function canCreateBankCopy(): Promise<boolean> {
+  return invokeChecked(v.boolean(), "can_create_bank_copy", {});
+}
+
 export function canRevealBank(): Promise<boolean> {
   return invokeChecked(v.boolean(), "can_reveal_bank", {});
 }

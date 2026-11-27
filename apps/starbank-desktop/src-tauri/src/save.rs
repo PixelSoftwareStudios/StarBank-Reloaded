@@ -17,6 +17,7 @@ use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 use crate::backup;
 use crate::commands::{CommandError, DesktopEngine, OpenedBank, is_request};
 use crate::conflict::ConflictState;
+use crate::export::can_create_bank_copy;
 use crate::recovery::{RecoveryOperation, WriteContext, uncertain_write, verified_result};
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name, destination_context};
 use crate::settings::{AutomaticBackup, SettingsStore};
@@ -179,7 +180,7 @@ pub(crate) async fn save_bank_as(
 	state: State<'_, DesktopEngine>,
 	target: ActiveTarget,
 ) -> Result<Option<OpenedBank>, CommandError> {
-	if !cfg!(any(target_os = "macos", target_os = "linux")) {
+	if !can_create_bank_copy() {
 		return Err(CommandError::Unavailable);
 	}
 	let _dialog = state.dialog()?;

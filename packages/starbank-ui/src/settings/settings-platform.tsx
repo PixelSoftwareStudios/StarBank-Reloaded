@@ -10,6 +10,7 @@ export type SettingsPlatform =
 export interface SettingsPlatformInfo {
   readonly version: string;
   readonly platform: SettingsPlatform;
+  readonly canCreateBankCopy?: boolean;
 }
 
 const PLATFORM_DETAILS = {
@@ -45,6 +46,10 @@ export function SettingsPlatformDetails({
   info: SettingsPlatformInfo;
 }) {
   const details = PLATFORM_DETAILS[info.platform];
+  const storage =
+    info.platform === "windows" && info.canCreateBankCopy
+      ? "Save As and file export require an unused filename on a local NTFS volume. Overwrite is unavailable in this Windows build."
+      : details.storage;
   return (
     <>
       <dl>
@@ -57,9 +62,7 @@ export function SettingsPlatformDetails({
           <dd>{details.name}</dd>
         </div>
       </dl>
-      <p className="wrap-anywhere text-[0.8125rem] text-muted">
-        {details.storage}
-      </p>
+      <p className="wrap-anywhere text-[0.8125rem] text-muted">{storage}</p>
     </>
   );
 }

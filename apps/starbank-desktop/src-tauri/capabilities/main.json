@@ -10,6 +10,7 @@
     "allow-dispatch-bank",
     "allow-export-bank-copy",
     "allow-can-export-bank",
+    "allow-can-create-bank-copy",
     "allow-list-open-requests",
     "allow-dismiss-open-request",
     "allow-open-requested-bank",

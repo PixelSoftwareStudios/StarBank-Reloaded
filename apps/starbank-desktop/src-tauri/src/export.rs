@@ -50,13 +50,18 @@ pub(crate) fn can_export_bank() -> bool {
 }
 
 #[tauri::command]
+pub(crate) fn can_create_bank_copy() -> bool {
+	cfg!(any(target_os = "linux", target_os = "macos"))
+}
+
+#[tauri::command]
 pub(crate) async fn export_bank_copy(
 	window: WebviewWindow,
 	state: State<'_, DesktopEngine>,
 	control: String,
 	suggested_name: String,
 ) -> Result<Option<ExportReply>, CommandError> {
-	if !can_export_bank() {
+	if !can_create_bank_copy() {
 		return Err(CommandError::Unavailable);
 	}
 	if !commands::is_request(&control, PREPARE_REQUEST)? {
