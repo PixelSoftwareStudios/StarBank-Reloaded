@@ -115,6 +115,7 @@ export function BankEditor({
     nextView: "table" | "simple";
     message: string;
   }>();
+  const [retainTable, setRetainTable] = useState(false);
   const rawEditor = useRef<RawEditorHandle>(null);
   const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
   const [rawRestart, setRawRestart] = useState(false);
@@ -270,12 +271,15 @@ export function BankEditor({
         applyRaw(nextView);
       }
     } else {
+      if (selectedView === "table" && nextView !== "table")
+        setRetainTable(true);
       if (selectedView === "raw" && nextView !== "raw")
         setRetainedRawRevision(document.revision);
       setView(nextView);
     }
   }
 
+  const tableVisible = selectedView === "table";
   const rawVisible = selectedView === "raw";
   const keepRawMounted =
     rawVisible || retainedRawRevision === document.revision;
@@ -369,7 +373,12 @@ export function BankEditor({
             />
           </Tabs.Content>
         )}
-        <Tabs.Content value="table" className="editor-view">
+        <Tabs.Content
+          value="table"
+          className="editor-view"
+          forceMount={tableVisible || retainTable ? true : undefined}
+          hidden={!tableVisible}
+        >
           <TableEditor
             sections={document.sections}
             values={tableDraft?.values}

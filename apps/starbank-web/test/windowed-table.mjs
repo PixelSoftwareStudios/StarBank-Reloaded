@@ -129,6 +129,36 @@ export async function verifyWindowedTable(page, chooseBank) {
   await scrollTo(distantIndex);
   await waitForValue(distantIndex, "9,000");
 
+  const tableTab = page.getByRole("tab", { name: "Table View" });
+  const rawTab = page.getByRole("tab", { name: "Raw View" });
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  const back = page.getByRole("button", { name: "Back to editor" });
+  const scrollTop = () => viewport.evaluate((scroll) => scroll.scrollTop);
+  const distantPosition = await scrollTop();
+  assert(distantPosition > 0);
+
+  async function checkDistantPosition(route) {
+    const position = await scrollTop();
+    assert(
+      Math.abs(position - distantPosition) <= 1,
+      `${route} changed table scroll from ${distantPosition} to ${position}`,
+    );
+    await distant.waitFor();
+    assert.equal(await selection(distantIndex).isChecked(), true);
+    await countWindow();
+  }
+
+  await settings.click();
+  await table.waitFor({ state: "hidden" });
+  await back.click();
+  await checkDistantPosition("Settings");
+
+  await rawTab.click();
+  await table.waitFor({ state: "hidden" });
+  await page.getByRole("textbox", { name: "Bank XML" }).waitFor();
+  await tableTab.click();
+  await checkDistantPosition("Raw View");
+
   await viewport.evaluate((scroll) => {
     scroll.scrollTop = scroll.scrollHeight;
   });
@@ -205,6 +235,44 @@ export async function verifyWindowedTable(page, chooseBank) {
   await dirty.waitFor({ state: "hidden" });
   assert.equal(await smallFields.first().inputValue(), "2.50");
   assert.equal(await smallFields.last().inputValue(), "4.50");
+
+  const sectionFilter = page.getByRole("searchbox", {
+    name: "Filter sections by name",
+  });
+  await sectionFilter.fill("sm");
+  await filter.fill("field");
+  const smallSort = small.getByRole("button", { name: "Name", exact: true });
+  await smallSort.click();
+  await smallSort.click();
+
+  async function checkSmallTable() {
+    await small.waitFor();
+    assert.equal(await sectionFilter.inputValue(), "sm");
+    assert.equal(await filter.inputValue(), "field");
+    assert.equal(
+      await small
+        .getByRole("columnheader", { name: "Name" })
+        .getAttribute("aria-sort"),
+      "descending",
+    );
+    assert.equal(await firstSmall.isChecked(), true);
+    assert.equal(await lastSmall.isChecked(), true);
+    assert.equal(await untouched.isVisible(), false);
+    const selectedSection = page
+      .getByRole("navigation", { name: "Bank sections" })
+      .getByRole("button", { name: "Small", exact: true });
+    assert.equal(await selectedSection.getAttribute("aria-current"), "true");
+  }
+
+  await settings.click();
+  await small.waitFor({ state: "hidden" });
+  await back.click();
+  await checkSmallTable();
+
+  await rawTab.click();
+  await small.waitFor({ state: "hidden" });
+  await tableTab.click();
+  await checkSmallTable();
 
   return { initialRows, scrolledRows };
 }

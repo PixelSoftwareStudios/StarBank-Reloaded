@@ -72,7 +72,7 @@ export function WindowedTable({
 
   const refresh = useCallback(() => {
     const scroll = viewport.current;
-    if (!scroll) return;
+    if (!scroll || scroll.getClientRects().length === 0) return;
     const measured = scroll
       .querySelector("[data-bank-row-index]")
       ?.getBoundingClientRect().height;
