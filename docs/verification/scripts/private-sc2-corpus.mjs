@@ -17,6 +17,7 @@ const documentLimit = 8 * 1024 * 1024;
 const archiveLimit = 512 * 1024 * 1024;
 const maxCases = 512;
 const sha256Pattern = /^[0-9a-f]{64}$/;
+const origins = new Set(["synthetic", "owner_file", "game"]);
 const encodings = new Set(["utf-8", "utf-16le", "utf-16be"]);
 const signatures = new Set([
   "unsigned",
@@ -99,7 +100,7 @@ function verifyRecord(entry) {
     "invalid fixture record, length or checksum",
   );
   requireCheck(
-    ["synthetic", "game"].includes(source?.origin) &&
+    origins.has(source?.origin) &&
       text(source.capture) &&
       text(source.authorization) &&
       text(source.expectationSource),
@@ -397,7 +398,9 @@ async function main(args) {
   await init({
     module_or_path: capture(resolve(wasmBinary), documentLimit).bytes,
   });
-  const passed = { synthetic: { bank: 0, map: 0 }, game: { bank: 0, map: 0 } };
+  const passed = Object.fromEntries(
+    Array.from(origins, (origin) => [origin, { bank: 0, map: 0 }]),
+  );
   let failures = 0;
   for (const [index, entry] of manifest.cases.entries()) {
     try {
@@ -423,7 +426,7 @@ async function main(args) {
     }
   }
   process.stdout.write(
-    `Passed ${passed.synthetic.bank} synthetic banks, ${passed.synthetic.map} synthetic maps, ${passed.game.bank} game banks and ${passed.game.map} game maps. Failed ${failures}.\n`,
+    `Passed ${passed.synthetic.bank} synthetic banks, ${passed.synthetic.map} synthetic maps, ${passed.owner_file.bank} owner-supplied banks, ${passed.owner_file.map} owner-supplied maps, ${passed.game.bank} game banks and ${passed.game.map} game maps. Failed ${failures}.\n`,
   );
   if (failures) process.exitCode = 1;
 }

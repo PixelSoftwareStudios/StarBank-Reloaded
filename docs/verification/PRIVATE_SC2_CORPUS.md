@@ -8,13 +8,15 @@ in-game acceptance check happen separately.
 
 Keep exact emitted bytes, the original bank basename and the original
 signing context together. Changing a handle, name or payload can change the
-signature. Record capture date and steps, authorizing owner or permission
-reference, game build and platform, map revision, and a byte count and
-SHA-256 collected at capture. Derive expected values from the authored map,
-the captured signature, or an independent reference. A StarBank Reloaded
-run cannot supply its own expected results. A synthetic or re-signed
-anonymized specimen remains synthetic. The manifest declares provenance.
-The runner checks required fields and fingerprints.
+signature. Record the acquisition or capture date and steps, authorizing
+owner or permission reference, and the exact copied byte count and SHA-256.
+For a documented game capture, also record the game build, platform, and map
+revision. Derive expectations from independently read XML or archive
+metadata, the authored map, the captured signature, or another independent
+reference. A StarBank Reloaded run cannot supply its own expected results.
+A synthetic or re-signed anonymized specimen remains synthetic. The
+manifest declares provenance. The runner checks required fields and
+fingerprints.
 
 ## Run
 
@@ -49,9 +51,19 @@ The manifest root has `schemaVersion: 1` and a nonempty `cases` array.
 Each record provides `path`, `kind` (`bank` or `map`), exact
 `byteLength`, lowercase `sha256`, `source` and `expected`.
 Paths are relative to the manifest. The `source` object requires
-`origin` (`synthetic` or `game`), `capture`, `authorization` and
-`expectationSource`. A game capture also requires `gameBuild`,
-`platform` and `mapRevision`. Keep sensitive values local.
+`origin`, `capture`, `authorization` and `expectationSource`. The
+nonempty `capture` records fixture preparation, acquisition, or capture
+and exact-copy steps. Use the origin that matches the available evidence.
+
+- `synthetic` covers authored, generated, and re-signed anonymized fixtures.
+- `owner_file` covers an existing authorized owner-supplied local bank or
+  map whose original game capture details are unavailable. Record how the
+  owner provided it and how the verification copy was made. The runner
+  counts these files separately from documented game captures.
+- `game` covers documented captures with nonempty `gameBuild`, `platform`
+  and `mapRevision` in addition to the shared source fields.
+
+Keep sensitive values local.
 
 Readable banks specify a complete `context` with `author`, `player`
 and `bank_name`, or explicit `null` when checking without context.
