@@ -15,6 +15,7 @@ import { verifyRawSyntaxDiagnostics } from "./raw-syntax-diagnostics.mjs";
 import { verifySaveMenu } from "./save-menu.mjs";
 import { verifySimpleDraftRecovery } from "./simple-draft-recovery.mjs";
 import { verifySnapshotRefresh } from "./snapshot-refresh.mjs";
+import { verifyStructureDraftClose } from "./structure-draft-close.mjs";
 import { verifyWindowedTable } from "./windowed-table.mjs";
 
 const playwright = await import(
@@ -795,6 +796,7 @@ async function verify(name) {
     await switchBank.getByRole("button", { name: "Discard and open" }).click();
     await page.getByRole("heading", { name: "Replacement.SC2Bank" }).waitFor();
     assert.equal(await value.inputValue(), "002");
+    await verifyStructureDraftClose(page, value);
     await verifyStructuralEditing(page, value);
     await verifySimpleView(page, chooseBank);
     const utf16Opening = initial

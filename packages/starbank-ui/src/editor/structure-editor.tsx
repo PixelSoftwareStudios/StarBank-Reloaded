@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useId, useLayoutEffect, useState } from "react";
 import {
   type EngineStructureChange,
   type EngineStructuredValueKind,
@@ -67,6 +67,12 @@ interface Choice {
   name: string;
 }
 
+export interface StructureDraft {
+  readonly name: string;
+  readonly valueKind: EngineStructuredValueKind;
+  readonly value: string;
+}
+
 const fieldLabelClasses = "grid gap-[0.15rem]";
 const fieldClasses = `min-h-7.5 w-full min-w-0 rounded-sm border border-line bg-field px-[0.4rem] py-[0.2rem] ${focusOutlineClasses}`;
 
@@ -74,11 +80,13 @@ function OccurrenceSelect({
   label,
   choices,
   current,
+  disabled,
   onSelect,
 }: {
   label: string;
   choices: readonly Choice[];
   current?: string;
+  disabled: boolean;
   onSelect: (id: string) => void;
 }) {
   const labelId = useId();
@@ -92,7 +100,7 @@ function OccurrenceSelect({
       <select
         className={fieldClasses}
         aria-labelledby={labelId}
-        disabled={choices.length === 0}
+        disabled={disabled || choices.length === 0}
         value={current ?? ""}
         onChange={(event) => onSelect(event.currentTarget.value)}
       >
@@ -146,28 +154,41 @@ function StructureForm({
   row,
   disabled,
   onApply,
+  onDraftChange,
 }: {
   operation: OperationOption;
   target?: Choice;
   row?: EditorRow;
   disabled: boolean;
   onApply: (change: EngineStructureChange) => void;
+  onDraftChange: (draft?: StructureDraft) => void;
 }) {
   const { kind, fields } = operation;
   const typeLabel = useId();
-  const [name, setName] = useState(
-    kind.startsWith("rename_")
+  const initial: StructureDraft = {
+    name: kind.startsWith("rename_")
       ? (target?.name ?? "")
       : kind === "add_value"
         ? "Value"
         : "",
-  );
-  const [valueKind, setValueKind] = useState<EngineStructuredValueKind>(
-    STRUCTURED_VALUE_KINDS.find((item) => item === row?.type) ?? "string",
-  );
-  const [value, setValue] = useState(row?.value ?? "");
+    valueKind:
+      STRUCTURED_VALUE_KINDS.find((item) => item === row?.type) ?? "string",
+    value: row?.value ?? "",
+  };
+  const [draft, setDraft] = useState(initial);
+  const editsName = fields === "name" || fields === "name_and_value";
+  const editsValue = fields === "value" || fields === "name_and_value";
+  const changed =
+    (editsName && draft.name !== initial.name) ||
+    (editsValue &&
+      (draft.valueKind !== initial.valueKind || draft.value !== initial.value));
   const removes = kind.startsWith("remove_");
   const available = operation.target === "bank" || target !== undefined;
+
+  useLayoutEffect(
+    () => onDraftChange(changed ? draft : undefined),
+    [changed, draft, onDraftChange],
+  );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,7 +198,15 @@ function StructureForm({
       !window.confirm(`${operation.label} "${target?.name || "Unnamed"}"?`)
     )
       return;
-    onApply(buildChange(kind, target?.id ?? "", name, valueKind, value));
+    onApply(
+      buildChange(
+        kind,
+        target?.id ?? "",
+        draft.name,
+        draft.valueKind,
+        draft.value,
+      ),
+    );
   }
 
   return (
@@ -185,32 +214,36 @@ function StructureForm({
       className="editor-dialog-fields mt-[0.4rem] grid gap-[0.4rem]"
       onSubmit={submit}
     >
-      {(fields === "name" || fields === "name_and_value") && (
+      {editsName && (
         <label className={fieldLabelClasses}>
           {kind === "add_value" || kind === "rename_value"
             ? "Element name"
             : "Name"}
           <input
             className={fieldClasses}
-            value={name}
-            onChange={(event) => setName(event.currentTarget.value)}
+            disabled={disabled}
+            value={draft.name}
+            onChange={(event) =>
+              setDraft({ ...draft, name: event.currentTarget.value })
+            }
             required={kind === "add_value" || kind === "rename_value"}
           />
         </label>
       )}
-      {(fields === "value" || fields === "name_and_value") && (
+      {editsValue && (
         <>
           <label className={fieldLabelClasses}>
             <span id={typeLabel}>Value type</span>
             <select
               className={fieldClasses}
               aria-labelledby={typeLabel}
-              value={valueKind}
+              disabled={disabled}
+              value={draft.valueKind}
               onChange={(event) => {
                 const next = STRUCTURED_VALUE_KINDS.find(
                   (item) => item === event.currentTarget.value,
                 );
-                if (next) setValueKind(next);
+                if (next) setDraft({ ...draft, valueKind: next });
               }}
             >
               {STRUCTURED_VALUE_KINDS.map((item) => (
@@ -224,8 +257,11 @@ function StructureForm({
             Value
             <input
               className={fieldClasses}
-              value={value}
-              onChange={(event) => setValue(event.currentTarget.value)}
+              disabled={disabled}
+              value={draft.value}
+              onChange={(event) =>
+                setDraft({ ...draft, value: event.currentTarget.value })
+              }
             />
           </label>
         </>
@@ -247,6 +283,7 @@ export default function StructureEditor({
   busy,
   notice,
   onApply,
+  onDraftChange,
   onDismiss,
 }: {
   sections: readonly EditorSection[];
@@ -254,6 +291,7 @@ export default function StructureEditor({
   busy: boolean;
   notice?: string;
   onApply: (change: EngineStructureChange) => void;
+  onDraftChange: (draft?: StructureDraft) => void;
   onDismiss: () => void;
 }) {
   const actionLabel = useId();
@@ -299,6 +337,7 @@ export default function StructureEditor({
           <select
             className={fieldClasses}
             aria-labelledby={actionLabel}
+            disabled={busy}
             value={operation.kind}
             onChange={(event) => {
               const next = operations.find(
@@ -319,6 +358,7 @@ export default function StructureEditor({
             label="Section"
             choices={sections}
             current={section?.id}
+            disabled={busy}
             onSelect={setSectionId}
           />
         )}
@@ -327,6 +367,7 @@ export default function StructureEditor({
             label="Key"
             choices={keys}
             current={key?.id}
+            disabled={busy}
             onSelect={setKeyId}
           />
         )}
@@ -335,6 +376,7 @@ export default function StructureEditor({
             label="Value element"
             choices={values}
             current={row?.id}
+            disabled={busy}
             onSelect={setValueId}
           />
         )}
@@ -346,6 +388,7 @@ export default function StructureEditor({
         row={operation.target === "value" ? row : undefined}
         disabled={busy}
         onApply={onApply}
+        onDraftChange={onDraftChange}
       />
     </EditorDialog>
   );

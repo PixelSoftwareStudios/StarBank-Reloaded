@@ -3,6 +3,7 @@ import {
   lazy,
   type ReactNode,
   Suspense,
+  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -38,6 +39,7 @@ import {
 } from "./index";
 import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
+import type { StructureDraft } from "./structure-editor";
 import {
   type TableValidationRequest,
   useTableDraftValidation,
@@ -152,7 +154,15 @@ export function BankEditor({
   const [structure, setStructure] = useState<{
     revision: string;
     sectionId?: string;
+    draft?: StructureDraft;
   }>();
+  const reportStructureDraft = useCallback((draft?: StructureDraft) => {
+    setStructure((current) =>
+      current && current.draft !== draft ? { ...current, draft } : current,
+    );
+  }, []);
+  const structureDraft =
+    structure?.revision === document.revision ? structure.draft : undefined;
   const [diff, setDiff] = useState<{ revision: string; value: EngineDiff }>();
   const [draftSwitch, setDraftSwitch] = useState<{
     kind: DraftSwitchKind;
@@ -234,8 +244,12 @@ export function BankEditor({
     (tableDraft !== undefined && (!onEditValues || hasInvalidTableEdits)) ||
     (rawDraft !== undefined && !onReplaceXml);
   useLayoutEffect(() => {
-    onDraftChange?.(draft !== undefined || profileDraft !== undefined);
-  }, [draft, profileDraft, onDraftChange]);
+    onDraftChange?.(
+      draft !== undefined ||
+        profileDraft !== undefined ||
+        structureDraft !== undefined,
+    );
+  }, [draft, profileDraft, structureDraft, onDraftChange]);
 
   const simpleVisible = selectedView === "simple";
   const staleProfile =
@@ -800,6 +814,7 @@ export function BankEditor({
             initialSection={structure.sectionId}
             busy={editsBlocked}
             notice={notice}
+            onDraftChange={reportStructureDraft}
             onApply={(change) =>
               run(
                 () => onStructure(target, change),

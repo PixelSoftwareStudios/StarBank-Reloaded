@@ -60,7 +60,7 @@ export function useNativeCloseGuard(options: CloseOptions) {
       }
       const { ticket } = probe;
       const observed = draft.current;
-      const save = current.current.save;
+      const save = observed.hasDraft ? undefined : current.current.save;
       running.current = true;
       setPending(true);
 

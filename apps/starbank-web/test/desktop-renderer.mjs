@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
 import { verifyBatchBackupReview } from "./batch-backup-review.mjs";
 import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
+import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 
 const dist = fileURLToPath(
@@ -167,6 +168,8 @@ function createBridge(engine, canOverwrite, copyCapability) {
   let cancelPicker = false;
   let heldPicker;
   let closeChoice;
+  let heldCloseConfirmation;
+  let heldStructureReply;
   let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
@@ -269,17 +272,25 @@ function createBridge(engine, canOverwrite, copyCapability) {
 
   function invoke(command, args) {
     if (command === "dispatch_bank") {
-      return {
+      let hold;
+      const reply = {
         value: dispatchFrame(
           engine,
           args,
           (request) => {
             wireRequests.push(request);
+            if (request.command.kind === "structure") {
+              hold = heldStructureReply;
+              heldStructureReply = undefined;
+            }
             if (supersedeNextEdit) advanceRevisionBeforeEdit(request);
           },
           transformReply,
         ),
       };
+      if (!hold) return reply;
+      hold.start();
+      return hold.wait.then(() => reply);
     }
     calls.push({ command, args });
     if (nextWriteRecovery?.command === command) {
@@ -293,9 +304,13 @@ function createBridge(engine, canOverwrite, copyCapability) {
       };
     }
     switch (command) {
-      case "confirm_window_close":
+      case "confirm_window_close": {
         assert(closeChoice);
-        return { value: closeChoice };
+        const reply = { value: closeChoice };
+        const held = heldCloseConfirmation;
+        heldCloseConfirmation = undefined;
+        return held ? held.then(() => reply) : reply;
+      }
       case "complete_window_close":
         return {};
       case "read_settings":
@@ -508,6 +523,17 @@ function createBridge(engine, canOverwrite, copyCapability) {
     chooseClose(choice) {
       closeChoice = choice;
     },
+    holdNextCloseConfirmation() {
+      const { promise, resolve } = Promise.withResolvers();
+      heldCloseConfirmation = promise;
+      return resolve;
+    },
+    holdNextStructureReply() {
+      const start = Promise.withResolvers();
+      const reply = Promise.withResolvers();
+      heldStructureReply = { start: start.resolve, wait: reply.promise };
+      return { started: start.promise, release: reply.resolve };
+    },
     cancelNextPicker() {
       cancelPicker = true;
     },
@@ -559,6 +585,8 @@ async function bindRenderer(page, bridge) {
               payload,
             });
         }
+        if (command === "confirm_window_close")
+          window.fixtureRequestedCloseTicket = args.report.ticket;
         const reply = await window.invokeDesktopFixture(
           command,
           binary ? Array.from(args) : args,
@@ -569,6 +597,8 @@ async function bindRenderer(page, bridge) {
           window.fixtureCopyCapabilityReplied = true;
         if (command === "save_bank_as")
           window.fixtureSaveAsReplies = (window.fixtureSaveAsReplies ?? 0) + 1;
+        if (command === "complete_window_close")
+          window.fixtureCompletedCloseTicket = args.ticket;
         if (reply.error) throw reply.error;
         return binary ? Uint8Array.from(reply.value).buffer : reply.value;
       },
@@ -1558,6 +1588,17 @@ async function verifyRenderer(
       );
       return;
     }
+    if (openRecovery === "structure_close") {
+      await openBank(page);
+      await verifyNativeStructureDraftClose(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer guarded the unsubmitted structure draft during close.`,
+      );
+      return;
+    }
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
       const currentName = "Replacement-2.SC2Bank";
@@ -1617,6 +1658,7 @@ try {
   await verifyRenderer(browser, true, true);
   await verifyRenderer(browser, true, "verified_write");
   await verifyRenderer(browser, true, "close_probe");
+  await verifyRenderer(browser, true, "structure_close");
   for (const capability of [
     { value: true },
     { value: false },
