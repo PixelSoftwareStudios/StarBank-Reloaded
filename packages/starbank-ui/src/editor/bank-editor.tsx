@@ -241,7 +241,24 @@ export function BankEditor({
   const staleProfile =
     profileDraft !== undefined &&
     (profileDraft.revision !== document.revision ||
-      profileDraft.profile_id !== profile?.profile_id);
+      profileDraft.profile_id !== profile?.profile_id ||
+      !profile?.groups.some(({ fields }) =>
+        fields.some(({ id }) => id === profileDraft.field_id),
+      ));
+  const profileReview =
+    staleProfile && profileDraft
+      ? {
+          field: profileDraft.fieldLabel,
+          input: profileDraft.input,
+          changes: profileDraft.preview?.changes.map((change) => ({
+            field:
+              profileDraft.previewFieldLabels?.get(change.field_id) ??
+              change.field_id,
+            previous: change.previous,
+            value: change.value,
+          })),
+        }
+      : undefined;
 
   function stageProfile(field: EditorProfileField, input: EditorProfileInput) {
     if (!profile || editsBlocked || draft || staleProfile || field.read_only)
@@ -254,6 +271,7 @@ export function BankEditor({
             profile_id: profile.profile_id,
             revision: document.revision,
             field_id: field.id,
+            fieldLabel: field.label,
             input,
           },
     );
@@ -262,6 +280,7 @@ export function BankEditor({
   function previewProfile() {
     if (
       !simpleVisible ||
+      !profile ||
       !profileController ||
       !profileDraft ||
       staleProfile ||
@@ -275,10 +294,20 @@ export function BankEditor({
         field_id: proposed.field_id,
         input: proposed.input,
       });
+      const previewFieldIds = new Set(
+        preview.changes.map(({ field_id }) => field_id),
+      );
+      const previewFieldLabels = new Map(
+        profile.groups.flatMap(({ fields }) =>
+          fields
+            .filter(({ id }) => previewFieldIds.has(id))
+            .map(({ id, label }) => [id, label] as const),
+        ),
+      );
       setProfileDraft((current) =>
         current === proposed
           ? preview.changes.length > 0
-            ? { ...current, preview }
+            ? { ...current, preview, previewFieldLabels }
             : undefined
           : current,
       );
@@ -631,7 +660,7 @@ export function BankEditor({
           >
             <SimpleEditor
               profile={profile}
-              draft={profileDraft}
+              draft={staleProfile ? undefined : profileDraft}
               disabled={editsBlocked || Boolean(draft) || staleProfile}
               onChange={stageProfile}
             />
@@ -822,6 +851,18 @@ export function BankEditor({
             >
               {profileDraft.preview ? "Apply preview" : "Preview edits"}
             </button>
+          )}
+          {profileReview && (
+            <details className="min-w-0 basis-full">
+              <summary className="cursor-pointer">Review Simple draft</summary>
+              <textarea
+                aria-label="Original Simple draft"
+                className="mt-2 w-full rounded-control border border-control-edge bg-field p-2 font-mono"
+                readOnly
+                rows={4}
+                value={JSON.stringify(profileReview, null, 2)}
+              />
+            </details>
           )}
         </div>
       )}

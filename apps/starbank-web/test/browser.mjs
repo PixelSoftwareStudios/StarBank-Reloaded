@@ -9,6 +9,7 @@ import {
   verifyLocalImports,
 } from "./local-bank-library.mjs";
 import { verifySaveMenu } from "./save-menu.mjs";
+import { verifySimpleDraftRecovery } from "./simple-draft-recovery.mjs";
 import { verifySnapshotRefresh } from "./snapshot-refresh.mjs";
 import { verifyWindowedTable } from "./windowed-table.mjs";
 
@@ -565,6 +566,7 @@ async function verify(name) {
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
     await verifySnapshotRefresh(browser, server.url, bankPicker, viewport);
+    await verifySimpleDraftRecovery(browser, server.url, bankPicker, viewport);
     const tableDraftPage = await context.newPage();
     try {
       await tableDraftPage.setViewportSize(viewport);

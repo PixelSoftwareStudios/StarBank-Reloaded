@@ -72,7 +72,9 @@ export interface EditorProfileController {
 
 export interface EditorProfileDraft extends EditorProfileEdit {
   readonly revision: string;
+  readonly fieldLabel: string;
   readonly preview?: EditorProfilePreview;
+  readonly previewFieldLabels?: ReadonlyMap<string, string>;
 }
 
 export function profileStatus(current?: EditorProfile): string | undefined {
