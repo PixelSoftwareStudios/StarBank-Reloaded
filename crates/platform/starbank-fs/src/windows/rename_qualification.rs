@@ -27,6 +27,8 @@ use windows_sys::{
 
 use super::{DirectoryScope, Identity, NO_REPARSE_OR_RECALL, Observation, read_snapshot};
 
+mod security_qualification;
+
 const STAGED_NAME: &str = "PendingBank.sc2bank";
 const DESTINATION_NAME: &str = "PublishedBank.SC2Bank";
 const CASE_ALIAS: &str = "pUBLISHEDbANK.sc2bank";
@@ -196,6 +198,7 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 
 	verify_published(&root, &scope, original_stage.identity)?;
 	assert_absent(&staged);
+	security_qualification::qualify_private_stage(&root)?;
 	Ok(())
 }
 

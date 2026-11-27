@@ -43,6 +43,12 @@ On November 27, 2026, run `45997318578` at `e4385da` passed the `NtSetInformatio
 
 This result qualifies the sibling and distinct-root rename and read-back probe on the tested runner. The stage inherits directory security. Private staging DACLs, unprivileged namespace durability, late directory changes, checkpoint termination and production failure classification remain open. Windows storage remains read-only.
 
+## Private stage descriptor probe
+
+The existing opt-in NTFS test now includes a synthetic creation-time security probe for REQ-SAVE-02. It creates a fixture directory with an inheritable Everyone read ACE and verifies that an ordinary inherited control receives that ACE. The stage instead receives an explicit TokenUser owner, TokenPrimaryGroup group and protected owner-only DACL during exclusive, handle-relative `NtCreateFile`. Before writing any bytes, the probe checks the resulting owner, group, individual ACEs, scoped descriptor flags and ordinary single-link file attributes. It checks them again through the held handle and a fresh destination handle after publication, together with the original file ID and payload digest. Account SIDs are redacted from observations. [Security probe](../src/windows/rename_qualification/security_qualification.rs)
+
+Local Windows x64 MSVC compilation and all-target Clippy with warnings denied passed on the macOS host using Rust 1.100.0. Native Windows execution is pending. The existing hosted NTFS test selection includes this extension. This probe checks descriptor metadata; a distinct-user access denial, SACL inspection, post-publication sync, checkpoint termination and production outcome classification remain separate obligations. Windows bank writes remain disabled.
+
 ## Native acceptance
 
 | Fixture | Expected observation |
