@@ -27,6 +27,7 @@ use windows_sys::{
 
 use super::{DirectoryScope, Identity, NO_REPARSE_OR_RECALL, Observation, read_snapshot};
 
+mod readback_qualification;
 mod security_qualification;
 
 const STAGED_NAME: &str = "PendingBank.sc2bank";
@@ -198,6 +199,7 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 
 	verify_published(&root, &scope, original_stage.identity)?;
 	assert_absent(&staged);
+	readback_qualification::qualify_held_stage_readback(&root)?;
 	security_qualification::qualify_private_stage(&root)?;
 	Ok(())
 }

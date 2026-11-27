@@ -55,6 +55,12 @@ Hosted run `46016246440` at `7d960c4` passed all 243 default Windows tests and t
 
 The corrected fixture uses documented directory-compatible creation options and minimal directory access. Reparse/recall guards remain on regular stage/control files; directory creation is exclusive under the held synthetic temporary parent. Creation errors now include the fixture leaf and exact options. Native execution of the correction remains pending. This fixes an identified parameter-contract violation without claiming to have isolated the original kernel rejection. [NtCreateFile directory parameters](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile#parameters)
 
+## Held-stage read-back probe
+
+The opt-in NTFS test also checks read-back while the original restrictive stage handle remains open. Its independent verifier requests read access and shares read, write and delete to accommodate the existing stage handle; the stage itself still denies competing write and delete access. The fixture requires actual sharing-violation responses for incompatible opens, checks the held file's ID, length and SHA-256, then releases the handles and confirms the competing access requests can succeed without writing or deleting. An ordinary snapshot read verifies the final published bytes afterward. This case uses inherited fixture permissions; creation-time private security is checked separately. [Held-stage probe](../src/windows/rename_qualification/readback_qualification.rs)
+
+Pinned Windows x64 MSVC all-target Clippy, formatting and the repository source gate passed locally. Native execution is pending. The test does not change the production reader's sharing policy or enable Windows writes.
+
 ## Native acceptance
 
 | Fixture | Expected observation |
