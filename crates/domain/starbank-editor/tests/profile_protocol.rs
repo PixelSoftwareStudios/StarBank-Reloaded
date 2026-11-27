@@ -1,9 +1,23 @@
 use serde_json::{Value, json};
-use starbank_editor::Engine;
+use starbank_editor::{Engine, WireReply};
 
 const DEFINITION: &[u8] = include_bytes!("../../starbank-profiles/tests/fixtures/training.json");
 const BANK: &[u8] = include_bytes!("../../starbank-profiles/tests/fixtures/training.sc2bank");
 const MAX_OVERSIZE_PROFILE: usize = 64 * 1024 + 1;
+
+fn exchange(
+	engine: &mut Engine,
+	target: Option<(&str, &str)>,
+	command: Value,
+	attachment: Option<&[u8]>,
+) -> WireReply {
+	let mut message = json!({ "schema_version": 1, "request_id": "req-test", "command": command });
+	if let Some((document_id, revision)) = target {
+		message["document_id"] = json!(document_id);
+		message["expected_revision"] = json!(revision);
+	}
+	engine.dispatch(&message.to_string(), attachment)
+}
 
 fn dispatch(
 	engine: &mut Engine,
@@ -11,12 +25,7 @@ fn dispatch(
 	command: Value,
 	attachment: Option<&[u8]>,
 ) -> Value {
-	let mut message = json!({ "schema_version": 1, "request_id": "req-test", "command": command });
-	if let Some((document_id, revision)) = target {
-		message["document_id"] = json!(document_id);
-		message["expected_revision"] = json!(revision);
-	}
-	let reply = engine.dispatch(&message.to_string(), attachment);
+	let reply = exchange(engine, target, command, attachment);
 	assert!(reply.bytes.is_none());
 	serde_json::from_str(&reply.json).unwrap()
 }
@@ -231,4 +240,126 @@ fn profile_identity_does_not_adopt_signing_context() {
 	assert_eq!(payload(&loaded)["status"], "matched");
 	let after = dispatch(&mut engine, target, json!({"kind":"snapshot"}), None);
 	assert_eq!(payload(&after)["signature_status"], "missing_context");
+}
+
+fn checkbox_bank(kind: &str, value: &str) -> String {
+	format!(
+		r#"<Bank><Section name="Options"><Key name="Enabled"><Value {kind}="{value}"/></Key></Section></Bank>"#
+	)
+}
+
+fn checkbox_profile(checked: &str, unchecked: &str) -> Vec<u8> {
+	serde_json::to_vec(&json!({
+		"version": 1,
+		"id": "synthetic-checkbox",
+		"identity": {"author":"9-S2-1-123", "bank":"TrainingBank"},
+		"groups": [{
+			"label": "Options",
+			"fields": [{
+				"id": "enabled",
+				"label": "Enabled",
+				"path": {"section":{"name":"Options"}, "key":{"name":"Enabled"}},
+				"control": {
+					"kind":"checkbox", "storage":"bank_value",
+					"checked":checked, "unchecked":unchecked
+				}
+			}]
+		}]
+	}))
+	.unwrap()
+}
+
+fn checkbox_preview(checked: bool) -> Value {
+	json!({"kind":"profile_preview","payload":{
+		"profile_id":"synthetic-checkbox","field_id":"enabled",
+		"input":{"kind":"checked","value":checked}
+	}})
+}
+
+#[test]
+fn invalid_integer_checkbox_endpoint_cannot_match_or_change_the_bank() {
+	let bank = checkbox_bank("int", "0");
+	let mut engine = Engine::default();
+	let opened = dispatch(
+		&mut engine,
+		None,
+		json!({"kind":"open"}),
+		Some(bank.as_bytes()),
+	);
+	let target = Some((opened["document_id"].as_str().unwrap(), "0"));
+
+	for invalid in ["NaN", "1,000", "170141183460469231731687303715884105728"] {
+		for (checked, unchecked, requested) in [(invalid, "0", true), ("0", invalid, false)] {
+			let definition = checkbox_profile(checked, unchecked);
+			let loaded = dispatch(
+				&mut engine,
+				target,
+				manual_profile_file(),
+				Some(&definition),
+			);
+			assert_eq!(loaded["revision"], "0");
+			assert_eq!(payload(&loaded)["status"], "incompatible");
+			let preview = dispatch(&mut engine, target, checkbox_preview(requested), None);
+			assert_eq!(payload(&preview)["code"], "profile_unavailable");
+			assert_eq!(preview["revision"], "0");
+		}
+	}
+
+	let snapshot = dispatch(&mut engine, target, json!({"kind":"snapshot"}), None);
+	assert_eq!(snapshot["revision"], "0");
+	assert_eq!(payload(&snapshot)["dirty"], false);
+	assert_eq!(payload(&snapshot)["can_undo"], false);
+	let raw = exchange(&mut engine, target, json!({"kind":"raw"}), None);
+	assert_eq!(raw.bytes.as_deref(), Some(bank.as_bytes()));
+}
+
+#[test]
+fn valid_bank_value_checkbox_toggles_keep_exact_storage_lexemes() {
+	for (kind, checked, unchecked) in [
+		("int", "0001", "0"),
+		("flag", "yes", "no"),
+		("string", "1,000", "literal"),
+	] {
+		let bank = checkbox_bank(kind, unchecked);
+		let mut engine = Engine::default();
+		let opened = dispatch(
+			&mut engine,
+			None,
+			json!({"kind":"open"}),
+			Some(bank.as_bytes()),
+		);
+		let id = opened["document_id"].as_str().unwrap();
+		let definition = checkbox_profile(checked, unchecked);
+		let loaded = dispatch(
+			&mut engine,
+			Some((id, "0")),
+			manual_profile_file(),
+			Some(&definition),
+		);
+		assert_eq!(payload(&loaded)["status"], "matched");
+
+		for (revision, next, checked_now, expected) in
+			[("0", "1", true, checked), ("1", "2", false, unchecked)]
+		{
+			let target = Some((id, revision));
+			let preview = dispatch(&mut engine, target, checkbox_preview(checked_now), None);
+			assert_eq!(payload(&preview)["changes"][0]["value"], expected);
+			let applied = dispatch(
+				&mut engine,
+				target,
+				json!({
+					"kind":"profile_apply","payload":{"preview_id":payload(&preview)["preview_id"]}
+				}),
+				None,
+			);
+			assert_eq!(applied["result"]["kind"], "snapshot");
+			assert_eq!(applied["revision"], next);
+
+			let raw = exchange(&mut engine, Some((id, next)), json!({"kind":"raw"}), None);
+			assert_eq!(
+				raw.bytes.as_deref(),
+				Some(checkbox_bank(kind, expected).as_bytes())
+			);
+		}
+	}
 }

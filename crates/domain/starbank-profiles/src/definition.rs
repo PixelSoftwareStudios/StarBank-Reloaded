@@ -169,19 +169,19 @@ impl Control {
 				checked,
 				unchecked,
 			} => {
-				matches!(
-					(storage, kind),
-					(
-						CheckboxStorage::Int | CheckboxStorage::BankValue,
-						ValueKind::Int
-					) | (
-						CheckboxStorage::Flag | CheckboxStorage::BankValue,
-						ValueKind::Flag
-					) | (
-						CheckboxStorage::String | CheckboxStorage::BankValue,
-						ValueKind::String
-					)
-				) && (value == checked || value == unchecked)
+				if value != checked && value != unchecked {
+					return false;
+				}
+				match (storage, kind) {
+					(CheckboxStorage::Int | CheckboxStorage::BankValue, ValueKind::Int) => {
+						[checked, unchecked]
+							.iter()
+							.all(|state| decimal::in_range(state, 0, None, None))
+					}
+					(CheckboxStorage::Flag | CheckboxStorage::BankValue, ValueKind::Flag)
+					| (CheckboxStorage::String | CheckboxStorage::BankValue, ValueKind::String) => true,
+					_ => false,
+				}
 			}
 			Self::Text { storage } => matches!(
 				(storage, kind),
