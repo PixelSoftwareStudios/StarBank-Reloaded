@@ -1,5 +1,7 @@
 # macOS external signing verification
 
+Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
+
 On 2026-11-27, a scratch build of `e2cf03533264146e23815f38f1353c2d5c829555` completed the external signing workflow on macOS 14.7.2 (23H311), arm64. The build used Rust 1.100.0 (`0ef1bc386`), Node 24.22.3, pnpm 12.23.0, and Apple Swift 6.0.3 for the accessibility driver.
 
 The driver opened `Current.SC2Bank` from the startup queue. It chose **Tools → Re-sign external bank…** and selected `Foreign.SC2Bank` in the actual AppKit Open sheet. The WKWebView form accepted the manual author, player and bank name and reported that the source was unsigned. **Save signed copy…** opened the actual AppKit Save sheet. The driver confirmed the uniquely named scratch source folder in **Where** and accepted Save. The app reported a verified export and continued displaying the original current bank.

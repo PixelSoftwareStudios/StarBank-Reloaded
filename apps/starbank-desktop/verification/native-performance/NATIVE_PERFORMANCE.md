@@ -76,6 +76,8 @@ host and this isolated build configuration.
 
 ## Reproduction
 
+The exact measured revision no longer resolves in the local checkout after the history rewrite. The archive command identifies the original input. Record a new run and its actual revision for a current measurement under the applicable testing policy. [Historical evidence](../../../../docs/verification/VERIFICATION_REGISTER.md#historical-evidence)
+
 Keep `prepare-scratch.py`, `native-perf.swift`, `cpu-units.swift`, and
 `summarize.py` together in a fresh scratch directory. Run from that directory
 with `STARBANK_REPOSITORY` set to the StarBank checkout. Use Node 24.22.3,

@@ -33,10 +33,11 @@ Depends on: 02.
 
 Depends on: 03.
 
-- [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Compare synthetic vectors with the pinned v2.0 signer.
+- [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Verify independent synthetic digests and native/WASM/CLI agreement. [Adapter parity](verification/ADAPTER_PARITY.md)
 - [x] Wire automatic and explicit re-signing, including create-only signed copies of external banks. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Verify the macOS native external-signing picker workflow on synthetic banks. [macOS evidence](verification/MACOS_EXTERNAL_SIGNING.md)
-- [ ] Verify actual game-generated digests and game acceptance for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
+- [x] Match the stored signatures of two owner-supplied banks against independently calculated digests and native/WASM/CLI output. [Private corpus](verification/PRIVATE_SC2_CORPUS.md)
+- [ ] Verify documented SC2-generated digests across a broader corpus and game acceptance of edited copies for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-05 — Editor transactions and validation
@@ -64,7 +65,7 @@ Depends on: 04,05.
 
 - [x] Implement checked preparation, exclusive creation, verified local APFS replacement, backup snapshots and reversible restore policy.
 - [x] Verify the APFS save, backup and restore paths with a synthetic bank. Exercise process termination and retained bytes around replacement. [Native storage evidence](../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
-- [ ] Qualify native Windows writes, Linux replacement that preserves hidden metadata, and physical power-loss recovery. [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
+- [ ] Qualify Windows NTFS create-only and replacement separately. Windows storage remains read-only. Qualify Linux replacement with hidden metadata and physical power-loss recovery. [Windows create probe](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md) · [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 

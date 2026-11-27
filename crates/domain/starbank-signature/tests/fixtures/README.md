@@ -2,8 +2,7 @@
 
 These StarCraft II bank files are synthetic and contain synthetic account handles.
 Expected digests use manually assembled canonical bytes hashed independently with
-Python's SHA-1. The macOS .NET 10.0.12 oracle also matched the two case-order
-vectors against the pinned upstream reader and signer.
+Python's SHA-1. [Historical evidence](../../../../../docs/verification/VERIFICATION_REGISTER.md#historical-evidence)
 
 | Fixture | Author / player / bank name | Expected digest |
 | --- | --- | --- |
@@ -11,5 +10,3 @@ vectors against the pinned upstream reader and signer.
 | `case-swapped-ties.sc2bank` | `1-S2-1-1001` / `2-S2-1-2002` / `Bank` | `5B7E8B16CEF62A229D8A659498571B039B4F7040` |
 | `canonical-ascii.sc2bank` | `1-S2-1-0` / `1-S2-1-0` / `Fixture` | `9689A338F3C1C57C9090E476B6A5F60336C17DAC` |
 | `canonical-ordinal.sc2bank` | `1-S2-1-0` / `1-S2-1-0` / `Fixture` | `55C56FBE432B737EB534DE691B9A410375C4234F` |
-
-[StarBank v2.0 signer at the pinned revision](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankSignatureGenerator.cs#L11-L49)

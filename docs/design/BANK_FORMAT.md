@@ -1,6 +1,6 @@
 # Bank format and lossless model
 
-External bank editing uses plain XML and needs no game installation or archive backend. The acceptance baseline is StarBank v2.0 at the pinned revision reviewed 2026-11-26. [BankReader.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankReader.cs#L14-L78) · [BankWriter.cs](https://github.com/BlueRaja/Starbank/blob/1f95ab3425753b12d6387d327870dc6d408c49ac/StarBank/Bank%20Stuffs/BankWriter.cs#L19-L71)
+External bank editing uses plain XML and works without a game installation or archive backend. Qualify format behavior with independently documented expectations and authorized SC2 fixtures. [Bank format requirements](../REQUIREMENTS.md) · [Historical evidence](../verification/VERIFICATION_REGISTER.md#historical-evidence)
 
 Illustrative synthetic example (not a captured or signed SC2 fixture):
 

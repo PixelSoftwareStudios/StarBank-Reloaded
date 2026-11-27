@@ -1,5 +1,7 @@
 # Production browser timing on synthetic banks
 
+Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
+
 A clean archive of `aaf5b58c5f70a04e4a931267b7c8e5845b5703f1` produced the Vite assets on November 27, 2026. The run used an Apple M1 Pro with macOS 14.7.2, headless Chromium 159.0.8154.6, Playwright 1.65.1, and an 850×500 viewport. Node 24.22.3, pnpm 12.23.0, Rust 1.100.0 and wasm-bindgen 0.2.129 matched the project pins. The script ran five discarded warmups, then 25 timed pairs. The production asset fingerprint was `47f43e61c069ea94b2a3520057e24558696cb8727567a1e8669c37f4dcc1f7df`.
 
 | Browser operation | Fixture | Median (ms) | p95 (ms) |

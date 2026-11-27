@@ -1,5 +1,7 @@
 # Implementation evidence
 
+Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
+
 ## WP-03 bank XML
 
 `sc2bank` parses bounded XML 1.0 in UTF-8 and BOM-marked UTF-16LE and UTF-16BE. It keeps original source bytes, ordered section/key/value occurrences and unknown markup. Export without changes returns the original bytes. Edits to recognized existing value attributes replace their original byte ranges, escape the inserted values and revalidate the result. Unsupported encodings, DTDs, invalid references, ambiguous edits and exceeded limits return typed errors.

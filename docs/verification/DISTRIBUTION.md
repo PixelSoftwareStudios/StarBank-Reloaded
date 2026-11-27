@@ -1,5 +1,7 @@
 # Package qualification
 
+Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
+
 ## macOS arm64 disk image
 
 The debug DMG was built at `dfe70d8f9e23b5a0596254a51681629f1a294ae9` on macOS 14.7.2 arm64 using Xcode SDK 15.2, Rust 1.100.0, Node 24.22.3, pnpm 12.23.0 and Tauri CLI 2.12.6. The source archive SHA-256 was `876db8de99fb989b1c4b56e8fc3650e5e8fec074124c7d08cf028a1fc773de31`.

@@ -1,11 +1,11 @@
 # Verification obligations
 
-All Pending unless stated otherwise. Evidence is crate-local; these rows track intent and gate, not completed proofs. Add reproducible harness path, revision, tool version, constraints and results during implementation.
+These obligations track verification scope and release gates. The acceptance register and linked evidence record which cases passed and which remain open. Record the harness, source revision, tool version, input constraints and result.
 
 | Obligation | Requirements | Method | Invariant / gate |
 |---|---|---|---|
 | VO-01 | REQ-FMT-01/02/03/04 | rstest, proptest, insta, fuzz, Miri | Lossless unchanged bytes, preservation or rejection on edit, safe limits; no panic on malformed input |
-| VO-02 | REQ-SIG-01/02/03 | Differential C# and real game corpus, synthetic digest vectors, property tests, optional Lean/Kani | Exact order/encoding/context, no mutation of source order; validate before sign; no proof of SHA1 security |
+| VO-02 | REQ-SIG-01/02/03 | Independent expected digests, native/WASM/CLI comparisons, authorized SC2-generated corpus and offline game acceptance, property tests, optional Lean/Kani | Exact order, encoding and context. Source order stays intact and validation precedes signing. SHA-1 serves legacy format compatibility. |
 | VO-03 | REQ-EDIT-01/02/03/04/05/06/07 | Proptest, Kani bounded state/number operations, Lean refinement feasibility, Loom/Shuttle revision ordering | Stable IDs, precise canonical numeric strings, atomic multi-edit, reset/undo and stale command rejection |
 | VO-04 | REQ-PROF-01/02 | Proptest, fuzz, Kani checked rules | All-or-none dependent graph, match confidence, cycles/overflow rejected |
 | VO-05 | REQ-SAVE-01/02, REQ-BACKUP-01/02 | TLA+/TLC commit states, Loom/Shuttle ownership, failpoints/crash harness, native FS | No precommit mutation, verified commits only, recoverable backup, uncertain state no blind retry; native metadata policy |
@@ -21,6 +21,14 @@ Formal verification palette is deliberate but selective. Kani proof bounds, Loom
 
 VO-01 has scoped Miri evidence for 46 parser and writer cases. The scalar and structural AddressSanitizer runs processed 538,990 inputs in two 90-second runs. The namespace declaration budget case passed natively and has no interpreter result. [Miri evidence and remaining tool scopes](../../crates/formats/sc2bank/verification/MIRI.md) · [Fuzz harness](../../crates/formats/sc2bank/fuzz/README.md)
 
+VO-02 has independent synthetic digest vectors and exact native, release WASM and CLI comparisons. Independent calculations also matched the stored signatures of two owner-supplied banks. Their game build and capture procedure are unknown. Documented SC2-generated captures, broader coverage, and game acceptance of edited copies remain open. [Adapter parity](ADAPTER_PARITY.md) · [Private corpus](PRIVATE_SC2_CORPUS.md)
+
 VO-05 includes a bounded TLA+ model of a protected save or restore with a competing write and a process crash. TLC checked 298 distinct states and exercised three expected counterexamples. Native APFS tests covered process crashes and a kernel short-write failure. Physical power-loss durability remains open. [Save and backup model](../../crates/platform/starbank-fs/verification/save-backup-model/README.md) · [Native fault tests](../../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
 
 VO-09 and VO-10 include the 10,000-value production browser gate, nested static asset and worker loading under the packaged headers, and offline exact backup and recovery. The frontend CI job checks exact native, release WASM and CLI parity and runs the built desktop renderer with synthetic IPC. The renderer test covers Tools, backup copies and guarded navigation in headless Chromium. [Browser and native verification](IMPLEMENTATION.md) · [Adapter parity](ADAPTER_PARITY.md) · [Desktop renderer test](../../apps/starbank-web/test/desktop-renderer.mjs) · [Chromium timing](BROWSER_PERFORMANCE.md)
+
+## Historical evidence
+
+Earlier development included consultation of the original StarBank source and a synthetic comparison against its signer. The source and its comparison harness were removed. New compatibility evidence follows the independent implementation policy in [AGENTS](../../AGENTS.md). The independent vectors and authorized files cover their recorded cases. Game acceptance and release licensing remain open.
+
+The local history rewrite left several measured commits unavailable by their original IDs, including `aaf5b58`, `e2cf035`, `dfe70d8`, `958668c`, `0aee45b` and `d95ba77`. Reports retain those IDs and their original run scope. For a current-revision claim, rerun the applicable checks from the exact available revision and record new evidence.

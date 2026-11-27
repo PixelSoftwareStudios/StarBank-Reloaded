@@ -7,7 +7,7 @@ Read EES-1/EVS-1 and registers. Every Required requirement has a minimum accepta
 | Suite | Cases |
 |---|---|
 | Format | XML ordinary/multi/empty/repeated, unknowns, namespaces, escaping, encoding, invalid roots/DTD, excessive limits. Untouched bytes identical; exact semantics on edits. |
-| Signature | Known digest inputs, actual SC2 signatures + independent upstream reference, context name/author/player, stable equal order, ordinal supplementary Unicode, ASCII fallback, text skip, no value child, missing attributes. No invented fixture signatures. |
+| Signature | Independent synthetic expected digests and documented SC2-generated signatures. Exercise exact context, stable ties, supplementary Unicode order, ASCII fallback, omitted text, empty keys and missing attributes. Verify edited copies in an authorized offline game run. |
 | Editor | Raw valid/invalid switch, dirty reset vs original/last save, per-field/section revert, bulk same value, mixed selection, exact numeric input commas/precision, no type coercion, profile transaction cycles, stale revisions and undo history. |
 | Storage | Overwrite/new/export/copy, Save As destination context, original permissions incl ACL limitation, locked Windows file, full disk, temp sync/rename/verify, backup first overwrite/explicit collisions, restore current snapshot, symlink/hardlink, changed target, interruption and recovery. |
 | Discovery | Windows Known Folder/OneDrive/macOS Application Support/Documents/iCloud fixtures; all account handles, nested/direct/legacy, unknown roots, permission/empty states, Linux stub; manual selection on all. |
