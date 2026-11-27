@@ -1,6 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use std::ffi::OsStr;
+
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
@@ -9,6 +10,11 @@ use std::path::{Path, PathBuf};
 
 use rustix::fs::{StatFs, XattrFlags, fstatfs, getxattr, setxattr};
 use starbank_fs::{CommitIntent, CommitOutcome, StorageError, commit, read_snapshot};
+
+#[path = "macos_enospc/calibration.rs"]
+mod calibration;
+
+use calibration::Calibration;
 
 const TEST_FILESYSTEM: &str = "STARBANK_ENOSPC_APFS";
 const FIXTURE_PARENT: &str = "/private/tmp";
@@ -67,11 +73,15 @@ fn exercise_commit_intents(
 	capacity: usize,
 	policy: FillPolicy,
 ) -> io::Result<()> {
-	let fixture = fixture_io("create test directory", tempfile::tempdir_in(root))?;
-	let existing = fixture.path().join(EXISTING);
-	let target = fixture.path().join(NEW);
-	let filler_path = fixture.path().join(FILLER);
-	let control_path = fixture.path().join(RAW_CONTROL);
+	let fixture = fixture_io("create test directory", tempfile::tempdir_in(root))?.keep();
+	eprintln!(
+		"APFS case {policy:?}: preserving case directory on failure: {}",
+		fixture.display()
+	);
+	let existing = fixture.join(EXISTING);
+	let target = fixture.join(NEW);
+	let filler_path = fixture.join(FILLER);
+	let control_path = fixture.join(RAW_CONTROL);
 	fixture_io("write original bank", fs::write(&existing, ORIGINAL))?;
 	fixture_io(
 		"set original mode",
@@ -83,6 +93,11 @@ fn exercise_commit_intents(
 	)?;
 	let before = read_snapshot(&existing, PREPARED_SIZE).expect("observe original bank");
 
+	let mut control = fixture_io(
+		"create native write control",
+		create_exclusive(&control_path),
+	)?;
+	let mut calibration = Calibration::new(&fixture, capacity)?;
 	let FilledVolume {
 		filled,
 		available,
@@ -99,18 +114,18 @@ fn exercise_commit_intents(
 	}
 	eprintln!("APFS case {policy:?}: filler ready, calibrated={calibrated}");
 	let prepared = vec![b'w'; PREPARED_SIZE];
-	let mut control = fixture_io(
-		"create native write control",
-		create_exclusive(&control_path),
-	)?;
+	calibration.pack(&fixture, volume, &prepared, "before native control")?;
 	let error = control
 		.write_all(&prepared)
 		.expect_err("native control must run out of APFS capacity");
 	assert_eq!(error.raw_os_error(), Some(libc::ENOSPC));
 	let control_written = fixture_io("inspect native write control", control.metadata())?.len();
-	drop(control);
-	fixture_io("remove native write control", fs::remove_file(control_path))?;
-	eprintln!("APFS case {policy:?}: native write control returned ENOSPC and was removed");
+	let control_blocks =
+		fixture_io("inspect native control allocation", control.metadata())?.blocks();
+	eprintln!(
+		"APFS case {policy:?}: retained native control ENOSPC, length={control_written}, allocated blocks={control_blocks}, reported available={}",
+		available_bytes(volume)?
+	);
 
 	for (destination, intent) in [
 		(&target, CommitIntent::CreateNew),
@@ -123,6 +138,12 @@ fn exercise_commit_intents(
 			CommitIntent::CreateNew => "create new",
 			CommitIntent::ReplaceExpected(_) => "replace expected",
 		};
+		calibration.pack(&fixture, volume, &prepared, operation)?;
+		calibration.release_metadata_reserve(&fixture, operation)?;
+		eprintln!(
+			"APFS case {policy:?}: {operation} reserve released; immediately before required commit, reported available {}",
+			available_bytes(volume)?
+		);
 		eprintln!("APFS case {policy:?}: checking {operation} publication refusal");
 		assert_staging_exhaustion(commit(destination, &prepared, intent, PREPARED_SIZE));
 		let after = read_snapshot(&existing, PREPARED_SIZE).expect("reopen original bank");
@@ -138,21 +159,26 @@ fn exercise_commit_intents(
 			getxattr(&existing, XATTR, &mut attribute),
 		)?;
 		assert_eq!(&attribute[..size], XATTR_BYTES);
-		let names = fixture_io(
-			"enumerate pending-file cleanup",
-			fs::read_dir(fixture.path()),
-		)?
-		.map(|entry| entry.map(|entry| entry.file_name()))
-		.collect::<io::Result<Vec<_>>>();
+		let names = fixture_io("enumerate pending-file cleanup", fs::read_dir(&fixture))?
+			.map(|entry| entry.map(|entry| entry.file_name()))
+			.collect::<io::Result<Vec<_>>>();
 		let mut names = fixture_io("read pending-file cleanup entries", names)?;
 		names.sort_unstable();
+		let mut expected = calibration.names().to_vec();
+		expected.extend([EXISTING.into(), FILLER.into(), RAW_CONTROL.into()]);
+		expected.sort_unstable();
 		assert_eq!(
-			names,
-			[OsStr::new(EXISTING), OsStr::new(FILLER)],
+			names, expected,
 			"the failed create and both pending names must be absent",
 		);
 	}
 
+	drop(control);
+	fixture_io(
+		"remove retained native control",
+		fs::remove_file(control_path),
+	)?;
+	calibration.release(&fixture)?;
 	fixture_io("remove filler", fs::remove_file(filler_path))?;
 	let stats = fixture_io("measure reclaimed volume", fstatfs(volume))?;
 	let recovered = bytes_from_blocks(&stats, stats.f_bavail)?;
@@ -175,7 +201,10 @@ fn exercise_commit_intents(
 		"APFS case {policy:?}: capacity {capacity} bytes, filler {filled} bytes, available {available} bytes, calibrated={calibrated}, raw control stored {control_written} of {PREPARED_SIZE} bytes, both staging writes errno {}, recovered {recovered} bytes",
 		libc::ENOSPC,
 	);
-	fixture_io("remove completed case directory", fixture.close())?;
+	fixture_io(
+		"remove completed case directory",
+		fs::remove_dir_all(&fixture),
+	)?;
 	Ok(())
 }
 
