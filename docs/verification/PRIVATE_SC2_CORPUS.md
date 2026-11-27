@@ -36,12 +36,15 @@ node docs/verification/scripts/private-sc2-corpus.mjs /path/to/private/manifest.
 
 The runner opens only listed regular files beneath the manifest directory.
 It refuses traversals out of that scope and paths that resolve through
-aliases. The CLI receives a single listed archive path, with indexing cache
-disabled. It only reads that archive. Signing context and bank bytes pass
-through the native checker’s standard input. Child output stays in memory.
-The summary contains case positions, fixed diagnostics and counts
-by declared origin and type. It emits no input paths, names, digests, account
-handles, map metadata or bank contents. A failure exits with status 1.
+aliases. The CLI receives a single listed input path per call. Map scans disable
+indexing cache. Bank checks use only read-only commands. Signing context
+and bank bytes pass through the native protocol checker’s standard input.
+For CLI bank checks, the explicit signing context is supplied as local
+process arguments. Child output stays in memory. The summary contains
+case positions, fixed diagnostics, counts by declared origin and type,
+and the number of passing CLI bank checks. It emits no input paths, names,
+digests, account handles, map metadata or bank contents. A failure exits
+with status 1.
 The runner checks source hashes before and after successful cases.
 There is no desktop window, game process, browser or network service.
 
@@ -97,7 +100,12 @@ The bank check opens the input, checks the expected projection, encoding
 and signature state, exports without modification, and reparses the exact
 exported bytes. An optional signed output must match its independent hash
 and verify after reparse. It compares native and release WASM control
-replies and byte attachments.
+replies and byte attachments. When the manifest provides a complete signing
+context, the runner also checks the CLI's ordered inspection projection,
+source SHA-256 and signature status, or its typed parse refusal. For a valid
+signature it runs `validate --require-signature` on the exact input. A bank
+with `context: null` uses only the protocol checkers because the CLI may
+infer a signing context from its path.
 
 Maps specify an `expected` object with `exitStatus`, ordered
 `issueCodes`, and `metadata`. Use `null` metadata for a rejected archive.

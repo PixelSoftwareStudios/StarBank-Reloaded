@@ -14,6 +14,7 @@ import { isDeepStrictEqual } from "node:util";
 
 const manifestLimit = 1024 * 1024;
 const documentLimit = 8 * 1024 * 1024;
+const bankReportLimit = 16 * documentLimit;
 const archiveLimit = 512 * 1024 * 1024;
 const maxCases = 512;
 const sha256Pattern = /^[0-9a-f]{64}$/;
@@ -296,7 +297,7 @@ function verifyNative(native, transcript) {
     .join("\n");
   const result = run(native, [], {
     input,
-    maxBuffer: 16 * documentLimit,
+    maxBuffer: bankReportLimit,
   });
   requireCheck(result.status === 0, "native protocol exited unsuccessfully");
   const replies = result.stdout.toString("utf8").trimEnd().split("\n");
@@ -313,6 +314,67 @@ function verifyNative(native, transcript) {
             Buffer.from(nativeReply.bytes).equals(Buffer.from(reply.bytes))
           : nativeReply.bytes === null),
       "native and WASM bank replies differed",
+    );
+  }
+}
+
+function verifyCliBank(binary, path, entry) {
+  const { context, expected } = entry;
+  const args = [
+    path,
+    `--author=${context.author}`,
+    `--player=${context.player}`,
+    `--bank-name=${context.bank_name}`,
+    "--json",
+  ];
+  const inspection = run(binary, ["inspect", ...args], {
+    maxBuffer: bankReportLimit,
+  });
+  const reply = JSON.parse(inspection.stdout.toString("utf8"));
+  requireCheck(
+    reply?.schema_version === 1,
+    "unexpected CLI bank report version",
+  );
+  if (expected.openError === "invalid_document") {
+    const code = reply.error?.code;
+    requireCheck(
+      (inspection.status === 3 &&
+        (code === "invalid_bank" || code === "input_limit")) ||
+        (inspection.status === 7 && code === "unsupported_bank_format"),
+      "CLI bank refusal differed from the independent expectation",
+    );
+    return;
+  }
+
+  requireCheck(
+    inspection.status === 0 &&
+      reply.command === "inspect" &&
+      Array.isArray(reply.result?.contents),
+    "unexpected CLI bank inspection report",
+  );
+  requireCheck(
+    reply.result.sha256 === entry.sha256 &&
+      reply.result.signature?.status === expected.signatureStatus &&
+      isDeepStrictEqual(
+        bankProjection(reply.result.contents),
+        expected.projection,
+      ),
+    "CLI bank checksum, signature or projection differed from the independent expectation",
+  );
+  if (expected.signatureStatus === "valid") {
+    const validation = run(binary, [
+      "validate",
+      ...args,
+      "--require-signature",
+    ]);
+    const report = JSON.parse(validation.stdout.toString("utf8"));
+    requireCheck(
+      validation.status === 0 &&
+        report?.schema_version === 1 &&
+        report.command === "validate" &&
+        report.result?.sha256 === entry.sha256 &&
+        report.result?.signature?.status === "valid",
+      "CLI did not validate the expected signature on the exact input",
     );
   }
 }
@@ -401,6 +463,7 @@ async function main(args) {
   const passed = Object.fromEntries(
     Array.from(origins, (origin) => [origin, { bank: 0, map: 0 }]),
   );
+  let cliBankChecks = 0;
   let failures = 0;
   for (const [index, entry] of manifest.cases.entries()) {
     try {
@@ -413,20 +476,26 @@ async function main(args) {
         loaded.size === entry.byteLength && loaded.sha256 === entry.sha256,
         "fixture length or SHA-256 differed from provenance",
       );
-      if (bank) verifyBank(WasmBankEngine, native, loaded.bytes, entry);
-      else verifyMap(cli, path, entry.expected);
+      const checkCliBank = bank && entry.context !== null;
+      if (bank) {
+        verifyBank(WasmBankEngine, native, loaded.bytes, entry);
+        if (checkCliBank) verifyCliBank(cli, path, entry);
+      } else {
+        verifyMap(cli, path, entry.expected);
+      }
       requireCheck(
         capture(path, limit, true).sha256 === entry.sha256,
         "source bytes changed during verification",
       );
       passed[entry.source.origin][entry.kind] += 1;
+      if (checkCliBank) cliBankChecks += 1;
     } catch (error) {
       failures += 1;
       reportFailure(`Case ${index + 1}`, error);
     }
   }
   process.stdout.write(
-    `Passed ${passed.synthetic.bank} synthetic banks, ${passed.synthetic.map} synthetic maps, ${passed.owner_file.bank} owner-supplied banks, ${passed.owner_file.map} owner-supplied maps, ${passed.game.bank} game banks and ${passed.game.map} game maps. Failed ${failures}.\n`,
+    `Passed ${passed.synthetic.bank} synthetic banks, ${passed.synthetic.map} synthetic maps, ${passed.owner_file.bank} owner-supplied banks, ${passed.owner_file.map} owner-supplied maps, ${passed.game.bank} game banks and ${passed.game.map} game maps. Failed ${failures}. CLI bank checks: ${cliBankChecks}.\n`,
   );
   if (failures) process.exitCode = 1;
 }
