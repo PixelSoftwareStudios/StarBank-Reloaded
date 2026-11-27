@@ -210,6 +210,50 @@ fn accepts_explicit_folders_and_files_without_assuming_signing_context()
 }
 
 #[test]
+fn manual_collection_keeps_loose_banks_when_accounts_contributes_no_roots()
+-> Result<(), Box<dyn std::error::Error>> {
+	let temp = tempfile::tempdir()?;
+	let root = temp.path().canonicalize()?;
+	let collection = root.join("Selected collection");
+	let loose = write_fixture(&collection, "Loose.SC2Bank")?;
+	let accounts = collection.join("Accounts");
+	fs::create_dir(&accounts)?;
+	let limits = ScanLimits::default();
+
+	let selected = is_valid_bank_path(&collection, limits)?;
+	assert_eq!(selected.kind(), SelectionKind::Collection);
+	let inventory = inventory_banks(&selected, limits)?;
+	assert_eq!(inventory.banks.len(), 1);
+	let bank = &inventory.banks[0].locations[0];
+	assert_eq!(bank.path, loose);
+	assert!(bank.signing_hint.is_none());
+
+	let explicit_accounts = is_valid_bank_path(&accounts, limits)?;
+	assert_eq!(explicit_accounts.kind(), SelectionKind::Accounts);
+	assert!(
+		inventory_banks(&explicit_accounts, limits)?
+			.banks
+			.is_empty()
+	);
+
+	let game = root.join("StarCraft II");
+	write_fixture(&game, "Outside.SC2Bank")?;
+	fs::create_dir(game.join("Accounts"))?;
+	let game_root = is_valid_bank_path(&game, limits)?;
+	assert_eq!(game_root.kind(), SelectionKind::GameRoot);
+	assert!(game_root.bank_roots().is_empty());
+	assert!(inventory_banks(&game_root, limits)?.banks.is_empty());
+
+	let scoped = write_fixture(&accounts, "123/1-S2-1-98/Banks/1-S2-1-76/Scoped.SC2Bank")?;
+	let recognized = is_valid_bank_path(&collection, limits)?;
+	assert_eq!(recognized.kind(), SelectionKind::GameRoot);
+	let inventory = inventory_banks(&recognized, limits)?;
+	assert_eq!(inventory.banks.len(), 1);
+	assert_eq!(inventory.banks[0].locations[0].path, scoped);
+	Ok(())
+}
+
+#[test]
 fn refuses_unbounded_partial_results() -> Result<(), Box<dyn std::error::Error>> {
 	let temp = tempfile::tempdir()?;
 	let root = temp.path().join("Banks");

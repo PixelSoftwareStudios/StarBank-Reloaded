@@ -218,14 +218,13 @@ fn find_root_markers(
 			.file_name();
 		let path = parent.join(&name);
 		budget.visit(&path, 0)?;
-		if name.eq_ignore_ascii_case(ACCOUNTS)
-			|| (trust_game_markers && name.eq_ignore_ascii_case(BANKS))
-		{
+		let is_accounts = name.eq_ignore_ascii_case(ACCOUNTS);
+		if is_accounts || (trust_game_markers && name.eq_ignore_ascii_case(BANKS)) {
 			let metadata = scoped_metadata(directory, &name, &path)?;
 			if metadata.is_dir() {
-				markers = true;
 				let child = open_child(directory, &name, &metadata, &path)?;
-				if name.eq_ignore_ascii_case(ACCOUNTS) {
+				let previous_root_count = roots.len();
+				if is_accounts {
 					find_scoped_roots(&child, &path, 0, budget, roots)?;
 				} else {
 					roots.push(BankRoot {
@@ -234,6 +233,8 @@ fn find_root_markers(
 						directory: child,
 					});
 				}
+				// An arbitrary collection may contain an unrelated Accounts directory.
+				markers |= trust_game_markers || roots.len() > previous_root_count;
 			}
 		} else if trust_game_markers
 			&& (name.eq_ignore_ascii_case(VARIABLES) || name.eq_ignore_ascii_case(EXECUTE_INFO))
