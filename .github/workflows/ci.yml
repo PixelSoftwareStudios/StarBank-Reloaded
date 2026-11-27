@@ -160,10 +160,12 @@ jobs:
       # Keep the package lists explicit when adding portable crates.
       - run: >-
           cargo build --locked --target wasm32-unknown-unknown
-          -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor -p starbank-wasm
+          -p starbank-core -p sc2bank -p starbank-signature
+          -p starbank-profiles -p starbank-editor -p starbank-wasm
       - run: >-
           cargo clippy --locked --target wasm32-unknown-unknown
-          -p starbank-core -p sc2bank -p starbank-signature -p starbank-editor -p starbank-wasm
+          -p starbank-core -p sc2bank -p starbank-signature
+          -p starbank-profiles -p starbank-editor -p starbank-wasm
           -- -D warnings
 
   frontend:
