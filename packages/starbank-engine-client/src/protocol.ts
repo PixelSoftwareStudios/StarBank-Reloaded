@@ -4,6 +4,7 @@ import {
   profilePreviewSchema,
   profileSchema,
 } from "./profile-protocol";
+import { type EngineSigningContext, signatureStatus } from "./signing-protocol";
 
 export type {
   EngineProfile,
@@ -21,11 +22,10 @@ export {
 
 export const EDITOR_SCHEMA_VERSION = 1;
 
-export interface EngineSigningContext {
-  readonly author: string;
-  readonly player: string;
-  readonly bank_name: string;
-}
+export type {
+  EngineSignatureStatus,
+  EngineSigningContext,
+} from "./signing-protocol";
 
 export interface EngineValueEdit {
   readonly id: string;
@@ -121,17 +121,6 @@ export interface EngineRequest {
   readonly expected_revision?: string;
   readonly command: EngineCommand;
 }
-
-const signatureStatus = v.picklist([
-  "unsigned",
-  "malformed",
-  "missing_context",
-  "unsupported",
-  "valid",
-  "invalid",
-]);
-
-export type EngineSignatureStatus = v.InferOutput<typeof signatureStatus>;
 
 const engineValue = v.object({
   id: v.string(),

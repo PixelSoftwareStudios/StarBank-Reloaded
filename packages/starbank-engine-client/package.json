@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/client.ts",
     "./worker": "./src/worker.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./signing-protocol": "./src/signing-protocol.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

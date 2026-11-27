@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import type {
-  EngineSignatureStatus,
-  EngineSigningContext,
-} from "starbank-engine-client/protocol";
+import {
+  type EngineSigningContext,
+  signatureStatus,
+} from "starbank-engine-client/signing-protocol";
 import * as v from "valibot";
 
 const HEADER_BYTES = 5;
@@ -65,21 +65,60 @@ export type ManualResignAction = {
   readonly context: EngineSigningContext;
 };
 
-type ResignReply =
-  | { readonly kind: "manual_context_required" }
-  | {
-      readonly kind: "checked";
-      readonly payload: Exclude<EngineSignatureStatus, "missing_context">;
-    }
-  | { readonly kind: "signed"; readonly payload: FileDialogReply };
+const checkedSignature = v.picklist(
+  signatureStatus.options.filter((status) => status !== "missing_context"),
+);
+const resignReply = v.variant("kind", [
+  v.object({ kind: v.literal("manual_context_required") }),
+  v.object({ kind: v.literal("checked"), payload: checkedSignature }),
+  v.object({ kind: v.literal("signed"), payload: fileDialogReply }),
+]);
+const externalSigningSource = v.nullable(
+  v.object({
+    id: v.pipe(v.string(), v.nonEmpty()),
+    name: v.string(),
+    requires_context: v.boolean(),
+    signature_status: signatureStatus,
+  }),
+);
+
+type ResignReply = v.InferOutput<typeof resignReply>;
 
 export function resignActiveBank(
   target: ActiveBankTarget,
   manual?: ManualResignAction,
 ): Promise<ResignReply> {
-  return invoke<ResignReply>("resign_active_bank", {
+  return invokeChecked(resignReply, "resign_active_bank", {
     target,
     manual: manual ?? null,
+  });
+}
+
+export function pickExternalSigningSource() {
+  return invokeChecked(
+    externalSigningSource,
+    "pick_external_bank_to_resign",
+    {},
+  );
+}
+
+export function checkExternalBankSignature(
+  id: string,
+  context: EngineSigningContext,
+) {
+  return invokeChecked(checkedSignature, "check_external_bank_signature", {
+    id,
+    context,
+  });
+}
+
+export function exportExternalSignedBank(
+  id: string,
+  context: EngineSigningContext | null,
+) {
+  return invokeChecked(v.nullable(v.string()), "export_external_signed_bank", {
+    id,
+    context,
   });
 }
 
