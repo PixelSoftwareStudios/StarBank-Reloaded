@@ -9,7 +9,7 @@ StarBank Reloaded aims to be a cross-platform, modern version of StarBank, for t
 
 ## Installation
 
-Binaries available in the Releases tab or run `just build`
+Build from source with `just build`.
 
 ## Development
 
