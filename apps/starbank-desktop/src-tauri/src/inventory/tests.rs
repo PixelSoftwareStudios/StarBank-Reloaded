@@ -178,8 +178,9 @@ fn cancelling_folder_or_auto_detection_preserves_the_published_and_saved_scope()
 	let persisted = fs::read(&config)?;
 
 	for (mode, last_stage, generation) in [
-		(ScanMode::Manual(pending), "indexing_maps", 2),
-		(ScanMode::Automatic, "locating_folder", 3),
+		(ScanMode::Manual(pending.clone()), "enumerating_banks", 2),
+		(ScanMode::Manual(pending), "indexing_maps", 3),
+		(ScanMode::Automatic, "locating_folder", 4),
 	] {
 		let mut cancelled_at_phase = false;
 		let result = service.scan_with_progress(mode, &[], |event| {

@@ -9,7 +9,8 @@ use starbank_map_index::{
 	prepare_map_cache_rebuild, prepare_map_cache_refresh,
 };
 use starbank_paths::{
-	PathError, PathSelection, ScanLimits, get_sc2_root_path, inventory_banks, is_valid_bank_path,
+	PathError, PathSelection, ScanLimits, get_sc2_root_path, inventory_banks_with_cancellation,
+	is_valid_bank_path,
 };
 
 use super::{
@@ -191,9 +192,11 @@ pub(super) fn collect_inventory(
 		identity: Some(root.identity()),
 	});
 	progress.enumerating_banks();
-	check_cancelled(cancellation)?;
-	let banks = match inventory_banks(&selection, BANK_SCAN_LIMITS) {
+	let banks = match inventory_banks_with_cancellation(&selection, BANK_SCAN_LIMITS, || {
+		cancellation.is_cancelled()
+	}) {
 		Ok(banks) => banks,
+		Err(PathError::Cancelled) => return Err(InventoryError::Cancelled),
 		Err(error) => return Ok((path_failure(manual_path, &error), accepted, None)),
 	};
 	check_cancelled(cancellation)?;

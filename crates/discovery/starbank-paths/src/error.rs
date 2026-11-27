@@ -22,6 +22,8 @@ pub struct CandidateFailure {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum PathError {
+	/// The caller requested that bank enumeration stop.
+	Cancelled,
 	/// Automatic discovery has no implementation on this OS yet.
 	NotImplemented,
 	/// The current OS has no supported automatic discovery policy.
@@ -90,6 +92,7 @@ impl PathError {
 impl fmt::Display for PathError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
+			Self::Cancelled => f.write_str("Bank inventory scan cancelled"),
 			Self::NotImplemented => {
 				f.write_str("Automatic SC2 bank discovery is not implemented on this OS")
 			}

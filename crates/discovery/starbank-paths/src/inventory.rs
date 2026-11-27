@@ -84,13 +84,32 @@ pub fn inventory_banks(
 	selection: &PathSelection,
 	limits: ScanLimits,
 ) -> Result<BankInventory, PathError> {
+	inventory_banks_with_cancellation(selection, limits, || false)
+}
+
+/// Enumerates selected bank roots until the callback requests cancellation.
+///
+/// The callback is polled around filesystem operations. A request to cancel
+/// stops the walk at the next checkpoint and discards partial results.
+///
+/// # Errors
+///
+/// Returns [PathError::Cancelled] on cancellation, or a typed path, permission,
+/// or limit error when the scan cannot complete.
+pub fn inventory_banks_with_cancellation(
+	selection: &PathSelection,
+	limits: ScanLimits,
+	is_cancelled: impl FnMut() -> bool,
+) -> Result<BankInventory, PathError> {
 	let mut state = InventoryState {
 		budget: Budget::new(limits),
+		is_cancelled,
 		banks: BTreeMap::new(),
 		backups: Vec::new(),
 	};
 	for root in &selection.roots {
 		if let Some(name) = selection.filename.as_ref() {
+			state.check_cancelled()?;
 			let path = root.path().join(name);
 			state.budget.visit(&path, 0)?;
 			let metadata = scoped_metadata(&root.directory, name, &path)?;
@@ -102,8 +121,8 @@ pub fn inventory_banks(
 			state.walk(&root.directory, root.path(), 0)?;
 		}
 	}
-	let mut banks = state
-		.banks
+	state.check_cancelled()?;
+	let mut banks = std::mem::take(&mut state.banks)
 		.into_values()
 		.map(|mut locations| {
 			locations.sort_unstable_by(|left, right| left.path.cmp(&right.path));
@@ -119,24 +138,39 @@ pub fn inventory_banks(
 	});
 	state.backups.sort_unstable();
 	state.backups.dedup();
+	state.check_cancelled()?;
 	Ok(BankInventory {
 		banks,
 		backups: state.backups,
 	})
 }
 
-struct InventoryState {
+struct InventoryState<F> {
 	budget: Budget,
+	is_cancelled: F,
 	banks: BTreeMap<FileIdentity, Vec<BankLocation>>,
 	backups: Vec<PathBuf>,
 }
 
-impl InventoryState {
+impl<F: FnMut() -> bool> InventoryState<F> {
+	fn check_cancelled(&mut self) -> Result<(), PathError> {
+		if (self.is_cancelled)() {
+			return Err(PathError::Cancelled);
+		}
+		Ok(())
+	}
+
 	fn walk(&mut self, directory: &Dir, parent: &Path, depth: usize) -> Result<(), PathError> {
-		let entries = directory
+		self.check_cancelled()?;
+		let mut entries = directory
 			.entries()
 			.map_err(|source| PathError::io(parent, source))?;
-		for entry in entries {
+		loop {
+			self.check_cancelled()?;
+			let Some(entry) = entries.next() else {
+				break;
+			};
+			self.check_cancelled()?;
 			let name = entry
 				.map_err(|source| PathError::io(parent, source))?
 				.file_name();
@@ -144,6 +178,7 @@ impl InventoryState {
 			self.budget.visit(&path, depth)?;
 			let metadata = scoped_metadata(directory, &name, &path)?;
 			if metadata.is_dir() {
+				self.check_cancelled()?;
 				self.budget.check_depth(&path, depth + 1)?;
 				let child = open_child(directory, &name, &metadata, &path)?;
 				self.walk(&child, &path, depth + 1)?;
@@ -162,6 +197,7 @@ impl InventoryState {
 		path: PathBuf,
 	) -> Result<(), PathError> {
 		if has_extension(&path, BANK_EXTENSION) {
+			self.check_cancelled()?;
 			let identity = file_identity(directory, name, metadata, &path)?;
 			self.banks.entry(identity).or_default().push(BankLocation {
 				signing_hint: parse_signing_context(&path),

@@ -12,6 +12,9 @@ mod windows;
 
 pub use context::{SigningContextHint, parse_signing_context};
 pub use error::{CandidateFailure, LimitKind, PathError};
-pub use inventory::{BankEntry, BankInventory, BankLocation, ScanLimits, inventory_banks};
+pub use inventory::{
+	BankEntry, BankInventory, BankLocation, ScanLimits, inventory_banks,
+	inventory_banks_with_cancellation,
+};
 pub use resolver::{AutoDetectedRoot, get_sc2_root_path};
 pub use selection::{BankRoot, PathSelection, PlayerScope, SelectionKind, is_valid_bank_path};
