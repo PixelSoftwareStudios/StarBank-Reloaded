@@ -29,8 +29,8 @@ attached="$scratch/attach.plist"
 image_state="$scratch/image-state.plist"
 mount_state="$scratch/mount-state.txt"
 state_checker=crates/platform/starbank-fs/verification/macos-enospc-state.py
-max_detach_attempts=6
-detach_retry_seconds=1
+max_detach_attempts=12
+detach_retry_seconds=2
 inspect_state() {
 	/sbin/mount >"$mount_state" || return 1
 	/usr/bin/hdiutil info -plist >"$image_state" || return 1
@@ -47,13 +47,21 @@ detach_owned_image() {
 		case "$fixture_state" in
 			detached) return 0 ;;
 			mounted)
-				printf 'Ordinary disposable image detach attempt %s/%s\n' "$detach_attempt" "$max_detach_attempts" >&2
+				printf 'Ordinary disposable image detach attempt %s/%s: mounted\n' "$detach_attempt" "$max_detach_attempts" >&2
 				if ! /usr/bin/hdiutil detach "$mountpoint"; then
 					printf '%s\n' 'Ordinary detach failed; rechecking the exact owned image before retry.' >&2
 				fi
 				;;
-			pending)
-				printf '%s\n' 'Disposable mount/image transition is pending; waiting for fresh ownership evidence.' >&2
+			# hdiutil(1) supports an explicit /dev node; the checker proves ownership.
+			attached_unmounted:*)
+				detach_device=${fixture_state#attached_unmounted:}
+				printf 'Ordinary disposable image root detach attempt %s/%s: attached_unmounted %s\n' "$detach_attempt" "$max_detach_attempts" "$detach_device" >&2
+				if ! /usr/bin/hdiutil detach "$detach_device"; then
+					printf '%s\n' 'Ordinary device detach failed; rechecking exact image ownership.' >&2
+				fi
+				;;
+			image_absent_stale_mount|attached_stale_mount)
+				printf 'Disposable image transition %s at attempt %s/%s; waiting for fresh evidence.\n' "$fixture_state" "$detach_attempt" "$max_detach_attempts" >&2
 				;;
 			*) return 1 ;;
 		esac
@@ -91,7 +99,7 @@ cleanup() {
 mkdir "$mountpoint"
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
-/usr/bin/hdiutil create -size 128m -type SPARSE -fs APFS -volname StarBankENOSPC "$image"
+/usr/bin/hdiutil create -size 128m -type SPARSE -layout GPTSPUD -fs APFS -volname StarBankENOSPC "$image"
 /usr/bin/hdiutil attach -nobrowse -noautoopen -owners on -mountpoint "$mountpoint" -plist "$image" >"$attached"
 if ! inspect_state || [ "$fixture_state" != mounted ]; then
 	printf 'The disposable image did not mount at %s\n' "$mountpoint" >&2
