@@ -75,7 +75,7 @@
   accent-color: var(--map-focus);
 }
 
-.settings-page button:disabled {
+.settings-page :is(button, input, select):disabled {
   color: var(--shell-muted);
 }
 
