@@ -16,14 +16,16 @@ use std::ptr;
 use windows_sys::Win32::{
 	Foundation::{GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
 	Storage::FileSystem::{
-		FILE_CASE_SENSITIVE_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES,
-		FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE, FileCaseSensitiveInfo,
-		GetVolumeInformationByHandleW, READ_CONTROL, ReOpenFile,
+		FILE_CASE_SENSITIVE_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_GENERIC_WRITE,
+		FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE,
+		FileCaseSensitiveInfo, GetVolumeInformationByHandleW, READ_CONTROL, ReOpenFile,
 	},
 };
 
 const FS_NAME_UNITS: u32 = 32;
-const WRITABLE_PARENT_ACCESS: u32 = GENERIC_WRITE | FILE_READ_ATTRIBUTES | FILE_TRAVERSE;
+const WRITABLE_PARENT_ACCESS: u32 = FILE_GENERIC_WRITE | FILE_READ_ATTRIBUTES | FILE_TRAVERSE;
+const DIRECTORY_FLAGS: u32 = FILE_FLAG_BACKUP_SEMANTICS | NO_REPARSE_OR_RECALL;
+const DIRECTORY_SHARING: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 pub(super) struct Scope {
 	pub(super) directory: DirectoryScope,
@@ -40,27 +42,7 @@ impl Scope {
 		let directory = DirectoryScope::open(&path)?;
 		require_ntfs(&directory.parent)?;
 		require_case_insensitive(&directory.parent)?;
-		// Reopen the held object instead of resolving another writable path. Qualify the
-		// actual cap-primitives handle; API refusal fails before staging, with no fallback.
-		// https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-reopenfile
-		// SAFETY: original parent stays live; directory flags and no-delete sharing are
-		// documented for ReOpenFile. No ambient writable-path traversal is introduced.
-		let writable = unsafe {
-			ReOpenFile(
-				directory.parent.as_raw_handle(),
-				WRITABLE_PARENT_ACCESS,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				FILE_FLAG_BACKUP_SEMANTICS | NO_REPARSE_OR_RECALL,
-			)
-		};
-		if writable == INVALID_HANDLE_VALUE {
-			return Err(StorageError::io(
-				"reopen writable destination directory",
-				io::Error::last_os_error(),
-			));
-		}
-		// SAFETY: ReOpenFile transferred ownership of the successful new handle.
-		let writable = unsafe { File::from_raw_handle(writable) };
+		let writable = open_writable_parent(&directory, &path)?;
 		check_directory(&writable)?;
 		if Identity::read(&writable)? != directory.identity {
 			return Err(StorageError::Conflict);
@@ -164,6 +146,56 @@ impl Scope {
 		};
 		Ok((file, FileSnapshot { fingerprint, bytes }))
 	}
+}
+
+fn open_writable_parent(
+	directory: &DirectoryScope,
+	destination: &Path,
+) -> Result<File, StorageError> {
+	let Some(grandparent) = directory._ancestors.last() else {
+		return reopen_drive_root(&directory.parent);
+	};
+	let leaf = destination
+		.parent()
+		.and_then(Path::file_name)
+		.ok_or(StorageError::UnsafePath(
+			"missing writable destination directory leaf",
+		))?;
+	super::super::check_component(leaf)?;
+	// The scope retains the verified immediate ancestor. A concrete access mask also keeps
+	// cap-primitives 4.0.3 from deriving backup intent or FILE_OPEN_REMOTE_INSTANCE from
+	// generic access bits in combination with FILE_FLAG_BACKUP_SEMANTICS.
+	let mut options = RelativeOptions::new();
+	options
+		.access_mode(WRITABLE_PARENT_ACCESS)
+		.share_mode(DIRECTORY_SHARING)
+		.custom_flags(DIRECTORY_FLAGS);
+	cap_primitives::fs::open(grandparent, Path::new(leaf), &options).map_err(|error| {
+		StorageError::io("open writable directory relative to held ancestor", error)
+	})
+}
+
+fn reopen_drive_root(root: &File) -> Result<File, StorageError> {
+	// A scope with no ancestors uses the original Win32-opened drive root. ReOpenFile
+	// documents CreateFile-origin handles. An unsupported reopen fails before staging.
+	// https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-reopenfile
+	// SAFETY: root stays live; directory flags and no-delete sharing apply to the new handle.
+	let handle = unsafe {
+		ReOpenFile(
+			root.as_raw_handle(),
+			GENERIC_WRITE | FILE_READ_ATTRIBUTES | FILE_TRAVERSE,
+			DIRECTORY_SHARING,
+			DIRECTORY_FLAGS,
+		)
+	};
+	if handle == INVALID_HANDLE_VALUE {
+		return Err(StorageError::io(
+			"reopen writable drive root",
+			io::Error::last_os_error(),
+		));
+	}
+	// SAFETY: ReOpenFile transferred ownership of this successful handle.
+	Ok(unsafe { File::from_raw_handle(handle) })
 }
 
 fn require_ntfs(directory: &File) -> Result<(), StorageError> {

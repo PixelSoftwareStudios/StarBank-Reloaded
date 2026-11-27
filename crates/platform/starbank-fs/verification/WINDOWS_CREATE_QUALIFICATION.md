@@ -123,3 +123,9 @@ cargo nextest run --locked -p starbank-fs --lib --run-ignored only --no-tests fa
 ```
 
 The Windows CI job selects this case explicitly after the existing NTFS probe. Public Windows writes and the desktop create-copy capability remain disabled until qualification completes.
+
+### First candidate execution
+
+Run `46027037190` at `5a057d1` passed all 249 default Windows tests and the legacy reduced-token probe, then the candidate's first nominal create rejected before staging. `ReOpenFile` returned Win32 error 87 on the cap-primitives-opened parent; subsequent candidate scenarios had not run. The other ten hosted jobs passed. [Windows result](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46027037190/job/140600985960)
+
+The correction opens nested writable parents by the already validated leaf from their held immediate ancestor. Concrete `FILE_GENERIC_WRITE` rights avoid cap-primitives' reserved option for the generic-write bit. No-follow, no-recall, directory identity and case-policy checks remain. The ancestor-less drive-root branch retains `ReOpenFile` on its original Win32-opened handle; it is still runtime-unqualified and rejects before staging if unavailable. Local Windows-target strict Clippy passed; native confirmation is pending.
