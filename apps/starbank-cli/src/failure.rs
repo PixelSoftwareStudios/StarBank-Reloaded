@@ -40,6 +40,7 @@ pub(crate) enum ErrorCode {
 	CannotSign,
 	StaleSignature,
 	InvalidBackup,
+	BackupChanged,
 	BackupMetadata,
 	BackupUncertain,
 	Io,

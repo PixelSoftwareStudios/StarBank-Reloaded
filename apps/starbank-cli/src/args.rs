@@ -177,6 +177,10 @@ pub(crate) enum BackupCommand {
 		#[arg(long)]
 		expected_current_sha256: String,
 
+		/// Expected snapshot digest from a restore preview or verified backup listing.
+		#[arg(long)]
+		expected_backup_sha256: Option<String>,
+
 		/// Verify the restore plan without creating a reversal or replacing the bank.
 		#[arg(long)]
 		dry_run: bool,

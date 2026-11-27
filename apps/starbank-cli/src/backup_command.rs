@@ -25,11 +25,13 @@ pub(crate) fn run(command: BackupCommand, json: bool) -> Result<Status, Failure>
 			file,
 			backup,
 			expected_current_sha256,
+			expected_backup_sha256,
 			dry_run,
 		} => restore(
 			&bank_source(&file)?,
 			&std::path::absolute(backup)?,
 			&expected_current_sha256,
+			expected_backup_sha256.as_deref(),
 			dry_run,
 			json,
 		),
@@ -84,20 +86,17 @@ fn create(source: &BankSource, json: bool) -> Result<Status, Failure> {
 fn restore(
 	source: &BankSource,
 	path: &Path,
-	expected_sha256: &str,
+	expected_current_sha256: &str,
+	expected_backup_sha256: Option<&str>,
 	dry_run: bool,
 	json: bool,
 ) -> Result<Status, Failure> {
 	let limits = Limits::default();
 	let current = read_snapshot(source.path(), limits.document_bytes)?;
-	let mut confirmed = [0; SHA256_BYTES];
-	hex::decode_to_slice(expected_sha256, &mut confirmed).map_err(|_| {
-		Failure::new(
-			Status::Validation,
-			ErrorCode::InvalidBackup,
-			"The current bank fingerprint must contain 64 hexadecimal characters.",
-		)
-	})?;
+	let confirmed = decode_digest(
+		expected_current_sha256,
+		"The current bank fingerprint must contain 64 hexadecimal characters.",
+	)?;
 	if current.fingerprint().sha256() != &confirmed {
 		return Err(Failure::new(
 			Status::Conflict,
@@ -105,11 +104,30 @@ fn restore(
 			"The current bank no longer matches the confirmed fingerprint.",
 		));
 	}
+	let expected_backup = expected_backup_sha256
+		.map(|digest| {
+			decode_digest(
+				digest,
+				"The backup fingerprint must contain 64 hexadecimal characters.",
+			)
+		})
+		.transpose()?;
 	if path.parent() != source.path().parent() {
 		return Err(invalid_backup_path());
 	}
 	let mut catalog = catalog(limits)?;
 	let prepared = catalog.prepare_restore(source, current, path, BackupPlacement::Adjacent)?;
+	let selected_digest = prepared.selected().fingerprint().sha256();
+	if expected_backup
+		.as_ref()
+		.is_some_and(|expected| expected != selected_digest)
+	{
+		return Err(Failure::new(
+			Status::Conflict,
+			ErrorCode::BackupChanged,
+			"The selected backup no longer matches the confirmed fingerprint.",
+		));
+	}
 	let selected_document = parse(prepared.selected().bytes(), limits)?;
 	let current_document = parse(prepared.current().bytes(), limits).map_err(Failure::from);
 	// Restore reports signature verification when the destination provides a usable context.
@@ -123,7 +141,7 @@ fn restore(
 	let mut report = RestoreReport {
 		snapshot: DisplayPath::new(path),
 		before_sha256: hex::encode(confirmed),
-		after_sha256: hex::encode(prepared.selected().fingerprint().sha256()),
+		after_sha256: hex::encode(selected_digest),
 		diff,
 		comparison_diagnostic: current_document.as_ref().err(),
 		signature,
@@ -189,6 +207,13 @@ fn restore(
 		Ok(())
 	})?;
 	Ok(status)
+}
+
+fn decode_digest(value: &str, message: &'static str) -> Result<[u8; SHA256_BYTES], Failure> {
+	let mut digest = [0; SHA256_BYTES];
+	hex::decode_to_slice(value, &mut digest)
+		.map_err(|_| Failure::new(Status::Validation, ErrorCode::InvalidBackup, message))?;
+	Ok(digest)
 }
 
 fn display(path: impl AsRef<Path>) -> String {

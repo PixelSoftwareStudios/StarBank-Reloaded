@@ -151,3 +151,106 @@ fn restore_reports_unavailable_comparison_and_preserves_invalid_signature_bytes(
 		assert_eq!(directory_contents(&bank), contents_before);
 	}
 }
+
+#[test]
+fn restore_refuses_a_replaced_backup_when_the_reviewed_digest_is_supplied() {
+	let fixture = Fixture::new();
+	let bank = fixture.write("Live.sc2bank", SOURCE);
+	let selected = backup(&bank);
+	let current = SOURCE.replace("00065", "00071");
+	fs::write(&bank, &current).expect("modify live bank");
+	let expected_current = hex::encode(Sha256::digest(&current));
+	let initial = restore(&bank, &selected, &expected_current)
+		.arg("--dry-run")
+		.output()
+		.expect("review original backup");
+	let initial = json(&initial, 0);
+	let expected_backup = initial["result"]["after_sha256"]
+		.as_str()
+		.expect("reviewed backup digest");
+
+	let replacement = SOURCE.replace("00065", "00099");
+	let replacement_digest = hex::encode(Sha256::digest(&replacement));
+	fs::write(&selected, &replacement).expect("replace synthetic backup bytes");
+	let mut sidecar = selected.as_os_str().to_owned();
+	sidecar.push(".json");
+	let mut metadata: serde_json::Value =
+		serde_json::from_slice(&fs::read(&sidecar).expect("read backup sidecar"))
+			.expect("decode backup sidecar");
+	metadata["sha256"] = serde_json::json!(replacement_digest);
+	fs::write(
+		&sidecar,
+		serde_json::to_vec(&metadata).expect("encode replacement sidecar"),
+	)
+	.expect("update synthetic backup sidecar");
+	let contents_before = directory_contents(&bank);
+
+	let unpinned = restore(&bank, &selected, &expected_current)
+		.arg("--dry-run")
+		.output()
+		.expect("review the internally consistent replacement");
+	assert_eq!(
+		json(&unpinned, 0)["result"]["after_sha256"],
+		replacement_digest
+	);
+	let guarded = |digest: &str| {
+		let mut command = restore(&bank, &selected, &expected_current);
+		command.args(["--expected-backup-sha256", digest]);
+		command
+	};
+	let malformed = guarded(&"z".repeat(64))
+		.arg("--dry-run")
+		.output()
+		.expect("reject malformed digest");
+	assert_eq!(json(&malformed, 3)["error"]["code"], "invalid_backup");
+
+	let stale_preview = guarded(expected_backup)
+		.arg("--dry-run")
+		.output()
+		.expect("reject stale digest during preview");
+	assert_eq!(json(&stale_preview, 5)["error"]["code"], "backup_changed");
+	let stale_apply = guarded(expected_backup)
+		.output()
+		.expect("reject stale digest before applying");
+	assert_eq!(json(&stale_apply, 5)["error"]["code"], "backup_changed");
+
+	let matching = guarded(&replacement_digest.to_ascii_uppercase())
+		.arg("--dry-run")
+		.output()
+		.expect("preview the newly reviewed backup with its digest");
+	assert_eq!(
+		json(&matching, 0)["result"]["after_sha256"],
+		replacement_digest
+	);
+	assert_eq!(directory_contents(&bank), contents_before);
+
+	let applied = guarded(&replacement_digest)
+		.output()
+		.expect("apply the newly reviewed backup with its digest");
+	#[cfg(target_os = "macos")]
+	{
+		let report = json(&applied, 0);
+		assert_eq!(report["result"]["outcome"], "committed_verified");
+		assert_eq!(report["result"]["after_sha256"], replacement_digest);
+		let reversal = report["result"]["reversal_backup"]
+			.as_str()
+			.expect("reversal snapshot");
+		assert_eq!(
+			fs::read_to_string(reversal).expect("read reversal"),
+			current
+		);
+		assert_eq!(
+			fs::read_to_string(&bank).expect("read restored bank"),
+			replacement
+		);
+		assert_eq!(
+			fs::read_to_string(&selected).expect("read selected backup"),
+			replacement
+		);
+	}
+	#[cfg(target_os = "linux")]
+	{
+		assert_eq!(json(&applied, 7)["error"]["code"], "unsupported_storage");
+		assert_eq!(directory_contents(&bank), contents_before);
+	}
+}

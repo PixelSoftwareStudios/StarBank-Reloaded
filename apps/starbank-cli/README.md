@@ -15,7 +15,7 @@ Build from the repository root with `cargo build --locked -p starbank-cli`. The 
 | `export FILE --output PATH [--dry-run]` | Prepares and verifies a new bank copy. |
 | `backup create FILE` | Verifies a timestamped adjacent snapshot and records its metadata. |
 | `backup list FILE [--verify]` | Lists recorded adjacent snapshots. `--verify` checks their length and SHA-256. |
-| `backup restore FILE BACKUP --expected-current-sha256 SHA [--dry-run]` | Verifies the selected backup and its target. An actual restore first commits a reversal snapshot. |
+| `backup restore FILE BACKUP --expected-current-sha256 SHA [--expected-backup-sha256 SHA] [--dry-run]` | Verifies the selected backup and its target. An actual restore first commits a reversal snapshot. |
 | `map inspect FILE` | Reads declared title, author and bank names from one selected .SC2Map archive. |
 | `map scan --root PATH` | Indexes selected map folders or archives without writing a cache. Repeat `--root` for multiple locations. |
 
@@ -24,6 +24,15 @@ Append `--json` for machine-readable output. Explicit signing context takes all 
 Output creation is exclusive. The two in-place commands require `--in-place` and create a verified adjacent backup before changing the original. `--backup` selects an explicitly requested backup reason for the catalog. Dry-run returns the prepared change and signature status without creating any files. It does not reserve a destination filename. Treat retained recovery artifacts and uncertainty as reasons to inspect current files before retrying.
 
 Adjacent snapshots use a UTC timestamp and a collision suffix when needed. The JSON sidecar stores the original basename, canonical signing context when known, timestamp, reason, byte length and digest. Restore requires the matching recorded sidecar and the current live-bank SHA-256. Listed snapshots start unverified in each invocation until checked.
+
+Pass the preview's `after_sha256` or a verified backup entry's `sha256` as `--expected-backup-sha256` to apply the reviewed bytes. A mismatch returns `backup_changed` with exit status 5 before creating a reversal. In these commands, `LIVE_SHA` is the inspected live digest and `BACKUP_SHA` is the digest from the preview.
+
+```sh
+starbank backup restore sample.sc2bank sample_20260901_120000.sc2bank.bak \
+  --expected-current-sha256 "$LIVE_SHA" --dry-run --json
+starbank backup restore sample.sc2bank sample_20260901_120000.sc2bank.bak \
+  --expected-current-sha256 "$LIVE_SHA" --expected-backup-sha256 "$BACKUP_SHA" --json
+```
 
 Restore reports the projected `diff` and the snapshot's `signature` at the live bank's inferred signing context. When the live bank cannot be parsed, `diff` is null and `comparison_diagnostic` gives the parse error. Recovery remains available from a verified, parseable snapshot. Restore copies the snapshot bytes exactly, including the stored signature.
 
