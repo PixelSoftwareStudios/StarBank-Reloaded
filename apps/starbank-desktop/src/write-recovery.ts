@@ -1,3 +1,4 @@
+import { engineTargetSchema } from "starbank-ui/engine/target-protocol";
 import * as v from "valibot";
 
 const RECOVERY_ERROR = "recovery_required";
@@ -41,30 +42,33 @@ const recoveryReceipt = v.pipe(
       "backup_copy",
       "external_signed_copy",
     ]),
-    outcome: v.picklist(["commit_uncertain", "live_unchanged"]),
+    outcome: v.picklist([
+      "commit_uncertain",
+      "live_unchanged",
+      "verified_needs_reopen",
+    ]),
     affectsActive: v.boolean(),
     destination: displayPath,
     recovery: recoveryLocation,
     backup: backupEvidence,
     reason: boundedText(MAX_REASON_BYTES),
     reasonTruncated: v.boolean(),
+    editorTarget: v.exactOptional(engineTargetSchema),
   }),
-  v.check(({ operation, outcome, affectsActive, backup }) => {
-    if (operation !== "save_overwrite" && operation !== "restore") {
-      return (
-        outcome === "commit_uncertain" &&
-        !affectsActive &&
-        backup.kind === "not_created"
-      );
-    }
+  v.check(({ operation, outcome, affectsActive, backup, editorTarget }) => {
+    const writesActive =
+      operation === "save_overwrite" || operation === "restore";
+    const verifiedWrite = outcome === "verified_needs_reopen";
+    if (editorTarget !== undefined && !verifiedWrite) return false;
+    if (verifiedWrite && !writesActive && operation !== "save_as") return false;
     if (outcome === "live_unchanged") {
-      return !affectsActive && backup.kind === "unverified";
+      return writesActive && !affectsActive && backup.kind === "unverified";
     }
-    return (
-      affectsActive &&
-      (backup.kind === "verified" ||
-        (operation === "save_overwrite" && backup.kind === "not_created"))
-    );
+    return writesActive
+      ? affectsActive &&
+          (backup.kind === "verified" ||
+            (operation === "save_overwrite" && backup.kind === "not_created"))
+      : !affectsActive && backup.kind === "not_created";
   }),
 );
 

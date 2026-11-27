@@ -21,6 +21,9 @@ const operationLabel = {
 } satisfies Record<WriteRecoveryReceipt["operation"], string>;
 
 function outcomeText(receipt: WriteRecoveryReceipt) {
+  if (receipt.outcome === "verified_needs_reopen") {
+    return "StarBank verified the write on disk. Reopen the destination to update the editor.";
+  }
   if (receipt.outcome === "live_unchanged") {
     return "StarBank stopped during backup preparation. The destination was left unchanged.";
   }

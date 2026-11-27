@@ -5,6 +5,7 @@ import {
   profileSchema,
 } from "./profile-protocol";
 import { type EngineSigningContext, signatureStatus } from "./signing-protocol";
+import { engineRevisionSchema } from "./target-protocol";
 
 export type {
   EngineProfile,
@@ -19,6 +20,8 @@ export {
   MAX_PROFILE_BYTES,
   profileLoadForFile,
 } from "./profile-protocol";
+
+export { engineTargetSchema } from "./target-protocol";
 
 export const EDITOR_SCHEMA_VERSION = 1;
 
@@ -240,18 +243,11 @@ const resultSchema = v.variant("kind", [
   }),
 ]);
 
-const maxRevision = "18446744073709551615";
-const revision = v.pipe(
-  v.string(),
-  v.regex(/^(0|[1-9][0-9]{0,19})$/),
-  v.check((value) => value.length < maxRevision.length || value <= maxRevision),
-);
-
 const replySchema = v.object({
   schema_version: v.literal(EDITOR_SCHEMA_VERSION),
   request_id: v.nullable(v.string()),
   document_id: v.nullable(v.string()),
-  revision: v.nullable(revision),
+  revision: v.nullable(engineRevisionSchema),
   result: resultSchema,
 });
 

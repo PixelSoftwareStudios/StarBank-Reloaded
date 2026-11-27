@@ -4,6 +4,7 @@ import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
+import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 
 const dist = fileURLToPath(
   new URL("../../starbank-desktop/dist", import.meta.url),
@@ -149,6 +150,7 @@ function createBridge(engine, canOverwrite) {
   let failNextOpenProjection = false;
   let restoreNextBackup = false;
   let nextWriteRecovery;
+  let cancelPicker = false;
   let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
@@ -267,7 +269,12 @@ function createBridge(engine, canOverwrite) {
     if (nextWriteRecovery?.command === command) {
       const receipt = nextWriteRecovery.receipt;
       nextWriteRecovery = undefined;
-      return { error: { recovery_required: receipt } };
+      return {
+        error: {
+          recovery_required:
+            typeof receipt === "function" ? receipt() : receipt,
+        },
+      };
     }
     switch (command) {
       case "read_settings":
@@ -308,6 +315,10 @@ function createBridge(engine, canOverwrite) {
       case "plugin:event|unlisten":
         return {};
       case "open_bank": {
+        if (cancelPicker) {
+          cancelPicker = false;
+          return { value: null };
+        }
         const request = JSON.parse(args.control);
         // The WASM wire protocol leaves native save acknowledgement to the host.
         // After a synthetic acknowledgement, let WASM replace the saved session.
@@ -438,6 +449,12 @@ function createBridge(engine, canOverwrite) {
     },
     acceptNextRestore() {
       restoreNextBackup = true;
+    },
+    cancelNextPicker() {
+      cancelPicker = true;
+    },
+    dispatchFixture(request) {
+      return JSON.parse(dispatch(engine, JSON.stringify(request)).control);
     },
     failNextWrite(command, receipt) {
       assert.equal(nextWriteRecovery, undefined);
@@ -1232,6 +1249,16 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
     const bridge = createBridge(engine, canOverwrite);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (openRecovery === "verified_write") {
+      await verifyVerifiedNeedsReopen(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer passed verified-write reopening.`,
+      );
+      return;
+    }
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
       const currentName = "Replacement-2.SC2Bank";
@@ -1286,6 +1313,7 @@ try {
   await verifyRenderer(browser, true);
   await verifyRenderer(browser, false);
   await verifyRenderer(browser, true, true);
+  await verifyRenderer(browser, true, "verified_write");
 } finally {
   await browser.close();
 }

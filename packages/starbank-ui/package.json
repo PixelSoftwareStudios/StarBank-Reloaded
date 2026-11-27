@@ -10,6 +10,7 @@
     "./editor": "./src/editor/index.ts",
     "./engine": "./src/engine/client.ts",
     "./engine/protocol": "./src/engine/protocol.ts",
+    "./engine/target-protocol": "./src/engine/target-protocol.ts",
     "./engine/worker": "./src/engine/worker.ts",
     "./engine/signing-protocol": "./src/engine/signing-protocol.ts",
     "./settings-model": "./src/settings/settings.ts",

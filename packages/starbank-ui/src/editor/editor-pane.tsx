@@ -10,10 +10,13 @@ import {
 } from "./editor-actions";
 import type { BankEditorController, EditorActionResult } from "./editor-model";
 
-export interface OpenRecovery {
-  name: string;
-  finish?: () => Promise<EditorActionResult>;
-}
+export type OpenRecovery =
+  | {
+      kind?: "accepted_open";
+      name: string;
+      finish?: () => Promise<EditorActionResult>;
+    }
+  | { kind: "verified_write"; reopen: () => Promise<EditorActionResult> };
 
 export function EditorPane({
   name,
@@ -60,24 +63,26 @@ export function EditorPane({
     })();
   };
 
+  const verifiedWrite = openRecovery?.kind === "verified_write";
+  const recover = verifiedWrite ? openRecovery.reopen : openRecovery?.finish;
   const recovery = openRecovery && (
     <div className="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2 text-[0.875rem]">
       <p role="status" className="min-w-0 flex-1 wrap-anywhere">
-        {openRecovery.finish
-          ? `The engine opened ${openRecovery.name}. Finish opening it to display the bank.`
-          : `The engine stopped before ${openRecovery.name} could be displayed.`}
+        {verifiedWrite
+          ? "The bank write was verified on disk. Reopen the bank to resume editing."
+          : openRecovery.finish
+            ? `The engine opened ${openRecovery.name}. Finish opening it to display the bank.`
+            : `The engine stopped before ${openRecovery.name} could be displayed.`}
         {controller.document && " The previous bank is read-only."}
       </p>
-      {openRecovery.finish && (
+      {recover && (
         <button
           className={buttonClasses()}
           type="button"
           disabled={busy}
-          onClick={() => {
-            if (openRecovery.finish) run(openRecovery.finish);
-          }}
+          onClick={() => run(recover)}
         >
-          Finish opening bank
+          {verifiedWrite ? "Reopen bank…" : "Finish opening bank"}
         </button>
       )}
     </div>

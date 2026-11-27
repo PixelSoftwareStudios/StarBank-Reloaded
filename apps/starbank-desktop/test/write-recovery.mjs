@@ -183,3 +183,98 @@ test("copy recovery never claims active authority or preparatory backups", () =>
     }
   }
 });
+
+const verifiedWrite = { ...receipt, outcome: "verified_needs_reopen" };
+const editorTarget = {
+  document_id: "document-42",
+  expected_revision: "9007199254740993",
+};
+const verifiedSaveAs = {
+  ...verifiedWrite,
+  operation: "save_as",
+  affectsActive: false,
+  backup: { kind: "not_created" },
+};
+
+test("verified write receipts preserve the optional editor target and physical write scope", () => {
+  for (const value of [
+    verifiedWrite,
+    { ...verifiedWrite, editorTarget },
+    { ...verifiedWrite, backup: { kind: "not_created" } },
+    { ...verifiedWrite, operation: "restore", editorTarget },
+    verifiedSaveAs,
+    { ...verifiedSaveAs, editorTarget },
+  ]) {
+    assert.deepEqual(parse(value), { kind: "receipt", receipt: value });
+  }
+});
+
+test("verified write receipts reject unrelated operations and contradictory backup evidence", () => {
+  for (const value of [
+    { ...verifiedWrite, affectsActive: false },
+    { ...verifiedWrite, backup: { ...verified, kind: "unverified" } },
+    { ...verifiedWrite, operation: "restore", backup: { kind: "not_created" } },
+    { ...verifiedSaveAs, affectsActive: true },
+    { ...verifiedSaveAs, backup: verified },
+    ...["export_copy", "backup_copy", "external_signed_copy"].map(
+      (operation) => ({ ...verifiedSaveAs, operation }),
+    ),
+  ]) {
+    assert.deepEqual(parse(value), invalid);
+  }
+});
+
+test("verified editor targets enforce opaque ID bounds and canonical u64 revisions", () => {
+  const documentId = "🌟".repeat(32);
+  for (const revision of ["0", "9007199254740993", "18446744073709551615"]) {
+    const value = {
+      ...verifiedWrite,
+      editorTarget: { document_id: documentId, expected_revision: revision },
+    };
+    assert.deepEqual(parse(value), { kind: "receipt", receipt: value });
+  }
+
+  for (const target of [
+    undefined,
+    null,
+    {},
+    "document-42",
+    { ...editorTarget, document_id: "" },
+    { ...editorTarget, document_id: 42 },
+    { ...editorTarget, document_id: "doc\u0000" },
+    { ...editorTarget, document_id: "doc\ud800" },
+    { ...editorTarget, document_id: `${documentId}x` },
+    { ...editorTarget, revision: editorTarget.expected_revision },
+    ...[
+      "",
+      "00",
+      "+1",
+      "-1",
+      " 1",
+      "1\n",
+      "1.0",
+      "18446744073709551616",
+      1,
+    ].map((expected_revision) => ({ ...editorTarget, expected_revision })),
+  ]) {
+    assert.deepEqual(
+      parse({ ...verifiedWrite, editorTarget: target }),
+      invalid,
+    );
+  }
+});
+
+test("editor targets are reserved for verified writes that need to reopen", () => {
+  for (const value of [
+    { ...receipt, editorTarget },
+    {
+      ...receipt,
+      outcome: "live_unchanged",
+      affectsActive: false,
+      backup: { ...verified, kind: "unverified" },
+      editorTarget,
+    },
+  ]) {
+    assert.deepEqual(parse(value), invalid);
+  }
+});

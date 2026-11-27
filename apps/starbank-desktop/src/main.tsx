@@ -82,6 +82,7 @@ import "starbank-ui/styles.css";
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 
 const APP_NAME = "StarBank Reloaded";
+const REOPEN_REQUIRED = "Reopen the bank after the verified write.";
 
 interface DesktopDocument {
   projection: BankEditorDocument;
@@ -91,6 +92,10 @@ interface DesktopDocument {
 
 type OpenBankSource = (control: string) => Promise<FileDialogReply | null>;
 
+interface VerifiedReopen {
+  readonly editorTarget?: EngineTarget;
+}
+
 interface AcceptedOpen {
   readonly previous: DesktopDocument | null;
   readonly target: EngineTarget;
@@ -99,6 +104,7 @@ interface AcceptedOpen {
   readonly canOverwrite: boolean;
   readonly bankId?: string;
   readonly completedOperation?: string;
+  readonly verifiedReopen?: VerifiedReopen;
 }
 
 function DesktopApp() {
@@ -121,6 +127,8 @@ function DesktopApp() {
   const [nativeNotice, setNativeNotice] = useState<string>();
   const [writeRecovery, setWriteRecovery] = useState<WriteRecoveryEvidence>();
   const [writeRecoveryVisible, setWriteRecoveryVisible] = useState(false);
+  const pendingVerifiedReopen = useRef<VerifiedReopen>(null);
+  const [verifiedReopen, setVerifiedReopen] = useState<VerifiedReopen>();
   const [selectedBankId, setSelectedBankId] = useState<string>();
   const [backupGeneration, setBackupGeneration] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -151,6 +159,7 @@ function DesktopApp() {
       document &&
       !refreshTarget &&
       !openRecovery &&
+      !verifiedReopen &&
       (overwriteAvailable || exportAvailable)
         ? async () => {
             const result = await save(
@@ -178,18 +187,37 @@ function DesktopApp() {
     return `desktop-${nextRequest.current}`;
   }
 
+  function showWriteRecovery(evidence: WriteRecoveryEvidence) {
+    setWriteRecovery(evidence);
+    setWriteRecoveryVisible(true);
+    setBackupGeneration((value) => value + 1);
+    if (evidence.kind === "invalid_receipt" || evidence.receipt.affectsActive) {
+      setOverwriteAvailable(false);
+    }
+  }
+
+  function rememberVerifiedReopen(evidence?: WriteRecoveryEvidence): boolean {
+    if (
+      evidence?.kind !== "receipt" ||
+      evidence.receipt.outcome !== "verified_needs_reopen"
+    ) {
+      return false;
+    }
+    if (!pendingVerifiedReopen.current) {
+      const pending = { editorTarget: evidence.receipt.editorTarget };
+      pendingVerifiedReopen.current = pending;
+      setVerifiedReopen(pending);
+      showWriteRecovery(evidence);
+    }
+    return true;
+  }
+
   function messageFor(error: unknown): string {
     const evidence = parseWriteRecoveryError(error);
+    if (rememberVerifiedReopen(evidence)) return REOPEN_REQUIRED;
     if (evidence) {
-      setWriteRecovery(evidence);
-      setWriteRecoveryVisible(true);
-      setBackupGeneration((value) => value + 1);
-      if (
-        evidence.kind === "invalid_receipt" ||
-        evidence.receipt.affectsActive
-      ) {
-        setOverwriteAvailable(false);
-      }
+      if (pendingVerifiedReopen.current) return REOPEN_REQUIRED;
+      showWriteRecovery(evidence);
       return "The bank operation needs review. Inspect write recovery details before retrying.";
     }
     return formatNativeMessage(error);
@@ -197,7 +225,11 @@ function DesktopApp() {
 
   async function exclusive<Result>(
     run: () => Promise<Result>,
+    reopen?: VerifiedReopen,
   ): Promise<Result> {
+    if (pendingVerifiedReopen.current !== (reopen ?? null)) {
+      throw new Error(REOPEN_REQUIRED);
+    }
     if (inProgress.current) {
       throw new Error("A bank operation is already in progress.");
     }
@@ -207,6 +239,7 @@ function DesktopApp() {
     try {
       return await run();
     } catch (error) {
+      rememberVerifiedReopen(parseWriteRecoveryError(error));
       if (
         error === "active_write_uncertain" ||
         error === "saved_needs_reopen"
@@ -222,9 +255,10 @@ function DesktopApp() {
 
   async function action<Result extends EditorActionResult>(
     run: () => Promise<Result>,
+    reopen?: VerifiedReopen,
   ): Promise<Result | Extract<EditorActionResult, { ok: false }>> {
     try {
-      return await exclusive(run);
+      return await exclusive(run, reopen);
     } catch (error) {
       return { ok: false, message: messageFor(error) };
     }
@@ -236,6 +270,12 @@ function DesktopApp() {
     bytes?: Uint8Array,
   ) {
     const opening = acceptedOpen.current;
+    if (
+      pendingVerifiedReopen.current &&
+      opening?.verifiedReopen !== pendingVerifiedReopen.current
+    ) {
+      throw new Error(REOPEN_REQUIRED);
+    }
     if (
       opening &&
       (target.id !== opening.target.document_id ||
@@ -422,6 +462,7 @@ function DesktopApp() {
   }
 
   function activeTarget(target: EditorTarget): ActiveBankTarget {
+    if (pendingVerifiedReopen.current) throw new Error(REOPEN_REQUIRED);
     if (acceptedOpen.current) {
       throw new Error("Finish opening the accepted bank first.");
     }
@@ -477,16 +518,66 @@ function DesktopApp() {
     });
   }
 
+  function reopenVerifiedBank(reopen: VerifiedReopen) {
+    return action(async () => {
+      if (acceptedOpen.current) {
+        throw new Error("Finish opening the accepted bank first.");
+      }
+      if (currentDraft.current) {
+        throw new Error("Discard the previous bank draft before reopening.");
+      }
+      const previous = currentDocument.current;
+      const id = requestId();
+      const target = reopen.editorTarget;
+      if (target) {
+        const choice = await confirmBankNavigation(
+          {
+            documentId: target.document_id,
+            revision: target.expected_revision,
+            requestId: id,
+          },
+          false,
+        );
+        if (choice !== "discard") return { ok: true };
+      }
+      if (currentDraft.current || currentDocument.current !== previous) {
+        throw new Error(
+          "The editor changed before the bank could be reopened.",
+        );
+      }
+      const control = engineRequest(
+        id,
+        target
+          ? { kind: "open", payload: { discard_current: true } }
+          : { kind: "open" },
+      );
+      const opened = await pickBank(JSON.stringify(control));
+      if (!opened) return { ok: true };
+      return acceptOpening(
+        opened,
+        id,
+        previous,
+        undefined,
+        `Reopened ${opened.name}.`,
+        reopen,
+      );
+    }, reopen);
+  }
+
   function acceptOpening(
     opened: FileDialogReply,
     id: string,
     previous: DesktopDocument | null,
     bankId: string | undefined,
     completedOperation?: string,
+    verifiedReopen?: VerifiedReopen,
   ): Promise<EditorActionResult> {
     const reply = decodeEngineReply(opened.control, id);
     const { target } = requireSnapshot(reply);
-    if (target.id === previous?.projection.id) {
+    if (
+      target.id === previous?.projection.id ||
+      target.id === verifiedReopen?.editorTarget?.document_id
+    ) {
       throw new Error("The bank engine did not acknowledge a new document.");
     }
     const opening: AcceptedOpen = {
@@ -497,6 +588,7 @@ function DesktopApp() {
       canOverwrite: opened.can_overwrite === true,
       bankId,
       completedOperation,
+      verifiedReopen,
     };
     acceptedOpen.current = opening;
     return displayOpening(opening, async () => reply);
@@ -509,7 +601,8 @@ function DesktopApp() {
     function stillOpening() {
       return (
         acceptedOpen.current === opening &&
-        currentDocument.current === opening.previous
+        currentDocument.current === opening.previous &&
+        pendingVerifiedReopen.current === (opening.verifiedReopen ?? null)
       );
     }
 
@@ -539,6 +632,10 @@ function DesktopApp() {
       }
       acceptedOpen.current = null;
       setOpenRecovery(undefined);
+      if (opening.verifiedReopen) {
+        pendingVerifiedReopen.current = null;
+        setVerifiedReopen(undefined);
+      }
       setWriteRecovery(undefined);
       setWriteRecoveryVisible(false);
       setProfile(undefined);
@@ -584,6 +681,7 @@ function DesktopApp() {
       busy ||
       hasDraft ||
       openRecovery !== undefined ||
+      verifiedReopen !== undefined ||
       refreshTarget !== undefined ||
       closeGuard.pending,
     onOpenBank: (id) => {
@@ -744,7 +842,7 @@ function DesktopApp() {
     onOpen: () => openFrom(pickBank),
     onDraftChange: closeGuard.reportDraft,
     onRefreshSnapshot:
-      !openRecovery && refreshTarget
+      !openRecovery && !verifiedReopen && refreshTarget
         ? (target) =>
             updateDocument(
               target,
@@ -964,25 +1062,32 @@ function DesktopApp() {
         name={APP_NAME}
         editor={controller}
         openRecovery={
-          openRecovery && {
-            name: openRecovery.name,
-            finish: () =>
-              action(() =>
-                displayOpening(
-                  openRecovery,
-                  async () =>
-                    (
-                      await dispatch(
-                        {
-                          id: openRecovery.target.document_id,
-                          revision: openRecovery.target.expected_revision,
-                        },
-                        { kind: "snapshot" },
-                      )
-                    ).reply,
-                ),
-              ),
-          }
+          openRecovery
+            ? {
+                name: openRecovery.name,
+                finish: () =>
+                  action(
+                    () =>
+                      displayOpening(
+                        openRecovery,
+                        async () =>
+                          (
+                            await dispatch(
+                              {
+                                id: openRecovery.target.document_id,
+                                revision: openRecovery.target.expected_revision,
+                              },
+                              { kind: "snapshot" },
+                            )
+                          ).reply,
+                      ),
+                    openRecovery.verifiedReopen,
+                  ),
+              }
+            : verifiedReopen && {
+                kind: "verified_write",
+                reopen: () => reopenVerifiedBank(verifiedReopen),
+              }
         }
         inventory={inventoryWithBackupStatus}
         preferences={preferences}
@@ -992,7 +1097,9 @@ function DesktopApp() {
               <BackupPreferencesFields
                 preferences={backupPreferences.preferences}
                 issue={backupPreferences.issue}
-                disabled={busy || closeGuard.pending}
+                disabled={
+                  busy || verifiedReopen !== undefined || closeGuard.pending
+                }
                 choose={() => updateBackupSettings("choose_backup_location")}
                 useDefault={() =>
                   updateBackupSettings("use_default_backup_location")
@@ -1015,6 +1122,7 @@ function DesktopApp() {
                   disabled={
                     busy ||
                     openRecovery !== undefined ||
+                    verifiedReopen !== undefined ||
                     closeGuard.pending ||
                     backupPreferences.preferences.location.mode ===
                       "needs_authorization"
@@ -1031,7 +1139,7 @@ function DesktopApp() {
               writeRecovery ? () => setWriteRecoveryVisible(true) : undefined
             }
             onResignExternal={
-              exportAvailable && !busy && !closeGuard.pending
+              exportAvailable && !busy && !verifiedReopen && !closeGuard.pending
                 ? () => {
                     void action(() =>
                       resignExternalBank({
@@ -1043,23 +1151,27 @@ function DesktopApp() {
                 : undefined
             }
             externalSigningUnavailable={
-              exportAvailable
-                ? undefined
-                : "Signed copy export is unavailable on this platform."
+              verifiedReopen
+                ? REOPEN_REQUIRED
+                : exportAvailable
+                  ? undefined
+                  : "Signed copy export is unavailable on this platform."
             }
             availability={
-              !exportAvailable
-                ? {
-                    kind: "unavailable",
-                    reason: "Batch backup is unavailable on this platform.",
-                  }
-                : inventory.status === "ready" &&
-                    inventory.bankBrowser?.banks.length
-                  ? { kind: "ready", selectedMap }
-                  : {
+              verifiedReopen
+                ? { kind: "unavailable", reason: REOPEN_REQUIRED }
+                : !exportAvailable
+                  ? {
                       kind: "unavailable",
-                      reason: "Load a bank inventory to use batch backup.",
+                      reason: "Batch backup is unavailable on this platform.",
                     }
+                  : inventory.status === "ready" &&
+                      inventory.bankBrowser?.banks.length
+                    ? { kind: "ready", selectedMap }
+                    : {
+                        kind: "unavailable",
+                        reason: "Load a bank inventory to use batch backup.",
+                      }
             }
             onStart={(request) =>
               exclusive(async () => {
@@ -1073,7 +1185,9 @@ function DesktopApp() {
         }
         workspaceAccessory={
           <OpenRequests
-            busy={busy || openRecovery !== undefined}
+            busy={
+              busy || openRecovery !== undefined || verifiedReopen !== undefined
+            }
             hasDraft={hasDraft}
             onOpen={(id) =>
               openFrom((control) => openRequestedBank(id, control))
