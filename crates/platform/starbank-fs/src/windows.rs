@@ -31,6 +31,8 @@ use windows_sys::Win32::{
 use crate::{FileSnapshot, Fingerprint, StorageError};
 
 mod identity;
+#[cfg(test)]
+mod stage_security;
 
 pub use identity::{WindowsDirectoryIdentity, WindowsFileIdentity};
 

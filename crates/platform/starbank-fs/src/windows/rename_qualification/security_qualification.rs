@@ -1,6 +1,7 @@
-//! Synthetic descriptor proof only: no cross-user access or namespace durability claim.
+//! Synthetic descriptor and same-user restricted-token proof. Cross-user access and namespace
+//! durability remain separate tests.
 //!
-//! Uses creation-time security, never a post-creation ACL repair:
+//! The private stage receives its descriptor at creation time:
 //! https://learn.microsoft.com/windows/win32/api/winternl/nf-winternl-ntcreatefile
 //! https://learn.microsoft.com/windows/win32/api/aclapi/nf-aclapi-getsecurityinfo
 
@@ -8,59 +9,53 @@ use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Write};
 use std::mem::size_of;
-use std::os::windows::{
-	ffi::OsStrExt,
-	io::{AsRawHandle, FromRawHandle, OwnedHandle},
-};
+use std::os::windows::io::{AsRawHandle, OwnedHandle};
 use std::path::Path;
 use std::{ptr, slice};
 
-use windows_sys::{
-	Wdk::{
-		Foundation::OBJECT_ATTRIBUTES,
-		Storage::FileSystem::{
-			FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN_NO_RECALL,
-			FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT, NtCreateFile,
+use windows_sys::Win32::{
+	Foundation::{ERROR_SUCCESS, GENERIC_READ, GENERIC_WRITE, LocalFree, STATUS_SUCCESS},
+	Security::{
+		ACCESS_ALLOWED_ACE,
+		Authorization::{
+			ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
+			GetSecurityInfo, SE_FILE_OBJECT,
 		},
+		DACL_SECURITY_INFORMATION, GROUP_SECURITY_INFORMATION, GetAce,
+		GetSecurityDescriptorControl, GetSecurityDescriptorDacl, GetSecurityDescriptorGroup,
+		GetSecurityDescriptorOwner, GetTokenInformation, INHERITED_ACE, OWNER_SECURITY_INFORMATION,
+		PSECURITY_DESCRIPTOR, PSID, SE_DACL_AUTO_INHERIT_REQ, SE_DACL_AUTO_INHERITED,
+		SE_DACL_DEFAULTED, SE_DACL_PRESENT, SE_DACL_PROTECTED, SE_GROUP_DEFAULTED,
+		SE_OWNER_DEFAULTED, SE_SELF_RELATIVE, TOKEN_ELEVATION, TOKEN_OWNER, TOKEN_PRIMARY_GROUP,
+		TOKEN_USER, TokenElevation, TokenOwner as OWNER_CLASS,
+		TokenPrimaryGroup as PRIMARY_GROUP_CLASS, TokenUser as USER_CLASS,
 	},
-	Win32::{
-		Foundation::{
-			ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, GENERIC_READ, GENERIC_WRITE, HANDLE,
-			LocalFree, STATUS_SUCCESS, UNICODE_STRING,
-		},
-		Security::{
-			ACCESS_ALLOWED_ACE,
-			Authorization::{
-				ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-				GetSecurityInfo, SE_FILE_OBJECT,
-			},
-			DACL_SECURITY_INFORMATION, GROUP_SECURITY_INFORMATION, GetAce,
-			GetSecurityDescriptorControl, GetSecurityDescriptorDacl, GetSecurityDescriptorGroup,
-			GetSecurityDescriptorOwner, GetTokenInformation, INHERITED_ACE,
-			OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID, SE_DACL_AUTO_INHERIT_REQ,
-			SE_DACL_AUTO_INHERITED, SE_DACL_DEFAULTED, SE_DACL_PRESENT, SE_DACL_PROTECTED,
-			SE_GROUP_DEFAULTED, SE_OWNER_DEFAULTED, SE_SELF_RELATIVE, TOKEN_ELEVATION, TOKEN_OWNER,
-			TOKEN_PRIMARY_GROUP, TOKEN_QUERY, TOKEN_USER, TokenElevation,
-			TokenOwner as OWNER_CLASS, TokenPrimaryGroup as PRIMARY_GROUP_CLASS,
-			TokenUser as USER_CLASS,
-		},
-		Storage::FileSystem::{
-			DELETE, FILE_ATTRIBUTE_ARCHIVE, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ,
-			FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
-			FILE_TRAVERSE, READ_CONTROL, SYNCHRONIZE,
-		},
-		System::{
-			IO::IO_STATUS_BLOCK,
-			Threading::{GetCurrentProcess, OpenProcessToken},
-			WindowsProgramming::FILE_CREATED,
-		},
+	Storage::FileSystem::{
+		FILE_ATTRIBUTE_ARCHIVE, FILE_GENERIC_READ, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES,
+		FILE_TRAVERSE, READ_CONTROL, SYNCHRONIZE,
 	},
+};
+
+use crate::windows::stage_security::{
+	EffectiveToken, PrivateStageSecurity, RelativeKind, SecurityDescriptor, create_relative,
 };
 
 use super::{
 	DESTINATION_NAME, DirectoryScope, Observation, PreparedStage, STAGED, STAGED_NAME,
 	assert_absent, verify_published,
 };
+
+#[path = "security_qualification/fixture_acl.rs"]
+mod fixture_acl;
+#[path = "security_qualification/restricted_read.rs"]
+mod restricted_read;
+#[path = "security_qualification/restricted_token.rs"]
+mod restricted_token;
+
+pub(in crate::windows) use fixture_acl::prepare_reduced_fixture;
+use restricted_read::{CONTROL_BYTES, qualify_restricted_read};
+pub(in crate::windows) use restricted_token::with_reduced_token;
+use restricted_token::{Actors, TokenInformation};
 
 const SECURITY_DIRECTORY: &str = "PrivateStageSecurity";
 const INHERITED_CONTROL: &str = "InheritedControl";
@@ -205,10 +200,30 @@ impl SecurityObservation {
 }
 
 pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-	let (user, group, default_owner) = token_identity()?;
+	let actors = Actors::for_current_user()?;
+	actors.as_creator(|effective| qualify_scoped(root, effective, &actors))?;
+	Ok(())
+}
+
+fn qualify_scoped(
+	root: &Path,
+	token: &OwnedHandle,
+	actors: &Actors,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let (user, group, default_owner) = token_identity(token)?;
+	let selected = EffectiveToken::current()?;
+	assert!(
+		selected.default_owner()? == default_owner,
+		"effective default owner"
+	);
+	assert_eq!(
+		selected.selected_type()?,
+		windows_sys::Win32::Security::TokenImpersonation,
+	);
+	let security = PrivateStageSecurity::current()?;
 	// An inheritable Everyone read ACE deliberately makes the inherited control broader.
 	// Protected owner-only security is supplied to NtCreateFile before any stage exists.
-	let parent_descriptor = descriptor(&format!(
+	let parent_descriptor = SecurityDescriptor::from_sddl(&format!(
 		"O:{user}G:{group}D:P(A;OICI;FA;;;{user})(A;OICI;FR;;;WD)"
 	))?;
 	let private_descriptor = descriptor(&format!("O:{user}G:{group}D:P(A;;FA;;;{user})"))?;
@@ -224,20 +239,18 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 		&outer.parent,
 		OsStr::new(SECURITY_DIRECTORY),
 		FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE,
-		FILE_ATTRIBUTE_NORMAL,
-		FILE_DIRECTORY_FILE,
-		parent_descriptor.0,
+		RelativeKind::Directory,
+		Some(&parent_descriptor),
 	)?;
 	drop(directory);
 	let path = root.join(SECURITY_DIRECTORY);
 	let scope = DirectoryScope::open_parent(&path)?;
-	let control = create_relative(
+	let mut control = create_relative(
 		&scope.parent,
 		OsStr::new(INHERITED_CONTROL),
 		GENERIC_READ | GENERIC_WRITE | READ_CONTROL | SYNCHRONIZE,
-		FILE_ATTRIBUTE_ARCHIVE,
-		FILE_NON_DIRECTORY_FILE,
-		ptr::null_mut(),
+		RelativeKind::File,
+		None,
 	)?;
 	let inherited = SecurityObservation::read(&control)?;
 	assert!(
@@ -256,16 +269,26 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 	);
 	assert_eq!(inherited.control & SE_DACL_PROTECTED, 0);
 	eprintln!("Inherited control descriptor: {inherited:?}");
+	control.write_all(CONTROL_BYTES)?;
+	control.sync_all()?;
 	drop(control);
 
-	let mut file = create_relative(
-		&scope.parent,
-		OsStr::new(STAGED_NAME),
-		GENERIC_READ | GENERIC_WRITE | DELETE | READ_CONTROL | SYNCHRONIZE,
-		FILE_ATTRIBUTE_ARCHIVE,
-		FILE_NON_DIRECTORY_FILE,
-		private_descriptor.0,
-	)?;
+	assert!(matches!(
+		security.verify(&scope.open_file(OsStr::new(INHERITED_CONTROL))?),
+		Err(crate::StorageError::UnsafeMetadata(_))
+	));
+	let occupied_before = Observation::read(&scope.open_file(OsStr::new(INHERITED_CONTROL))?)?;
+	let collision = security
+		.create(&scope, OsStr::new(INHERITED_CONTROL))
+		.expect_err("exclusive creation must preserve the inherited control");
+	assert_eq!(collision.kind(), io::ErrorKind::AlreadyExists);
+	assert_eq!(
+		Observation::read(&scope.open_file(OsStr::new(INHERITED_CONTROL))?)?,
+		occupied_before
+	);
+	assert_eq!(std::fs::read(path.join(INHERITED_CONTROL))?, CONTROL_BYTES);
+	let mut file = security.create(&scope, OsStr::new(STAGED_NAME))?;
+	security.verify(&file)?;
 	assert_eq!(
 		SecurityObservation::read(&file)?,
 		expected,
@@ -276,7 +299,9 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 	assert_eq!(stage_observation.len, 0);
 	file.write_all(STAGED)?;
 	file.sync_all()?;
+	security.verify(&file)?;
 	assert_eq!(SecurityObservation::read(&file)?, expected);
+	qualify_restricted_read(&scope.parent, actors)?;
 	let stage = PreparedStage {
 		parent: &scope,
 		file,
@@ -286,6 +311,7 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 		status, STATUS_SUCCESS,
 		"private-stage rename NTSTATUS {status:#010x}"
 	);
+	security.verify(&stage.file)?;
 	assert_eq!(SecurityObservation::read(&stage.file)?, expected);
 	assert_eq!(
 		Observation::read(&stage.file)?.identity,
@@ -293,6 +319,7 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 	);
 	drop(stage);
 	let published = scope.open_file(OsStr::new(DESTINATION_NAME))?;
+	security.verify(&published)?;
 	assert_eq!(
 		SecurityObservation::read(&published)?,
 		expected,
@@ -327,16 +354,10 @@ fn descriptor(sddl: &str) -> io::Result<LocalAllocation> {
 	Ok(LocalAllocation(result))
 }
 
-fn token_identity() -> io::Result<(String, String, String)> {
-	let mut token = ptr::null_mut();
-	// SAFETY: current-process pseudo handle is valid, token output is writable. TOKEN_QUERY
-	// neither requests nor enables privileges; OwnedHandle closes the successful token handle.
-	win32(unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) })?;
-	// SAFETY: successful OpenProcessToken transferred one owned handle.
-	let token = unsafe { OwnedHandle::from_raw_handle(token) };
-	let user = token_sid(&token, USER_CLASS)?;
-	let group = token_sid(&token, PRIMARY_GROUP_CLASS)?;
-	let default_owner = token_sid(&token, OWNER_CLASS)?;
+fn token_identity(token: &OwnedHandle) -> io::Result<(String, String, String)> {
+	let user = token_sid(token, USER_CLASS)?;
+	let group = token_sid(token, PRIMARY_GROUP_CLASS)?;
+	let default_owner = token_sid(token, OWNER_CLASS)?;
 	let mut elevation = TOKEN_ELEVATION::default();
 	let mut returned = 0;
 	// SAFETY: fixed SDK structure and exact length match the requested information class.
@@ -351,7 +372,7 @@ fn token_identity() -> io::Result<(String, String, String)> {
 	})?;
 	assert_eq!(returned as usize, size_of::<TOKEN_ELEVATION>());
 	eprintln!(
-		"Private-stage probe token elevated={}, default owner differs from TokenUser={}; probe does not enable privileges",
+		"Effective private-stage probe token elevated={}, default owner differs from TokenUser={}; probe does not enable privileges",
 		elevation.TokenIsElevated != 0,
 		default_owner != user
 	);
@@ -359,39 +380,16 @@ fn token_identity() -> io::Result<(String, String, String)> {
 }
 
 fn token_sid(token: &OwnedHandle, class: i32) -> io::Result<String> {
-	let mut required = 0;
-	// SAFETY: a zero-length query only obtains the required buffer size.
-	let result = unsafe {
-		GetTokenInformation(
-			token.as_raw_handle(),
-			class,
-			ptr::null_mut(),
-			0,
-			&mut required,
-		)
-	};
-	let error = io::Error::last_os_error();
-	if result != 0 || error.raw_os_error() != Some(ERROR_INSUFFICIENT_BUFFER as i32) {
-		return Err(error);
-	}
 	let minimum = match class {
 		USER_CLASS => size_of::<TOKEN_USER>(),
 		PRIMARY_GROUP_CLASS => size_of::<TOKEN_PRIMARY_GROUP>(),
 		OWNER_CLASS => size_of::<TOKEN_OWNER>(),
 		_ => unreachable!("only user, owner and primary group are queried"),
 	};
-	assert!(required as usize >= minimum);
-	let mut buffer = vec![0usize; (required as usize).div_ceil(size_of::<usize>())];
-	// SAFETY: usize allocation aligns both requested SDK structures and is at least required
-	// bytes. Returned embedded SID stays live while sid_string copies its string representation.
+	let buffer = TokenInformation::query(token, class, minimum)?;
+	// SAFETY: the pointer-aligned token buffer covers the selected SDK structure. Any
+	// embedded SID remains live while sid_string copies its representation.
 	unsafe {
-		win32(GetTokenInformation(
-			token.as_raw_handle(),
-			class,
-			buffer.as_mut_ptr().cast(),
-			required,
-			&mut required,
-		))?;
 		let sid = match class {
 			USER_CLASS => (*buffer.as_ptr().cast::<TOKEN_USER>()).User.Sid,
 			PRIMARY_GROUP_CLASS => (*buffer.as_ptr().cast::<TOKEN_PRIMARY_GROUP>()).PrimaryGroup,
@@ -420,74 +418,6 @@ fn sid_string(sid: PSID) -> io::Result<String> {
 	Err(io::Error::other(
 		"SID string exceeds documented bounded representation",
 	))
-}
-
-fn create_relative(
-	parent: &File,
-	leaf: &OsStr,
-	access: u32,
-	attributes: u32,
-	kind: u32,
-	descriptor: PSECURITY_DESCRIPTOR,
-) -> io::Result<File> {
-	super::super::check_component(leaf).map_err(io::Error::other)?;
-	let mut name: Vec<u16> = leaf.encode_wide().collect();
-	let length = u16::try_from(name.len() * size_of::<u16>()).map_err(io::Error::other)?;
-	let mut name = UNICODE_STRING {
-		Length: length,
-		MaximumLength: length,
-		Buffer: name.as_mut_ptr(),
-	};
-	let object = OBJECT_ATTRIBUTES {
-		Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
-		RootDirectory: parent.as_raw_handle(),
-		ObjectName: &mut name,
-		Attributes: 0,
-		SecurityDescriptor: descriptor.cast(),
-		SecurityQualityOfService: ptr::null_mut(),
-	};
-	let (share, flags) = if kind == FILE_DIRECTORY_FILE {
-		(FILE_SHARE_READ | FILE_SHARE_WRITE, kind)
-	} else {
-		(
-			FILE_SHARE_READ,
-			kind | FILE_OPEN_REPARSE_POINT | FILE_OPEN_NO_RECALL,
-		)
-	};
-	let options = flags | FILE_SYNCHRONOUS_IO_NONALERT;
-	let mut file: HANDLE = ptr::null_mut();
-	let mut completion = IO_STATUS_BLOCK::default();
-	// SAFETY: held parent, single checked leaf, live descriptor and initialized SDK buffers.
-	// FILE_CREATE never opens an existing object; synchronous completion owns exactly the
-	// returned file handle. The directory fixture uses a fresh held temporary parent and
-	// directory-compatible options. Regular files retain the reparse and recall guards.
-	let status = unsafe {
-		NtCreateFile(
-			&mut file,
-			access,
-			&object,
-			&mut completion,
-			ptr::null(),
-			attributes,
-			share,
-			FILE_CREATE,
-			options,
-			ptr::null(),
-			0,
-		)
-	};
-	if status != STATUS_SUCCESS {
-		return Err(io::Error::other(format!(
-			"NtCreateFile for fixture {leaf:?} with options {options:#010x} returned NTSTATUS {status:#010x}"
-		)));
-	}
-	// SAFETY: successful exclusive NtCreateFile transfers the new owned handle to File.
-	let file = unsafe { File::from_raw_handle(file) };
-	assert_eq!(
-		completion.Information, FILE_CREATED as usize,
-		"FILE_CREATE must report a newly created object"
-	);
-	Ok(file)
 }
 
 fn win32(result: i32) -> io::Result<()> {

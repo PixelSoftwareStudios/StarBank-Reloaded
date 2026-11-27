@@ -99,3 +99,11 @@ rustc --test --edition 2024 -D warnings --target x86_64-pc-windows-msvc \
 cargo clippy -p starbank-fs --all-targets --locked --offline \
   --target x86_64-pc-windows-msvc -- -D warnings
 ```
+
+## Private-stage implementation and reduced-token qualification
+
+The private-stage primitive is now shared by the native qualifier and the candidate writer. It selects the effective thread token, falling back to the process token only for `ERROR_NO_TOKEN`, creates an empty file with an explicit protected owner-only descriptor, and verifies owner, group, ACEs and descriptor flags before payload bytes. Creation accepts a bounded single UTF-16 leaf and uses the held parent. Native NTSTATUS remains available in the typed I/O cause. Windows runtime writes remain disabled while these modules are wired for test qualification. [Security boundary](../src/windows/stage_security.rs)
+
+The revised qualifier prepares only its empty, test-owned NTFS temporary directory with an explicit user ACL. A dedicated thread disables privileges other than optional traverse and disables Administrators membership; it independently reopens the fixture. A separate same-user World-restricted thread must read the inherited control and receive access denied on the private stage with equivalent read sharing. The production token selector must report `TokenImpersonation` inside the creator context. The qualifier also rejects the inherited control's security, preserves an occupied leaf, and checks the private descriptor through publication. The flush probe runs under the reduced creator as well. Both threads verify effective identity and restore thread security on exit. This is not a different-account or UAC-token test.
+
+Pinned Windows all-target Clippy, formatting and the source gate passed locally. These reduced-token and shared-primitive paths have not yet run natively. The earlier elevated-token observations remain valid for `1a574e1`; its full hosted matrix passed all 11 jobs, including the modern Windows cache-ID regression and both flush APIs. [Hosted matrix](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46018857958)

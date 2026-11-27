@@ -31,6 +31,8 @@ mod flush_qualification;
 mod readback_qualification;
 mod security_qualification;
 
+pub(in crate::windows) use security_qualification::{prepare_reduced_fixture, with_reduced_token};
+
 const STAGED_NAME: &str = "PendingBank.sc2bank";
 const DESTINATION_NAME: &str = "PublishedBank.SC2Bank";
 const CASE_ALIAS: &str = "pUBLISHEDbANK.sc2bank";
@@ -147,7 +149,7 @@ impl<'parent> PreparedStage<'parent> {
 #[ignore = "requires a native Windows host with its temporary directory on local NTFS"]
 fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn std::error::Error>> {
 	let temporary = tempfile::TempDir::new()?;
-	let root = temporary.path().canonicalize()?;
+	let root = prepare_reduced_fixture(&temporary)?;
 	let scope = DirectoryScope::open_parent(&root)?;
 	require_ntfs(&scope.parent)?;
 	eprintln!("NTFS probe parent identity {:?}", scope.identity);
@@ -202,7 +204,7 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 	assert_absent(&staged);
 	readback_qualification::qualify_held_stage_readback(&root)?;
 	security_qualification::qualify_private_stage(&root)?;
-	flush_qualification::qualify_flush_capabilities(&root)?;
+	with_reduced_token(|| flush_qualification::qualify_flush_capabilities(&root))?;
 	Ok(())
 }
 
