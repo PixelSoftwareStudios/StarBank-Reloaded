@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyDiffContext } from "./diff-context.mjs";
 import { verifyTableDraftSwitch } from "./draft-switch.mjs";
 import {
   simulateUnavailableBank,
@@ -262,8 +263,8 @@ async function verifyStructuralEditing(page, value) {
   });
   await page.getByRole("button", { name: "Changes…" }).click();
   const diff = page.getByRole("dialog", { name: "Changes since opening" });
-  await diff.getByText("Changed key Coins", { exact: true }).waitFor();
-  await diff.getByRole("button", { name: "Revert key Coins" }).click();
+  await diff.getByText("Changed key Player › Coins", { exact: true }).waitFor();
+  await diff.getByRole("button", { name: "Revert key Player › Coins" }).click();
   await diff.waitFor({ state: "hidden" });
   assert.equal(await value.inputValue(), "002");
 
@@ -569,6 +570,7 @@ async function verify(name) {
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
     await verifySnapshotRefresh(browser, server.url, bankPicker, viewport);
+    await verifyDiffContext(browser, server.url, bankPicker);
     await verifyNumericCaret(browser, server.url, bankPicker);
     await verifySimpleDraftRecovery(browser, server.url, bankPicker, viewport);
     await verifyAcceptedOpenRecovery(browser, server.url, bankPicker, viewport);

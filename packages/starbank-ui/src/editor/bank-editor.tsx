@@ -812,6 +812,7 @@ export function BankEditor({
         {diff?.revision === document.revision && (
           <EditorDiff
             diff={diff.value}
+            sections={document.sections}
             busy={editsBlocked}
             notice={notice}
             onRevert={
