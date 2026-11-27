@@ -21,6 +21,7 @@ desktop = [
   "dep:starbank-core",
   "dep:starbank-editor",
   "dep:starbank-fs",
+  "dep:starbank-instance",
   "dep:starbank-map-index",
   "dep:starbank-paths",
   "dep:starbank-signature",
@@ -50,13 +51,17 @@ tempfile = { version = "=3.27.0", optional = true }
 libc = { version = "=0.2.191", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"], optional = true }
+starbank-instance = { path = "../../../crates/platform/starbank-instance", optional = true }
+windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem"], optional = true }
 
 [build-dependencies]
 tauri-build = { version = "=2.7.6", optional = true , features = [] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"
+
+[target.'cfg(windows)'.dev-dependencies]
+tauri = { version = "=2.12.7", default-features = false, features = ["test"] }
 
 [lints]
 workspace = true

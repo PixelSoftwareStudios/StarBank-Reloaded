@@ -3394,6 +3394,7 @@ dependencies = [
  "starbank-core",
  "starbank-editor",
  "starbank-fs",
+ "starbank-instance",
  "starbank-map-index",
  "starbank-paths",
  "starbank-signature",

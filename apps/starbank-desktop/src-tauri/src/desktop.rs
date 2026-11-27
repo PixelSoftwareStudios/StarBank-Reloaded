@@ -8,9 +8,12 @@ use crate::{
 	close_guard::{self, DesktopCloseGuard},
 	commands::DesktopEngine,
 	inventory::InventoryService,
-	open_requests::{self, OpenRequests},
+	open_requests,
 	settings::SettingsStore,
 };
+
+#[cfg(windows)]
+use crate::windows_launch;
 
 const MAIN_WINDOW: &str = "main";
 const LOCAL_WEBVIEW_HOST: &str = "localhost";
@@ -19,7 +22,16 @@ const MAP_CACHE: &str = "map-index.json";
 const INVENTORY_ROOT: &str = "inventory-root.json";
 
 pub(crate) fn run() -> tauri::Result<()> {
-	let current_dir = std::env::current_dir().ok();
+	let context = tauri::generate_context!();
+	#[cfg(windows)]
+	let Some((requests, launch)) = windows_launch::begin(&context.config().identifier) else {
+		return Ok(());
+	};
+	#[cfg(not(windows))]
+	let requests = open_requests::OpenRequests::from_args(
+		std::env::current_dir().ok().as_deref(),
+		std::env::args_os().skip(1),
+	);
 	let builder = tauri::Builder::default();
 	#[cfg(target_os = "macos")]
 	let builder = builder.menu(close_guard::menu);
@@ -28,11 +40,8 @@ pub(crate) fn run() -> tauri::Result<()> {
 		.manage(DesktopCloseGuard::default())
 		.manage(BatchBackupService::default())
 		.manage(crate::external_sign::ExternalSignService::default())
-		.manage(OpenRequests::from_args(
-			current_dir.as_deref(),
-			std::env::args_os().skip(1),
-		))
-		.setup(|app| {
+		.manage(requests)
+		.setup(move |app| {
 			let cache_path = app.path().app_cache_dir().ok().and_then(|directory| {
 				std::fs::create_dir_all(&directory).ok()?;
 				std::fs::symlink_metadata(&directory)
@@ -62,6 +71,8 @@ pub(crate) fn run() -> tauri::Result<()> {
 				.find(|window| window.label == MAIN_WINDOW)
 				.ok_or("missing main webview configuration")?;
 			let development_origin = app.config().build.dev_url.clone();
+			#[cfg(windows)]
+			windows_launch::start(app.handle(), launch, MAIN_WINDOW);
 			WebviewWindowBuilder::from_config(app, config)?
 				.on_navigation(move |url| is_local_webview(url, development_origin.as_ref()))
 				.on_new_window(|_, _| NewWindowResponse::Deny)
@@ -121,13 +132,17 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::settings::change_setting,
 			crate::settings::recover_settings
 		])
-		.build(tauri::generate_context!())?
+		.build(context)?
 		.run(on_run_event);
 	Ok(())
 }
 
 fn on_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
 	close_guard::handle_event(app, &event);
+	#[cfg(windows)]
+	if matches!(event, tauri::RunEvent::Exit) {
+		windows_launch::stop(app);
+	}
 	#[cfg(target_os = "macos")]
 	if let tauri::RunEvent::Opened { urls } = event {
 		open_requests::enqueue(

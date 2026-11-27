@@ -21,6 +21,8 @@ mod reveal;
 mod save;
 mod selection;
 mod settings;
+#[cfg(windows)]
+mod windows_launch;
 mod xml_comparison;
 
 fn main() -> tauri::Result<()> {
