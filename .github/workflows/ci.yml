@@ -45,6 +45,24 @@ jobs:
       - run: cargo check --workspace --all-targets --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo nextest run --workspace --locked --no-tests fail
+      - name: Exercise Linux staging space exhaustion
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          fixture="$(mktemp -d "$RUNNER_TEMP/starbank-enospc.XXXXXX")"
+          cleanup() {
+            if mountpoint -q "$fixture"; then
+              sudo umount "$fixture"
+            fi
+            rmdir "$fixture"
+          }
+          trap cleanup EXIT
+          sudo mount -t tmpfs \
+            -o "size=64k,mode=0700,uid=$(id -u),gid=$(id -g),nodev,nosuid,noexec" \
+            tmpfs "$fixture"
+          STARBANK_ENOSPC_TMPFS="$fixture" cargo nextest run --workspace --locked \
+            --run-ignored only --no-tests fail --success-output immediate \
+            -E 'package(=starbank-fs) & binary(=linux_enospc)'
       - run: cargo test --workspace --doc --locked
       - run: cargo doc --workspace --no-deps --locked
         env:
