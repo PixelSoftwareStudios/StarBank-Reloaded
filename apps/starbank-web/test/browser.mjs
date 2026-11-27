@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyTableDraftSwitch } from "./draft-switch.mjs";
 import {
   simulateUnavailableBank,
   verifyLocalImports,
@@ -437,6 +438,15 @@ async function verify(name) {
       name === "firefox"
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
+    const tableDraftPage = await context.newPage();
+    try {
+      await tableDraftPage.setViewportSize(viewport);
+      await tableDraftPage.goto(server.url);
+      await verifyTableDraftSwitch(tableDraftPage, bankPicker(tableDraftPage));
+    } finally {
+      await tableDraftPage.close();
+    }
+
     const windowedPage = await context.newPage();
     try {
       await windowedPage.setViewportSize(viewport);

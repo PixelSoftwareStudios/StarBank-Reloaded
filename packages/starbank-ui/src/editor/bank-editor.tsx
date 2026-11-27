@@ -10,6 +10,8 @@ import {
 import {
   type BankEditorController,
   type BankEditorDocument,
+  type EditorActionResult,
+  type EditorDraft,
   type EditorProfileField,
   type EditorProfileInput,
   type EditorRow,
@@ -22,6 +24,7 @@ import type { AppSettings } from "starbank-platform/settings";
 import { type MapContext, MapContextDetails } from "../inventory/map-context";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
+import { DraftSwitchDialog } from "./draft-switch-dialog";
 import {
   EditorActions,
   fileDropHandlers,
@@ -29,10 +32,11 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
-import { RawDraftDialog } from "./raw-draft-dialog";
 import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
 import { TableEditor } from "./table-editor";
+
+type EditorView = NonNullable<ReturnType<typeof useEditorState>["view"]>;
 
 export type EditorSettings = Pick<
   AppSettings,
@@ -111,10 +115,12 @@ export function BankEditor({
     sectionId?: string;
   }>();
   const [diff, setDiff] = useState<{ revision: string; value: EngineDiff }>();
-  const [rawSwitch, setRawSwitch] = useState<{
-    nextView: "table" | "simple";
+  const [draftSwitch, setDraftSwitch] = useState<{
+    kind: EditorDraft["kind"];
+    nextView: EditorView;
     message: string;
   }>();
+  const tablePanel = useRef<HTMLDivElement>(null);
   const [retainTable, setRetainTable] = useState(false);
   const rawEditor = useRef<RawEditorHandle>(null);
   const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
@@ -210,41 +216,61 @@ export function BankEditor({
     });
   }
 
-  function applyRaw(nextView?: "table" | "simple") {
-    if (!rawDraft || !onReplaceXml || busy || stale) return;
+  function showView(nextView: EditorView) {
+    if (selectedView === "table") setRetainTable(true);
+    if (selectedView === "raw" && !rawDraft)
+      setRetainedRawRevision(document.revision);
+    setView(nextView);
+  }
+
+  function finishDraft(nextView?: EditorView) {
+    setDraft(undefined);
+    if (nextView) showView(nextView);
+  }
+
+  function submitDraft(
+    kind: EditorDraft["kind"],
+    action: () => Promise<EditorActionResult>,
+    nextView?: EditorView,
+  ) {
     run(
       async () => {
-        const result = await onReplaceXml(target, rawDraft.text).catch(
-          (error: unknown) => ({
-            ok: false as const,
+        let result: EditorActionResult;
+        try {
+          result = await action();
+        } catch (error) {
+          result = {
+            ok: false,
             message:
               error instanceof Error
                 ? error.message
-                : "The Raw draft could not be applied.",
-          }),
-        );
-        if (!result.ok && nextView) {
-          setRawSwitch({ nextView, message: result.message });
+                : `The ${kind === "raw" ? "Raw" : "Table"} draft could not be applied.`,
+          };
         }
+        if (!result.ok && nextView)
+          setDraftSwitch({ kind, nextView, message: result.message });
         return result;
       },
-      () => {
-        setDraft(undefined);
-        if (nextView) setView(nextView);
-      },
+      () => finishDraft(nextView),
     );
   }
 
+  function applyTable(nextView?: EditorView) {
+    if (!prepared || prepared.invalid.size > 0 || !onEditValues) return;
+    if (prepared.edits.length > 0)
+      submitDraft(
+        "table",
+        () => onEditValues(target, prepared.edits),
+        nextView,
+      );
+    else finishDraft(nextView);
+  }
+
   function apply() {
-    const clearDraft = () => setDraft(undefined);
     if (busy || stale) return;
-    if (rawDraft) {
-      applyRaw();
-    } else if (prepared && prepared.invalid.size === 0 && onEditValues) {
-      if (prepared.edits.length > 0)
-        run(() => onEditValues(target, prepared.edits), clearDraft);
-      else clearDraft();
-    }
+    if (rawDraft && onReplaceXml)
+      submitDraft("raw", () => onReplaceXml(target, rawDraft.text));
+    else if (tableDraft) applyTable();
   }
 
   function discardDraft() {
@@ -256,26 +282,34 @@ export function BankEditor({
     }
   }
 
-  function selectView(nextView: "simple" | "table" | "raw") {
-    if (selectedView === "raw" && nextView !== "raw" && rawDraft) {
-      if (busy) return;
+  function selectView(nextView: EditorView) {
+    if (nextView === selectedView || (draft && busy)) return;
+    const staleMessage = "The bank changed while you were editing this draft.";
+    if (selectedView === "raw" && rawDraft) {
       setRetainedRawRevision(undefined);
       if (stale || !onReplaceXml) {
-        setRawSwitch({
+        setDraftSwitch({
+          kind: "raw",
           nextView,
           message: stale
-            ? "The bank changed while you were editing this draft."
+            ? staleMessage
             : "The Raw draft cannot currently be applied.",
         });
       } else {
-        applyRaw(nextView);
+        submitDraft("raw", () => onReplaceXml(target, rawDraft.text), nextView);
       }
+    } else if (selectedView === "table" && prepared) {
+      const message = stale
+        ? staleMessage
+        : !onEditValues
+          ? "The Table draft cannot currently be applied."
+          : prepared.invalid.size > 0
+            ? "Check the marked values. Use commas only between three-digit groups."
+            : undefined;
+      if (message) setDraftSwitch({ kind: "table", nextView, message });
+      else applyTable(nextView);
     } else {
-      if (selectedView === "table" && nextView !== "table")
-        setRetainTable(true);
-      if (selectedView === "raw" && nextView !== "raw")
-        setRetainedRawRevision(document.revision);
-      setView(nextView);
+      showView(nextView);
     }
   }
 
@@ -344,13 +378,22 @@ export function BankEditor({
       <Tabs.Root
         className="editor-views"
         value={selectedView}
-        activationMode={rawDraft ? "manual" : "automatic"}
+        activationMode={draft ? "manual" : "automatic"}
         onValueChange={(key) => {
           if (key === "simple" || key === "table" || key === "raw")
             selectView(key);
         }}
       >
-        <Tabs.List aria-label="Bank views" className="editor-tab-list">
+        <Tabs.List
+          aria-label="Bank views"
+          className="editor-tab-list"
+          onKeyDown={(event) => {
+            // Radix activates the tab from keydown. Its native button click can
+            // otherwise activate the newly focused dialog button.
+            if (draft && (event.key === "Enter" || event.key === " "))
+              event.preventDefault();
+          }}
+        >
           {profile && (
             <Tabs.Trigger className="editor-tab" value="simple">
               Simple View
@@ -378,6 +421,7 @@ export function BankEditor({
           className="editor-view"
           forceMount={tableVisible || retainTable ? true : undefined}
           hidden={!tableVisible}
+          ref={tablePanel}
         >
           <TableEditor
             sections={document.sections}
@@ -446,17 +490,36 @@ export function BankEditor({
         </Tabs.Content>
       </Tabs.Root>
 
-      {rawSwitch && (
-        <RawDraftDialog
-          message={rawSwitch.message}
-          repairable={Boolean(onReplaceXml) && !stale}
+      {draftSwitch && (
+        <DraftSwitchDialog
+          kind={draftSwitch.kind}
+          message={draftSwitch.message}
+          repairable={
+            !stale &&
+            Boolean(draftSwitch.kind === "raw" ? onReplaceXml : onEditValues)
+          }
           onDecision={(decision) => {
             if (decision === "discard") {
               discardDraft();
-              setView(rawSwitch.nextView);
+              showView(draftSwitch.nextView);
+            } else if (decision === "repair") {
+              if (draftSwitch.kind === "raw") rawEditor.current?.focus();
+              else {
+                const panel = tablePanel.current;
+                const field =
+                  panel?.querySelector<HTMLInputElement>(
+                    'input[aria-invalid="true"]:not([readonly])',
+                  ) ??
+                  panel?.querySelector<HTMLInputElement>(
+                    "input[data-table-draft]:not([readonly])",
+                  ) ??
+                  panel?.querySelector<HTMLInputElement>(
+                    "[data-table-filter-search]",
+                  );
+                (field ?? panel)?.focus();
+              }
             }
-            setRawSwitch(undefined);
-            if (decision === "repair") rawEditor.current?.focus();
+            setDraftSwitch(undefined);
           }}
         />
       )}

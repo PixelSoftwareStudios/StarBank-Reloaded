@@ -240,6 +240,7 @@ export function TableEditor({
               inputMode={row.type === "fixed" ? "decimal" : "text"}
               aria-label={`${name} value`}
               aria-invalid={invalidValue || undefined}
+              data-table-draft={edited !== undefined || undefined}
               aria-describedby={invalidValue ? instructionsId : undefined}
               data-bank-field={windowed ? "value" : undefined}
               readOnly={!editable}

@@ -1,27 +1,47 @@
 import { useEffect, useId, useRef } from "react";
+import type { EditorDraft } from "starbank-editor";
 
-export type RawDraftDecision = "repair" | "discard" | "cancel";
+type DraftDecision = "repair" | "discard" | "cancel";
 
-export function RawDraftDialog({
+const draftCopy = {
+  raw: {
+    title: "Raw draft could not be applied",
+    repair: "Repair XML",
+    review: "Review Raw View",
+  },
+  table: {
+    title: "Table draft could not be applied",
+    repair: "Repair edits",
+    review: "Review Table View",
+  },
+} satisfies Record<
+  EditorDraft["kind"],
+  { title: string; repair: string; review: string }
+>;
+
+export function DraftSwitchDialog({
+  kind,
   message,
   repairable,
   onDecision,
 }: {
+  kind: EditorDraft["kind"];
   message: string;
   repairable: boolean;
-  onDecision: (decision: RawDraftDecision) => void;
+  onDecision: (decision: DraftDecision) => void;
 }) {
+  const copy = draftCopy[kind];
   const heading = useId();
   const description = useId();
   const dialog = useRef<HTMLDialogElement>(null);
-  const decision = useRef<RawDraftDecision>("cancel");
+  const decision = useRef<DraftDecision>("cancel");
 
   useEffect(() => {
     const element = dialog.current;
     if (element && !element.open) element.showModal();
   }, []);
 
-  function close(next: RawDraftDecision) {
+  function close(next: DraftDecision) {
     decision.current = next;
     dialog.current?.close();
   }
@@ -35,7 +55,7 @@ export function RawDraftDialog({
       onClose={() => onDecision(decision.current)}
     >
       <header className="editor-dialog-header">
-        <h2 id={heading}>Raw draft could not be applied</h2>
+        <h2 id={heading}>{copy.title}</h2>
       </header>
       <p id={description}>{message}</p>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -58,7 +78,7 @@ export function RawDraftDialog({
           type="button"
           onClick={() => close("repair")}
         >
-          {repairable ? "Repair XML" : "Review Raw View"}
+          {repairable ? copy.repair : copy.review}
         </button>
       </div>
     </dialog>
