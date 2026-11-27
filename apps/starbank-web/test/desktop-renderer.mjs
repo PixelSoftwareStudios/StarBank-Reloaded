@@ -138,6 +138,8 @@ function createBridge(engine, canOverwrite) {
   let malformedBackupList = false;
   let supersedeNextEdit = false;
   let failNextEditProjection = false;
+  let failNextOpenProjection = false;
+  let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
   let inventoryResponse = canOverwrite ? blockedInventory : inventory;
@@ -174,6 +176,20 @@ function createBridge(engine, canOverwrite) {
   }
 
   function transformReply(request, reply) {
+    if (
+      failedOpenTarget &&
+      request.command.kind === "raw_text" &&
+      request.document_id === failedOpenTarget.document_id &&
+      request.expected_revision === failedOpenTarget.expected_revision
+    ) {
+      const accepted = JSON.parse(reply.control);
+      assert.equal(accepted.result.kind, "raw_text");
+      failedOpenTarget = undefined;
+      return {
+        ...reply,
+        control: JSON.stringify({ ...accepted, revision: "999" }),
+      };
+    }
     if (failNextEditProjection && request.command.kind === "set_values") {
       const accepted = JSON.parse(reply.control);
       assert.equal(accepted.result.kind, "snapshot");
@@ -254,6 +270,15 @@ function createBridge(engine, canOverwrite) {
           saved = false;
         }
         const reply = dispatch(engine, JSON.stringify(request), initialBank);
+        if (failNextOpenProjection) {
+          failNextOpenProjection = false;
+          const accepted = JSON.parse(reply.control);
+          assert.equal(accepted.result.kind, "snapshot");
+          failedOpenTarget = {
+            document_id: accepted.document_id,
+            expected_revision: accepted.revision,
+          };
+        }
         openCount += 1;
         return {
           value: {
@@ -348,6 +373,9 @@ function createBridge(engine, canOverwrite) {
     },
     failNextEditProjection() {
       failNextEditProjection = true;
+    },
+    failNextOpenProjection() {
+      failNextOpenProjection = true;
     },
     wireRequests,
     corruptBackupList() {
@@ -655,6 +683,55 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   });
 }
 
+async function finishAcceptedOpen(page, bridge, expectedName) {
+  const finish = button(page, "Finish opening bank");
+  const lastRead = bridge.wireRequests.at(-1);
+  assert.equal(lastRead.command.kind, "raw_text");
+  const before = bridge.wireRequests.length;
+  const opens = bridge.callsFor("open_bank");
+  await finish.click();
+  await page
+    .getByRole("heading", { name: expectedName, exact: true })
+    .waitFor();
+  const reads = bridge.wireRequests.slice(before);
+  assert.deepEqual(
+    reads.map(({ command }) => command.kind),
+    ["snapshot", "raw_text"],
+  );
+  for (const read of reads) {
+    assert.equal(read.document_id, lastRead.document_id);
+    assert.equal(read.expected_revision, lastRead.expected_revision);
+  }
+  assert.deepEqual(bridge.callsFor("open_bank"), opens);
+  assert.equal(await goldField(page).inputValue(), "001");
+}
+
+async function verifyAcceptedOpen(page, bridge, canOverwrite) {
+  bridge.failNextOpenProjection();
+  const open = button(page, "Open Bank…");
+  const finish = button(page, "Finish opening bank");
+  await open.click();
+  await finish.waitFor();
+  assert(await open.isDisabled());
+  assert.equal(await goldField(page).count(), 0);
+  await finishAcceptedOpen(page, bridge, initialName);
+  assert(await open.isEnabled());
+
+  await editGold(page, "002");
+  bridge.choose("discard");
+  bridge.failNextOpenProjection();
+  await open.click();
+  await finish.waitFor();
+  assert(await page.getByRole("heading", { name: initialName }).isVisible());
+  await page.getByRole("cell", { name: "002", exact: true }).waitFor();
+  assert.equal(await goldField(page).count(), 0);
+  assert(await button(page, canOverwrite ? "Save" : "Save As…").isDisabled());
+  assert(await open.isDisabled());
+  await finishAcceptedOpen(page, bridge, "Replacement-2.SC2Bank");
+  assert.deepEqual(bridge.callsFor("save_active_bank"), []);
+  assert.deepEqual(bridge.callsFor("save_bank_as"), []);
+}
+
 async function verifyMalformedBackupList(page, bridge) {
   await editGold(page, "004");
   bridge.corruptBackupList();
@@ -779,7 +856,7 @@ async function refreshEditorOnly(page, bridge) {
   assert.equal(reads[0].expected_revision, reads[1].expected_revision);
 }
 
-async function verifyRenderer(browser, canOverwrite) {
+async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
   const context = await browser.newContext({
     offline: true,
     serviceWorkers: "block",
@@ -813,6 +890,16 @@ async function verifyRenderer(browser, canOverwrite) {
     const bridge = createBridge(engine, canOverwrite);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (openRecovery) {
+      await verifyAcceptedOpen(page, bridge, canOverwrite);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer passed accepted-open recovery.`,
+      );
+      return;
+    }
     if (canOverwrite) await verifyInventoryRecovery(page, bridge);
     await button(
       page,
@@ -852,6 +939,7 @@ const browser = await chromium.launch({ headless: true, timeout: 15_000 });
 try {
   await verifyRenderer(browser, true);
   await verifyRenderer(browser, false);
+  await verifyRenderer(browser, true, true);
 } finally {
   await browser.close();
 }

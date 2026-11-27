@@ -86,8 +86,19 @@ interface DesktopDocument {
 
 type OpenBankSource = (control: string) => Promise<FileDialogReply | null>;
 
+interface AcceptedOpen {
+  readonly previous: DesktopDocument | null;
+  readonly target: EngineTarget;
+  readonly name: string;
+  readonly breadcrumbs?: readonly string[];
+  readonly canOverwrite: boolean;
+  readonly bankId?: string;
+}
+
 function DesktopApp() {
   const currentDocument = useRef<DesktopDocument>(null);
+  const acceptedOpen = useRef<AcceptedOpen>(null);
+  const [openRecovery, setOpenRecovery] = useState<AcceptedOpen>();
   const [document, setDocument] = useState<DesktopDocument>();
   const [refreshRequest, setRefreshRequest] = useState<{
     displayed: EditorTarget;
@@ -100,6 +111,7 @@ function DesktopApp() {
       : undefined;
   const [profile, setProfile] = useState<EngineProfile>();
   const [hasDraft, setHasDraft] = useState(false);
+  const currentDraft = useRef(false);
   const [nativeNotice, setNativeNotice] = useState<string>();
   const [selectedBankId, setSelectedBankId] = useState<string>();
   const [backupGeneration, setBackupGeneration] = useState(0);
@@ -122,10 +134,16 @@ function DesktopApp() {
 
   const closeGuard = useNativeCloseGuard({
     busy,
-    onDraft: setHasDraft,
+    onDraft: (present) => {
+      currentDraft.current = present;
+      setHasDraft(present);
+    },
     onNotice: setNativeNotice,
     save:
-      document && !refreshTarget && (overwriteAvailable || exportAvailable)
+      document &&
+      !refreshTarget &&
+      !openRecovery &&
+      (overwriteAvailable || exportAvailable)
         ? async () => {
             const result = await save(
               document.projection,
@@ -192,6 +210,15 @@ function DesktopApp() {
     command: EngineCommand,
     bytes?: Uint8Array,
   ) {
+    const opening = acceptedOpen.current;
+    if (
+      opening &&
+      (target.id !== opening.target.document_id ||
+        target.revision !== opening.target.expected_revision ||
+        (command.kind !== "snapshot" && command.kind !== "raw_text"))
+    ) {
+      throw new Error("Finish opening the accepted bank first.");
+    }
     const id = requestId();
     const scope = {
       document_id: target.id,
@@ -209,23 +236,12 @@ function DesktopApp() {
     return { reply, bytes: nativeReply.bytes };
   }
 
-  async function adopt(
+  async function projectDocument(
     name: string,
     reply: EngineReply,
     breadcrumbs?: readonly string[],
-  ) {
-    if (reply.result.kind === "error") {
-      throw new Error(reply.result.payload.message);
-    }
-    if (
-      reply.result.kind !== "snapshot" ||
-      reply.document_id === null ||
-      reply.revision === null
-    ) {
-      throw new Error("The bank engine did not return a document.");
-    }
-    const target = { id: reply.document_id, revision: reply.revision };
-    const snapshot = reply.result.payload;
+  ): Promise<DesktopDocument> {
+    const { target, snapshot } = requireSnapshot(reply);
     const raw = await dispatch(target, { kind: "raw_text" });
     if (
       raw.reply.result.kind !== "raw_text" ||
@@ -235,7 +251,7 @@ function DesktopApp() {
     ) {
       throw new Error("The bank engine did not return XML.");
     }
-    const next = {
+    return {
       projection: {
         ...target,
         name,
@@ -253,6 +269,15 @@ function DesktopApp() {
       canUndo: snapshot.can_undo,
       canRedo: snapshot.can_redo,
     };
+  }
+
+  async function adopt(
+    name: string,
+    reply: EngineReply,
+    breadcrumbs?: readonly string[],
+  ) {
+    const next = await projectDocument(name, reply, breadcrumbs);
+    const target = next.projection;
     if (document?.projection.id !== target.id) {
       setProfile(undefined);
     } else if (profile && profile.status !== "unloaded") {
@@ -263,10 +288,14 @@ function DesktopApp() {
         setProfile(undefined);
       }
     }
+    publishDocument(next);
+    return { id: target.id, revision: target.revision };
+  }
+
+  function publishDocument(next: DesktopDocument) {
     currentDocument.current = next;
     setDocument(next);
     setRefreshRequest(undefined);
-    return target;
   }
 
   async function updateProfile(
@@ -368,6 +397,9 @@ function DesktopApp() {
   }
 
   function activeTarget(target: EditorTarget): ActiveBankTarget {
+    if (acceptedOpen.current) {
+      throw new Error("Finish opening the accepted bank first.");
+    }
     return {
       documentId: target.id,
       revision: target.revision,
@@ -377,7 +409,10 @@ function DesktopApp() {
 
   function openFrom(source: OpenBankSource, bankId?: string) {
     return action(async () => {
-      if (hasDraft) {
+      if (acceptedOpen.current) {
+        throw new Error("Finish opening the accepted bank first.");
+      }
+      if (currentDraft.current) {
         return {
           ok: false,
           message: "Apply or discard the current draft first.",
@@ -400,6 +435,10 @@ function DesktopApp() {
           if (!saved.ok || !saved.message) return saved;
         } else return { ok: true };
       }
+      if (currentDraft.current) {
+        throw new Error("Apply or discard the current draft first.");
+      }
+      const previous = currentDocument.current;
       const id = discardRequestId ?? requestId();
       const control = engineRequest(
         id,
@@ -409,22 +448,98 @@ function DesktopApp() {
       );
       const opened = await source(JSON.stringify(control));
       if (!opened) return { ok: true };
-      await adopt(
-        opened.name,
-        decodeEngineReply(opened.control, id),
-        opened.breadcrumbs,
-      );
-      setOverwriteAvailable(opened.can_overwrite === true);
-      setSelectedBankId(bankId);
-      return { ok: true, message: `Opened ${opened.name}.` };
+      const reply = decodeEngineReply(opened.control, id);
+      const { target } = requireSnapshot(reply);
+      if (target.id === previous?.projection.id) {
+        throw new Error("The bank engine did not acknowledge a new document.");
+      }
+      const opening = {
+        previous,
+        target: { document_id: target.id, expected_revision: target.revision },
+        name: opened.name,
+        breadcrumbs: opened.breadcrumbs,
+        canOverwrite: opened.can_overwrite === true,
+        bankId,
+      };
+      acceptedOpen.current = opening;
+      return displayOpening(opening, async () => reply);
     });
+  }
+
+  async function displayOpening(
+    opening: AcceptedOpen,
+    load: () => Promise<EngineReply>,
+  ): Promise<EditorActionResult> {
+    function stillOpening() {
+      return (
+        acceptedOpen.current === opening &&
+        currentDocument.current === opening.previous
+      );
+    }
+
+    try {
+      if (!stillOpening()) throw new Error("The selected bank changed.");
+      if (currentDraft.current) {
+        throw new Error("Discard the previous bank draft before finishing.");
+      }
+      const reply = await load();
+      const { target } = requireSnapshot(reply);
+      if (
+        target.id !== opening.target.document_id ||
+        target.revision !== opening.target.expected_revision
+      ) {
+        throw new Error(
+          "The bank engine did not return the accepted document.",
+        );
+      }
+      const next = await projectDocument(
+        opening.name,
+        reply,
+        opening.breadcrumbs,
+      );
+      if (!stillOpening()) throw new Error("The selected bank changed.");
+      if (currentDraft.current) {
+        throw new Error("Discard the previous bank draft before finishing.");
+      }
+      acceptedOpen.current = null;
+      setOpenRecovery(undefined);
+      setProfile(undefined);
+      setOverwriteAvailable(opening.canOverwrite);
+      setSelectedBankId(opening.bankId);
+      publishDocument(next);
+      return { ok: true, message: `Opened ${opening.name}.` };
+    } catch (error) {
+      if (!stillOpening()) throw error;
+      const target =
+        error instanceof SnapshotRefreshRequired &&
+        error.target.document_id === opening.target.document_id &&
+        revisionAtLeast(
+          error.target.expected_revision,
+          opening.target.expected_revision,
+        )
+          ? error.target
+          : opening.target;
+      const updated = { ...opening, target };
+      acceptedOpen.current = updated;
+      setOpenRecovery(updated);
+      return {
+        ok: false,
+        message: currentDraft.current
+          ? "Discard the previous bank draft before finishing."
+          : "The bank was accepted, but its XML could not be displayed.",
+      };
+    }
   }
 
   const inventory = useInventory({
     backupGeneration,
     selectedBankId,
     disabled:
-      busy || hasDraft || refreshTarget !== undefined || closeGuard.pending,
+      busy ||
+      hasDraft ||
+      openRecovery !== undefined ||
+      refreshTarget !== undefined ||
+      closeGuard.pending,
     onOpenBank: (id) => {
       void openFrom((control) => openInventoryBank(id, control), id).then(
         (result) => setNativeNotice(result.message),
@@ -581,23 +696,24 @@ function DesktopApp() {
     backupStatus,
     onOpen: () => openFrom(pickBank),
     onDraftChange: closeGuard.reportDraft,
-    onRefreshSnapshot: refreshTarget
-      ? (target) =>
-          updateDocument(
-            target,
-            async () =>
-              (
-                await dispatch(
-                  {
-                    id: refreshTarget.document_id,
-                    revision: refreshTarget.expected_revision,
-                  },
-                  { kind: "snapshot" },
-                )
-              ).reply,
-            refreshTarget.expected_revision,
-          )
-      : undefined,
+    onRefreshSnapshot:
+      !openRecovery && refreshTarget
+        ? (target) =>
+            updateDocument(
+              target,
+              async () =>
+                (
+                  await dispatch(
+                    {
+                      id: refreshTarget.document_id,
+                      revision: refreshTarget.expected_revision,
+                    },
+                    { kind: "snapshot" },
+                  )
+                ).reply,
+              refreshTarget.expected_revision,
+            )
+        : undefined,
     profile: {
       current: profile ?? { status: "unloaded" },
       requireAuthor: profile?.status === "missing_context",
@@ -800,6 +916,27 @@ function DesktopApp() {
         platformInfo={__STARBANK_PLATFORM_INFO__}
         name={APP_NAME}
         editor={controller}
+        openRecovery={
+          openRecovery && {
+            name: openRecovery.name,
+            finish: () =>
+              action(() =>
+                displayOpening(
+                  openRecovery,
+                  async () =>
+                    (
+                      await dispatch(
+                        {
+                          id: openRecovery.target.document_id,
+                          revision: openRecovery.target.expected_revision,
+                        },
+                        { kind: "snapshot" },
+                      )
+                    ).reply,
+                ),
+              ),
+          }
+        }
         inventory={inventoryWithBackupStatus}
         preferences={preferences}
         backupSettings={
@@ -830,6 +967,7 @@ function DesktopApp() {
                   keepNewest={backupPreferences.preferences.keepNewest}
                   disabled={
                     busy ||
+                    openRecovery !== undefined ||
                     closeGuard.pending ||
                     backupPreferences.preferences.location.mode ===
                       "needs_authorization"
@@ -885,7 +1023,7 @@ function DesktopApp() {
         }
         workspaceAccessory={
           <OpenRequests
-            busy={busy}
+            busy={busy || openRecovery !== undefined}
             hasDraft={hasDraft}
             onOpen={(id) =>
               openFrom((control) => openRequestedBank(id, control))
@@ -900,6 +1038,26 @@ function DesktopApp() {
       ) : null}
     </>
   );
+}
+
+function requireSnapshot(reply: EngineReply): {
+  target: EditorTarget;
+  snapshot: EngineSnapshot;
+} {
+  if (reply.result.kind === "error") {
+    throw new Error(reply.result.payload.message);
+  }
+  if (
+    reply.result.kind !== "snapshot" ||
+    reply.document_id === null ||
+    reply.revision === null
+  ) {
+    throw new Error("The bank engine did not return a document.");
+  }
+  return {
+    target: { id: reply.document_id, revision: reply.revision },
+    snapshot: reply.result.payload,
+  };
 }
 
 function displaySections(snapshot: EngineSnapshot) {
