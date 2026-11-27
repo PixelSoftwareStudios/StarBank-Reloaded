@@ -61,6 +61,13 @@ pub struct NativeActiveTarget {
 }
 
 impl Engine {
+	/// Reports whether the native renderer could still hold a projection or draft.
+	///
+	/// The history survives closing a bank. Rejected opens do not create history.
+	pub fn native_has_opened_document(&self) -> bool {
+		self.document_sequence != 0
+	}
+
 	/// Captures the active editor identity, revision, and dirty state for a native operation.
 	pub fn native_active_target(&self) -> Option<NativeActiveTarget> {
 		self.active.as_ref().map(|active| NativeActiveTarget {

@@ -36,7 +36,7 @@ enum Intent {
 struct Attempt {
 	ticket: u32,
 	intent: Intent,
-	captured: NativeActiveTarget,
+	captured: Option<NativeActiveTarget>,
 	phase: Phase,
 }
 
@@ -73,7 +73,11 @@ pub(crate) struct CloseReport {
 }
 
 impl Guard {
-	fn begin(&mut self, intent: Intent, captured: NativeActiveTarget) -> Option<CloseProbe> {
+	fn begin(
+		&mut self,
+		intent: Intent,
+		captured: Option<NativeActiveTarget>,
+	) -> Option<CloseProbe> {
 		if self
 			.pending
 			.as_ref()
@@ -119,10 +123,15 @@ impl Attempt {
 		}
 		match choice {
 			CloseChoice::Cancel => false,
-			CloseChoice::Discard => current == Some(&self.captured),
-			CloseChoice::Save => current.is_some_and(|active| {
-				active.document_id == self.captured.document_id && !active.dirty
-			}),
+			CloseChoice::Discard => current == self.captured.as_ref(),
+			CloseChoice::Save => {
+				self.captured
+					.as_ref()
+					.zip(current)
+					.is_some_and(|(captured, active)| {
+						active.document_id == captured.document_id && !active.dirty
+					})
+			}
 		}
 	}
 }
@@ -169,17 +178,18 @@ fn request(app: &AppHandle, intent: Intent) {
 		return;
 	};
 	let captured = session.editor.native_active_target();
-	drop(session);
 	let guard = app.state::<DesktopCloseGuard>();
-	let Some(active) = captured else {
+	// Before the first accepted bank, the webview cannot hold a bank draft.
+	if captured.is_none() && !session.editor.native_has_opened_document() {
 		let _ = close_native(&window, &guard, intent);
 		return;
-	};
+	}
+	drop(session);
 	let probe = guard
 		.0
 		.lock()
 		.ok()
-		.and_then(|mut state| state.begin(intent, active));
+		.and_then(|mut state| state.begin(intent, captured));
 	if let Some(probe) = probe
 		&& window
 			.emit_to(MAIN_WINDOW, REQUEST_EVENT, probe.clone())
@@ -213,15 +223,16 @@ pub(crate) async fn confirm_window_close(
 		if attempt.phase != Phase::Probe {
 			return Err(CommandError::Unavailable);
 		}
-		if active.as_ref() != Some(&attempt.captured) {
+		if active.as_ref() != attempt.captured.as_ref() {
 			state.clear(report.ticket);
 			return Err(stale());
 		}
 		attempt.phase = Phase::Prompt;
-		attempt.captured.dirty
+		attempt.captured.as_ref().is_some_and(|target| target.dirty)
 	};
 
-	let choice = ask(&window, dirty, report.has_draft, report.can_save).await;
+	let can_save = active.is_some() && report.can_save;
+	let choice = ask(&window, dirty, report.has_draft, can_save).await;
 	let mut state = guard.0.lock().map_err(|_| CommandError::Unavailable)?;
 	if choice == CloseChoice::Cancel {
 		state.clear(report.ticket);
@@ -265,7 +276,10 @@ pub(crate) fn complete_window_close(
 	if !attempt.permits(active.as_ref(), draft_generation) {
 		return Err(stale());
 	}
-	let active = active.ok_or_else(stale)?;
+	let Some(active) = active else {
+		// Keep the empty engine locked through the native close request.
+		return close_native(&window, &guard, attempt.intent);
+	};
 	let control = json!({
 		"schema_version": PROTOCOL_VERSION,
 		"request_id": REQUEST_ID,
@@ -405,7 +419,7 @@ mod tests {
 		let active = target("bank-1", "4", true);
 		let mut guard = Guard::default();
 		let probe = guard
-			.begin(Intent::Window, active.clone())
+			.begin(Intent::Window, Some(active.clone()))
 			.expect("new probe");
 		let attempt = guard.attempt(probe.ticket).expect("pending");
 		assert!(!attempt.permits(Some(&active), 7));
@@ -426,7 +440,7 @@ mod tests {
 		let attempt = Attempt {
 			ticket: 1,
 			intent: Intent::Window,
-			captured: active.clone(),
+			captured: Some(active.clone()),
 			phase: Phase::Approved {
 				choice: CloseChoice::Save,
 				draft_generation: 7,
@@ -440,15 +454,41 @@ mod tests {
 	}
 
 	#[test]
+	fn no_engine_still_requires_approval_and_an_unchanged_draft() {
+		let mut guard = Guard::default();
+		let probe = guard.begin(Intent::Window, None).expect("new probe");
+		let attempt = guard.attempt(probe.ticket).expect("pending");
+		assert!(!attempt.permits(None, 7));
+		attempt.phase = Phase::Approved {
+			choice: CloseChoice::Cancel,
+			draft_generation: 7,
+		};
+		assert!(!attempt.permits(None, 7));
+		attempt.phase = Phase::Approved {
+			choice: CloseChoice::Discard,
+			draft_generation: 7,
+		};
+		assert!(attempt.permits(None, 7));
+		assert!(!attempt.permits(None, 8));
+		assert!(!attempt.permits(Some(&target("late-bank", "0", false)), 7));
+		attempt.phase = Phase::Approved {
+			choice: CloseChoice::Save,
+			draft_generation: 7,
+		};
+		assert!(!attempt.permits(None, 7));
+		assert!(!attempt.permits(Some(&target("late-bank", "0", false)), 7));
+	}
+
+	#[test]
 	fn retried_probes_cannot_reuse_previous_approvals() {
 		let active = target("bank-1", "4", true);
 		let mut guard = Guard::default();
-		let first = guard.begin(Intent::Window, active.clone()).unwrap();
-		let second = guard.begin(Intent::Exit(0), active.clone()).unwrap();
+		let first = guard.begin(Intent::Window, Some(active.clone())).unwrap();
+		let second = guard.begin(Intent::Exit(0), Some(active.clone())).unwrap();
 		assert_ne!(first.ticket, second.ticket);
 		assert!(guard.attempt(first.ticket).is_none());
 		guard.attempt(second.ticket).unwrap().phase = Phase::Prompt;
-		assert!(guard.begin(Intent::Window, active).is_none());
+		assert!(guard.begin(Intent::Window, Some(active)).is_none());
 		guard.clear(first.ticket);
 		assert!(guard.attempt(second.ticket).is_some());
 		guard.clear(second.ticket);

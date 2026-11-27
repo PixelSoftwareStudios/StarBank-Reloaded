@@ -90,6 +90,45 @@ fn revision(response: &Value) -> Revision {
 }
 
 #[test]
+fn native_opening_history_survives_retiring_the_active_document() {
+	let mut engine = Engine::default();
+	assert!(!engine.native_has_opened_document());
+	assert!(engine.native_active_target().is_none());
+
+	let invalid = engine.dispatch(
+		&json!({
+			"schema_version": PROTOCOL_VERSION,
+			"request_id": "invalid-open",
+			"command": {"kind": "open"},
+		})
+		.to_string(),
+		Some(b"<Bank>"),
+	);
+	let rejected: Value = serde_json::from_str(&invalid.json).expect("structured wire reply");
+	assert_eq!(rejected["result"]["kind"], "error");
+	assert!(!engine.native_has_opened_document());
+
+	let opened = open_bank(&mut engine, ORIGINAL);
+	assert!(engine.native_has_opened_document());
+	assert!(engine.native_active_target().is_some());
+	let closed = engine.dispatch(
+		&json!({
+			"schema_version": PROTOCOL_VERSION,
+			"request_id": "close",
+			"document_id": opened["document_id"],
+			"expected_revision": opened["revision"],
+			"command": {"kind": "close"},
+		})
+		.to_string(),
+		None,
+	);
+	let closed: Value = serde_json::from_str(&closed.json).expect("structured wire reply");
+	assert_eq!(closed["result"]["kind"], "closed");
+	assert!(engine.native_active_target().is_none());
+	assert!(engine.native_has_opened_document());
+}
+
+#[test]
 fn native_receipt_is_bound_to_exact_bytes_and_requires_verified_acknowledgement() {
 	let mut bank = Bank::open();
 	bank.change(EDITED);
