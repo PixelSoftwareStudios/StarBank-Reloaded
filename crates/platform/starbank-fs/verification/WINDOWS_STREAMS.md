@@ -1,0 +1,17 @@
+# Windows held-file stream qualification
+
+WP-07 and REQ-SAVE-02. This opt-in probe tests named NTFS data stream visibility from the held read handle. Windows bank replacement remains unavailable.
+
+The test creates an ordinary private fixture directory on local NTFS using the existing reduced-token setup. The effective same-user actor has deny-only Administrators membership and at most the normal traverse privilege enabled. It checks one nonempty unnamed stream, then creates a nonempty named stream and an empty stream named `$DATA` while retaining the original read handle. A separate unnamed-stream write open must return a sharing violation. The final stream inventory must include both named streams with their exact counted UTF-16 names and logical sizes, including the default lookalike `:$DATA:$DATA`. Independent reads check the unnamed payload and both named streams. The original file ID must remain unchanged. The probe records observed file-time and fingerprint differences without requiring either to detect the stream write. [Sharing and naming rules](https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams)
+
+The probe uses the pinned `windows-sys` `NtQueryInformationFile(FileStreamInformation)` binding on the held, synchronous handle. It requires successful native completion and parses only the exact kernel-reported byte count in one 8-byte-aligned 64 KiB buffer. Overflow or incomplete output is a probe failure. The parser retains raw UTF-16 names and logical sizes and refuses ill-formed records. It accepts a final record with no padding or minimal alignment padding. Layout offsets are checked against the pinned SDK definitions. [Native query](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntqueryinformationfile) · [Stream record format](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/f8762be6-3ab9-411e-a7d6-5cc68f70c78d) · [Record construction](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/39679ad3-2ea1-4e5b-8af9-0fb88129b24e)
+
+This probe reads names and logical sizes. Allocation size, other NTFS metadata, SACL access, atomic stream exclusion, and replacement behavior remain outside its scope. A complete inventory still describes one observation, because NTFS tracks sharing per stream. No application files or settings are involved.
+
+Run on a native Windows host with ordinary local NTFS temporary storage and the pinned toolchain.
+
+```powershell
+cargo nextest run --locked -p starbank-fs --lib --run-ignored only --no-tests fail --success-output immediate -E 'test(=windows::stream_qualification::local_ntfs_held_file_stream_inventory)'
+```
+
+Local Rust 1.100.0 Windows x64 MSVC all-target Clippy passed with warnings denied. The five pure parser cases ran on macOS arm64 through the same pinned Clippy driver. Native execution is pending. [Probe source](../src/windows/stream_qualification.rs) · [Parser cases](../src/windows/stream_qualification/records/tests.rs)

@@ -94,6 +94,13 @@ jobs:
         shell: pwsh
         timeout-minutes: 3
         run: '& ./crates/platform/starbank-fs/verification/windows-enospc.ps1'
+      - name: Qualify held-file NTFS stream enumeration
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        run: >-
+          cargo nextest run --locked -p starbank-fs --lib
+          --run-ignored only --no-tests fail --success-output immediate
+          -E 'test(=windows::stream_qualification::local_ntfs_held_file_stream_inventory)'
       - name: Qualify Windows single-instance launch delivery
         if: runner.os == 'Windows'
         shell: pwsh

@@ -431,3 +431,6 @@ unsafe fn query<T: Default>(
 
 #[cfg(test)]
 mod rename_qualification;
+
+#[cfg(test)]
+mod stream_qualification;
