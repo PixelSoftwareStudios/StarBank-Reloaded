@@ -178,9 +178,67 @@ required-signature validation also passed for both originals without
 explicit context flags, using canonical path inference. Their bytes and
 recorded metadata remained unchanged after these checks.
 
-These results cover the two existing owner files. Broader game-version
-coverage, documented game captures, authorized game maps for REQ-MPQ-01,
-and game-side acceptance of edited files for REQ-SIG-03 remain open.
+These bank results cover the two existing owner files. Broader game-version
+coverage, documented game captures and game-side acceptance of edited files
+for REQ-SIG-03 remain open.
+
+### Existing local cache snapshots
+
+On November 27, 2026, bounded read-only inspection of the standard local
+Battle.net cache supplied four private exact copies, totalling 8,329,661
+bytes. During acquisition and initial inspection, the originals retained
+their SHA-256, file identity, size, mode, modification time and change time.
+The copies stayed outside the checkout. Their original game build, capture procedure
+and authorship are unknown; they are not authenticated game captures or an
+owner-authored repair corpus. No input payloads, source filenames, original paths,
+source digests or private selection manifest were committed. These checks ran
+separately from the manifest runner above.
+
+| Position | Bytes | Layout | Initial reader result | Corrected reader result |
+| --- | ---: | --- | --- | --- |
+| 1 | 2,595,098 | Offset-zero V4 | Readable | Exact member agreement |
+| 2 | 1,855,977 | Offset-zero V4 | Readable | Exact member agreement |
+| 3 | 2,857,667 | V4 with an extra sector-table word | Partial metadata with an invalid-entry issue | Exact member agreement |
+| 4 | 1,020,919 | Declared user-data origin, V4 | Unsupported archive | Exact member agreement |
+
+The reference was StormLib v9.40 at commit
+`6bb1882bd00ddbc3729cac5dac0fda81a61e5514`, linked from the previously verified
+arm64 artifact with SHA-256
+`56f86391735e19a8678dbfda9d796a375e12db5d12d22a3dca5b1ac3b441c1d2`.
+Scratch native readers opened generated copies in read-only mode and requested only
+`MapScript.galaxy`, `Base.SC2Data\MapScript.galaxy` and `DocumentHeader`.
+The comparisons capped archives at 32 MiB, members at 16 MiB and each reader
+process at eight seconds. Three authored synthetic controls matched their
+independent expected bytes before the private comparisons.
+
+After reader fixes `c5f0482` and `6d7e7bf`, both implementations opened all four copies:
+eight present members matched byte for byte and four absences agreed.
+There were no remaining member mismatches or refused entries. The rebuilt
+CLI also scanned each selected copy with caching disabled, returning one
+map, no issues and `incomplete: false`. All private copies retained their
+fingerprints and SHA-256 through the final checks. Extracted member payloads and metadata
+stayed in local memory; emitted summaries contained only case positions,
+fixed status categories and counts.
+
+The initial sector-table regression failed with `InvalidEntry(MapScript)`.
+After the correction, all 86 reader, index and CLI tests passed on macOS
+arm64, along with warnings-denied Clippy, formatting, rustdoc and the
+292-file source check. The
+synthetic regressions cover declared origins, bounds, exact sector output
+and continued append refusal for prefixed inputs and outputs.
+
+```sh
+cargo nextest run --locked -p starbank-mpq -p starbank-map-index -p starbank-cli --no-tests fail
+cargo clippy --locked -p starbank-mpq -p starbank-map-index -p starbank-cli --all-targets -- -D warnings
+cargo build --locked -p starbank-cli --bin starbank
+target/debug/starbank --json map scan --root /path/to/selected-copy.s2ma
+```
+
+This is local read-only compatibility evidence for REQ-MPQ-01. Controlled
+map captures, broader layouts/codecs, original-component repair and SC2
+Editor reopen remain unqualified. No game or editor was launched and no
+archive repair or modification was performed. [Reader scope](../../crates/adapters/starbank-mpq/README.md) ·
+[Pinned native artifact](../../crates/adapters/starbank-mpq-stormlib/verification/NATIVE_APPEND.md)
 
 [Format fixtures](../../crates/formats/sc2bank/tests/fixtures/README.md) ·
 [Map fixtures](../../crates/discovery/starbank-map-index/tests/fixtures/README.md) ·
