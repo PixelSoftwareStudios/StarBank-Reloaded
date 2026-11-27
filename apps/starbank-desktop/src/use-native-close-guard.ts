@@ -15,6 +15,8 @@ import {
 } from "./transport";
 
 const REQUEST_EVENT = "bank-close-requested";
+const BUSY_NOTICE =
+  "Wait for the current bank action to finish before closing.";
 
 interface CloseOptions {
   busy: boolean;
@@ -50,14 +52,12 @@ export function useNativeCloseGuard(options: CloseOptions) {
     let mounted = true;
     const listening = listen<unknown>(REQUEST_EVENT, ({ payload }) => {
       if (!mounted || running.current) return;
-      if (current.current.busy) {
-        current.current.onNotice(
-          "Wait for the current bank action to finish before closing.",
-        );
-        return;
-      }
       const probe = decodeCloseProbe(payload);
       if (!probe) return;
+      if (current.current.busy) {
+        current.current.onNotice(BUSY_NOTICE);
+        return;
+      }
       const { ticket } = probe;
       const observed = draft.current;
       const save = current.current.save;
@@ -85,16 +85,21 @@ export function useNativeCloseGuard(options: CloseOptions) {
             mounted &&
             draft.current === observed &&
             observed.generation < MAX_NATIVE_U32;
+          const busyBeforeCompletion = current.current.busy;
           const canProceed =
             currentDraft() &&
+            !busyBeforeCompletion &&
             (choice === "discard" || (save !== undefined && (await save())));
           const proceed = canProceed && currentDraft();
           await complete(proceed);
           approved = false;
-          if (!proceed && mounted && draft.current !== observed) {
-            current.current.onNotice(
-              "The draft changed before the window could close.",
-            );
+          if (!proceed && mounted) {
+            if (busyBeforeCompletion) current.current.onNotice(BUSY_NOTICE);
+            else if (draft.current !== observed) {
+              current.current.onNotice(
+                "The draft changed before the window could close.",
+              );
+            }
           }
         } catch {
           if (approved) await complete(false).catch(() => {});

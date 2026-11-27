@@ -92,6 +92,7 @@ test("close probes ignore malformed events without throwing or rounding tickets"
     undefined,
     {},
     "discard",
+    { ticket: 1, proceed: true },
     ...[0, -1, 0.5, "1", Number.NaN, MAX_NATIVE_U32 + 1].map((ticket) => ({
       ticket,
     })),

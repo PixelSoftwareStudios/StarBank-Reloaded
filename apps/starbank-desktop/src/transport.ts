@@ -437,7 +437,7 @@ const nativeRequestId = v.pipe(
 const openRequests = v.array(
   v.object({ id: nativeRequestId, name: v.string() }),
 );
-const closeProbe = v.object({ ticket: nativeRequestId });
+const closeProbe = v.strictObject({ ticket: nativeRequestId });
 const closeChoice = v.picklist(["save", "discard", "cancel"]);
 
 export type OpenRequest = v.InferOutput<typeof openRequests>[number];

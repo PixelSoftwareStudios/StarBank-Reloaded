@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
 import { verifyBatchBackupReview } from "./batch-backup-review.mjs";
+import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 
 const dist = fileURLToPath(
@@ -152,6 +153,8 @@ function createBridge(engine, canOverwrite) {
   let restoreNextBackup = false;
   let nextWriteRecovery;
   let cancelPicker = false;
+  let heldPicker;
+  let closeChoice;
   let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
@@ -278,6 +281,11 @@ function createBridge(engine, canOverwrite) {
       };
     }
     switch (command) {
+      case "confirm_window_close":
+        assert(closeChoice);
+        return { value: closeChoice };
+      case "complete_window_close":
+        return {};
       case "read_settings":
         return {
           value: {
@@ -316,6 +324,11 @@ function createBridge(engine, canOverwrite) {
       case "plugin:event|unlisten":
         return {};
       case "open_bank": {
+        if (heldPicker) {
+          const result = heldPicker;
+          heldPicker = undefined;
+          return result;
+        }
         if (cancelPicker) {
           cancelPicker = false;
           return { value: null };
@@ -451,6 +464,14 @@ function createBridge(engine, canOverwrite) {
     acceptNextRestore() {
       restoreNextBackup = true;
     },
+    holdNextPicker() {
+      const { promise, resolve } = Promise.withResolvers();
+      heldPicker = promise;
+      return () => resolve({ value: null });
+    },
+    chooseClose(choice) {
+      closeChoice = choice;
+    },
     cancelNextPicker() {
       cancelPicker = true;
     },
@@ -477,13 +498,31 @@ async function bindRenderer(page, bridge) {
   await page.exposeFunction("invokeDesktopFixture", bridge.invoke);
   await page.addInitScript(() => {
     let callbackId = 0;
+    const callbacks = new Map();
     window.fixtureNavigationReplies = 0;
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
     window.__TAURI_INTERNALS__ = {
-      transformCallback: () => ++callbackId,
-      unregisterCallback() {},
+      transformCallback(callback) {
+        callbackId += 1;
+        callbacks.set(callbackId, callback);
+        return callbackId;
+      },
+      unregisterCallback(id) {
+        callbacks.delete(id);
+      },
       async invoke(command, args) {
         const binary = command === "dispatch_bank";
+        if (
+          command === "plugin:event|listen" &&
+          args.event === "bank-close-requested"
+        ) {
+          window.fixtureCloseProbe = (payload) =>
+            callbacks.get(args.handler)({
+              event: args.event,
+              id: args.handler,
+              payload,
+            });
+        }
         const reply = await window.invokeDesktopFixture(
           command,
           binary ? Array.from(args) : args,
@@ -1256,6 +1295,16 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
     const bridge = createBridge(engine, canOverwrite);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (openRecovery === "close_probe") {
+      await verifyEmptyEngineCloseProbe(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer passed empty-engine close probes.`,
+      );
+      return;
+    }
     if (openRecovery === "verified_write") {
       await verifyVerifiedNeedsReopen(page, bridge);
       assert.deepEqual(bridge.unexpected, []);
@@ -1324,6 +1373,7 @@ try {
   await verifyRenderer(browser, false);
   await verifyRenderer(browser, true, true);
   await verifyRenderer(browser, true, "verified_write");
+  await verifyRenderer(browser, true, "close_probe");
 } finally {
   await browser.close();
 }
