@@ -13,6 +13,8 @@ use starbank_fs::{CommitIntent, CommitOutcome, StorageError, commit, read_snapsh
 
 #[path = "macos_enospc/calibration.rs"]
 mod calibration;
+#[path = "macos_enospc/fill_progress.rs"]
+mod fill_progress;
 
 use calibration::Calibration;
 
@@ -283,26 +285,26 @@ fn fill_volume(volume: &File, path: &Path, policy: FillPolicy) -> io::Result<Fil
 	let mut file = fixture_io("create filler", create_exclusive(path))?;
 	let chunk = vec![b'f'; FILL_CHUNK];
 	let mut synced_bytes = 0;
-	for _ in 0..MAX_FILL_STEPS {
-		let available = available_bytes(volume)?;
-		if policy == FillPolicy::ReportedThreshold && available <= FILL_TARGET_FREE {
-			if synced_bytes > 0 && available >= MIB {
+	let mut last_count = 0;
+	let mut available = available_bytes(volume)?;
+	for observation in 1..=MAX_FILL_STEPS {
+		let count = match fill_progress::next_step(policy, available, synced_bytes) {
+			fill_progress::FillStep::Complete => {
 				return Ok(FilledVolume {
 					filled: synced_bytes,
 					available,
 					calibrated: false,
 				});
 			}
-			return restore_headroom(&mut file, volume, synced_bytes, "reported free space");
-		}
-		let count = match policy {
-			FillPolicy::ReportedThreshold => chunk.len().min(available - FILL_TARGET_FREE),
-			FillPolicy::UntilEnospc => chunk.len(),
+			fill_progress::FillStep::RestoreHeadroom => {
+				return restore_headroom(&mut file, volume, synced_bytes, "reported free space");
+			}
+			fill_progress::FillStep::Write(count) => count,
+			fill_progress::FillStep::RefuseBudget => {
+				return refuse_fill_budget(&file, synced_bytes, available, last_count, observation);
+			}
 		};
-		assert!(
-			synced_bytes + count <= MAX_CAPACITY,
-			"refuse to write beyond the fixture capacity"
-		);
+		last_count = count;
 		if let Err(error) = file.write_all(&chunk[..count]) {
 			if error.raw_os_error() != Some(libc::ENOSPC) {
 				return fixture_io("write filler", Err(error));
@@ -316,10 +318,24 @@ fn fill_volume(volume: &File, path: &Path, policy: FillPolicy) -> io::Result<Fil
 			return restore_headroom(&mut file, volume, synced_bytes, "filler sync ENOSPC");
 		}
 		synced_bytes += count;
+		available = available_bytes(volume)?;
 	}
-	Err(io::Error::other(
-		"APFS filler did not reach its target within the bounded write count",
-	))
+	refuse_fill_budget(&file, synced_bytes, available, last_count, MAX_FILL_STEPS)
+}
+
+fn refuse_fill_budget(
+	file: &File,
+	filled: usize,
+	available: usize,
+	last_count: usize,
+	observations: usize,
+) -> io::Result<FilledVolume> {
+	let metadata = fixture_io("inspect refused filler progress", file.metadata())?;
+	Err(io::Error::other(format!(
+		"APFS filler refused bounded progress after {observations} observations: filled={filled}, current_available={available}, last_count={last_count}, file_length={}, allocated_blocks={}",
+		metadata.len(),
+		metadata.blocks(),
+	)))
 }
 
 fn restore_headroom(
