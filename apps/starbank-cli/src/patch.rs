@@ -13,6 +13,12 @@ use crate::{
 const PATCH_SCHEMA_VERSION: u32 = 1;
 const MAX_PATCH_BYTES: usize = 1024 * 1024;
 const MAX_PATCH_OPERATIONS: usize = 4_096;
+const INVALID_SCHEMA_MESSAGE: &str = "The patch does not match the versioned JSON schema.";
+
+#[derive(Deserialize)]
+struct PatchVersion {
+	schema_version: u32,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -118,15 +124,16 @@ impl Patch {
 		observed_sha256: &[u8; SHA256_BYTES],
 	) -> Result<Self, Failure> {
 		let file = input::read(path, MAX_PATCH_BYTES)?;
-		let patch: Self = serde_json::from_slice(file.bytes())
-			.map_err(|_| invalid("The patch does not match the versioned JSON schema."))?;
-		if patch.schema_version != PATCH_SCHEMA_VERSION {
-			return Err(Failure::new(
-				Status::Unsupported,
-				ErrorCode::UnsupportedPatchVersion,
-				"The patch schema version is unsupported.",
-			));
+		let bytes = file.bytes();
+		// Probe named versions early. Positional patches retain their strict Serde decode.
+		if bytes.trim_ascii_start().starts_with(b"{") {
+			let version: PatchVersion =
+				serde_json::from_slice(bytes).map_err(|_| invalid(INVALID_SCHEMA_MESSAGE))?;
+			check_schema_version(version.schema_version)?;
 		}
+		let patch: Self =
+			serde_json::from_slice(bytes).map_err(|_| invalid(INVALID_SCHEMA_MESSAGE))?;
+		check_schema_version(patch.schema_version)?;
 		if patch.operations.is_empty() || patch.operations.len() > MAX_PATCH_OPERATIONS {
 			return Err(invalid("The patch must contain between 1 and 4,096 edits."));
 		}
@@ -292,6 +299,17 @@ fn flush_values(session: &mut Session, edits: &mut Vec<ValueChange<'_>>) -> Resu
 
 fn missing() -> Failure {
 	invalid("A patch occurrence was not found in the bank.")
+}
+
+fn check_schema_version(version: u32) -> Result<(), Failure> {
+	if version != PATCH_SCHEMA_VERSION {
+		return Err(Failure::new(
+			Status::Unsupported,
+			ErrorCode::UnsupportedPatchVersion,
+			"The patch schema version is unsupported.",
+		));
+	}
+	Ok(())
 }
 
 fn invalid(message: &'static str) -> Failure {
