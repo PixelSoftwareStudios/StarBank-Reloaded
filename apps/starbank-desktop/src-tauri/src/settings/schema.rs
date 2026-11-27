@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{num::NonZeroUsize, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,6 +27,8 @@ pub(super) struct AppSettings {
 	wrap_raw: bool,
 	group_numbers: bool,
 	automatic_backup: AutomaticBackup,
+	#[serde(default)]
+	map_index_workers: MapIndexWorkers,
 }
 
 impl Default for AppSettings {
@@ -45,6 +47,7 @@ impl Default for AppSettings {
 			wrap_raw: false,
 			group_numbers: true,
 			automatic_backup: AutomaticBackup::FirstOverwrite,
+			map_index_workers: MapIndexWorkers::Auto,
 		}
 	}
 }
@@ -55,6 +58,10 @@ impl AppSettings {
 			auto_resign_on_save: self.auto_resign_on_save,
 			automatic_backup: self.automatic_backup,
 		}
+	}
+
+	pub(super) fn map_index_worker_limit(self) -> Option<NonZeroUsize> {
+		self.map_index_workers.limit()
 	}
 
 	pub(super) fn decode(bytes: &[u8]) -> Result<Self, SettingsIssue> {
@@ -91,6 +98,7 @@ impl AppSettings {
 			SettingChange::WrapRaw(value) => self.wrap_raw = value,
 			SettingChange::GroupNumbers(value) => self.group_numbers = value,
 			SettingChange::AutomaticBackup(value) => self.automatic_backup = value,
+			SettingChange::MapIndexWorkers(value) => self.map_index_workers = value,
 		}
 		Ok(())
 	}
@@ -117,6 +125,34 @@ pub(crate) enum SettingChange {
 	WrapRaw(bool),
 	GroupNumbers(bool),
 	AutomaticBackup(AutomaticBackup),
+	MapIndexWorkers(MapIndexWorkers),
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum MapIndexWorkers {
+	#[default]
+	#[serde(rename = "auto")]
+	Auto,
+	#[serde(rename = "1")]
+	One,
+	#[serde(rename = "2")]
+	Two,
+	#[serde(rename = "3")]
+	Three,
+	#[serde(rename = "4")]
+	Four,
+}
+
+impl MapIndexWorkers {
+	fn limit(self) -> Option<NonZeroUsize> {
+		NonZeroUsize::new(match self {
+			Self::Auto => return None,
+			Self::One => 1,
+			Self::Two => 2,
+			Self::Three => 3,
+			Self::Four => 4,
+		})
+	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

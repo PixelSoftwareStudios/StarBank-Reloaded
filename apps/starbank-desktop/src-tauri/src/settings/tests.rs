@@ -44,6 +44,65 @@ impl Sandbox {
 }
 
 #[test]
+fn old_v1_settings_preserve_existing_fields_and_each_worker_limit_persists()
+-> Result<(), Box<dyn Error>> {
+	let sandbox = Sandbox::new()?;
+	let mut old = serde_json::to_value(AppSettings::default())?;
+	old["theme"] = "dark".into();
+	old.as_object_mut()
+		.expect("settings object")
+		.remove("mapIndexWorkers");
+	let original = serde_json::to_vec(&old)?;
+	sandbox.write_current(&original)?;
+
+	assert_eq!(sandbox.store().map_index_worker_limit()?, None);
+	assert_eq!(fs::read(sandbox.current())?, original);
+	for (choice, expected) in [
+		("1", Some(1)),
+		("2", Some(2)),
+		("3", Some(3)),
+		("4", Some(4)),
+		("auto", None),
+	] {
+		let change = serde_json::from_value(serde_json::json!({
+			"key": "mapIndexWorkers",
+			"value": choice
+		}))?;
+		sandbox.store().change(change)?;
+		let reopened = sandbox.store();
+		assert_eq!(
+			reopened
+				.map_index_worker_limit()?
+				.map(std::num::NonZeroUsize::get),
+			expected,
+		);
+		let snapshot = serde_json::to_value(reopened.load()?)?;
+		assert_eq!(snapshot["settings"]["mapIndexWorkers"], choice);
+		assert_eq!(snapshot["settings"]["theme"], "dark");
+	}
+
+	for value in [
+		serde_json::json!("5"),
+		serde_json::json!(1),
+		serde_json::Value::Null,
+	] {
+		assert!(
+			serde_json::from_value::<SettingChange>(serde_json::json!({
+				"key": "mapIndexWorkers",
+				"value": value
+			}))
+			.is_err()
+		);
+		old["mapIndexWorkers"] = value;
+		assert_eq!(
+			AppSettings::decode(&serde_json::to_vec(&old)?),
+			Err(SettingsIssue::InvalidSettings)
+		);
+	}
+	Ok(())
+}
+
+#[test]
 fn separate_backup_preferences_survive_regular_preference_edits() -> Result<(), Box<dyn Error>> {
 	let sandbox = Sandbox::new()?;
 	let store = sandbox.store();

@@ -60,6 +60,36 @@ describe("browser preferences", () => {
     );
   });
 
+  test("migrates v1 settings without dropping existing settings or worker choices", () => {
+    const defaults = defaultSettings();
+    const { mapIndexWorkers: disappeared, ...legacy } = defaults;
+    expect(disappeared).toBe("auto");
+    const original = JSON.stringify({ ...legacy, theme: "dark" });
+    const storage = mockStorage(original);
+    expect(readBrowserSettings(storage)).toEqual({
+      kind: "loaded",
+      settings: { ...defaults, theme: "dark" },
+    });
+    expect(storage.getItem(BROWSER_SETTINGS_KEY)).toBe(original);
+
+    for (const mapIndexWorkers of ["1", "2", "3", "4", "auto"] as const) {
+      const next = { ...defaults, theme: "dark", mapIndexWorkers } as const;
+      expect(writeBrowserSettings(next, storage)).toEqual({ kind: "saved" });
+      expect(readBrowserSettings(storage)).toEqual({
+        kind: "loaded",
+        settings: next,
+      });
+    }
+    for (const invalid of ["0", "5", 1, null]) {
+      expect(
+        decodeSettings(JSON.stringify({ ...legacy, mapIndexWorkers: invalid })),
+      ).toEqual({
+        kind: "error",
+        issue: "invalid_settings",
+      });
+    }
+  });
+
   test("retains corrupt settings until explicitly recovered", () => {
     const storage = mockStorage("{");
     const current = defaultSettings();
@@ -231,6 +261,35 @@ test("settings render manual folder and backup controls only when available", ()
   expect(desktop).toContain("Choose your previous bank folder again");
   expect(desktop).toContain("Player One");
   expect(desktop).toContain("without an automatic backup");
+});
+
+test("the map index worker selector is native-only and respects read-only preferences", () => {
+  const noChange = () => undefined;
+  const shared = {
+    settings: { ...defaultSettings(), mapIndexWorkers: "2" },
+    onChange: noChange,
+    onBack: noChange,
+    readOnly: true,
+  } as const;
+  const browser = renderToStaticMarkup(
+    <SettingsPage
+      {...shared}
+      platformInfo={{ version: "0.1.0", platform: "web" }}
+    />,
+  );
+  expect(browser).toContain("Map indexing is available in the desktop app.");
+  expect(browser).not.toContain("Map index workers");
+  const desktop = renderToStaticMarkup(
+    <SettingsPage
+      {...shared}
+      platformInfo={{ version: "0.1.0", platform: "macos" }}
+    />,
+  );
+  expect(desktop).toContain("Map index workers</span><select disabled=");
+  expect(desktop).toContain(
+    '<option value="2" selected="">At most 2 workers</option>',
+  );
+  expect(desktop).toContain("Applies to the next scan.");
 });
 
 test("settings offer map index rebuild alongside refresh when supported", () => {

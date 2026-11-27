@@ -36,6 +36,8 @@ export function decodeBackupPreferences(input: unknown): BackupPreferences {
   return v.parse(backupPreferencesSchema, input);
 }
 
+const mapIndexWorkersSchema = v.picklist(["auto", "1", "2", "3", "4"]);
+
 const settingsSchema = v.strictObject({
   version: v.literal(SETTINGS_VERSION),
   hideBlizzardMaps: v.boolean(),
@@ -54,6 +56,7 @@ const settingsSchema = v.strictObject({
   wrapRaw: v.boolean(),
   groupNumbers: v.boolean(),
   automaticBackup: v.picklist(["first-overwrite", "every-overwrite", "off"]),
+  mapIndexWorkers: v.optional(mapIndexWorkersSchema, "auto"),
 });
 
 export type AppSettings = Readonly<v.InferOutput<typeof settingsSchema>>;
@@ -72,6 +75,7 @@ const defaults: AppSettings = {
   wrapRaw: false,
   groupNumbers: true,
   automaticBackup: "first-overwrite",
+  mapIndexWorkers: "auto",
 };
 
 export function defaultSettings(): AppSettings {

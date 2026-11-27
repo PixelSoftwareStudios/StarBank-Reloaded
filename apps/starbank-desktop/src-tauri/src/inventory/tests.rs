@@ -411,6 +411,10 @@ fn explicit_map_index_rebuild_uses_the_same_bank_authority_and_cancel_boundary()
 	let service = InventoryService::with_cache_path(Some(cache.clone()));
 	let initial = manual_snapshot(&service, &bank_root, &roots)?;
 	assert_eq!(initial["canRebuildMapIndex"], true);
+	let refresh = service
+		.scan_with_workers(ScanMode::Refresh, &roots, NonZeroUsize::new(1), |_| {})
+		.expect("refresh with the saved one-worker limit");
+	assert_eq!(serialize_snapshot(refresh)?["banks"], initial["banks"]);
 	let bank_id = initial["banks"][0]["id"].as_str().expect("bank id");
 	let previous_cache = fs::read(&cache)?;
 	fs::write(&archive, RIVAL)?;
@@ -418,9 +422,9 @@ fn explicit_map_index_rebuild_uses_the_same_bank_authority_and_cancel_boundary()
 	let cancelled = service.scan_with_progress(ScanMode::RebuildMapIndex, &roots, |event| {
 		let message = serde_json::to_value(event).expect("progress JSON");
 		if message["stage"] == "inspecting_archives" {
-			assert_eq!(message["generation"], "2");
+			assert_eq!(message["generation"], "3");
 			assert_eq!(message["completed"], 1);
-			service.cancel(2).expect("cancel rebuild");
+			service.cancel(3).expect("cancel rebuild");
 		}
 	});
 	assert!(matches!(cancelled, Err(InventoryError::Cancelled)));
@@ -434,8 +438,13 @@ fn explicit_map_index_rebuild_uses_the_same_bank_authority_and_cancel_boundary()
 	);
 
 	let rebuilt = service
-		.scan_with_roots(ScanMode::RebuildMapIndex, &roots)
-		.expect("rebuild after cancellation");
+		.scan_with_workers(
+			ScanMode::RebuildMapIndex,
+			&roots,
+			NonZeroUsize::new(2),
+			|_| {},
+		)
+		.expect("rebuild with the new saved two-worker limit");
 	let rebuilt = serialize_snapshot(rebuilt)?;
 	assert_eq!(rebuilt["maps"][0]["name"], "A Different Map");
 	assert_eq!(rebuilt["banks"], initial["banks"]);

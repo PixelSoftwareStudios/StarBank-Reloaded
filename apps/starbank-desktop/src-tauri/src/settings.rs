@@ -6,7 +6,7 @@ mod store;
 #[cfg(test)]
 mod tests;
 
-use std::{fmt, path::PathBuf};
+use std::{fmt, num::NonZeroUsize, path::PathBuf};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager as _};
@@ -97,6 +97,14 @@ impl SettingsStore {
 	/// Invalid or unavailable settings cannot supply an effective save policy.
 	pub(crate) fn save_preferences(&self) -> Result<SavePreferences, SettingsIssue> {
 		Ok(self.load()?.settings.save_preferences())
+	}
+
+	/// Reads the current map indexing worker preference.
+	///
+	/// # Errors
+	/// Invalid or unavailable settings cannot supply a saved worker limit.
+	pub(crate) fn map_index_worker_limit(&self) -> Result<Option<NonZeroUsize>, SettingsIssue> {
+		Ok(self.load()?.settings.map_index_worker_limit())
 	}
 
 	/// Reads the legacy folder as a picker hint for the native inventory.

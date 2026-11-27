@@ -83,6 +83,14 @@ const BACKUP_POLICIES: readonly Choice<AppSettings["automaticBackup"]>[] = [
   ["off", "Off"],
 ];
 
+const MAP_INDEX_WORKERS: readonly Choice<AppSettings["mapIndexWorkers"]>[] = [
+  ["auto", "Auto"],
+  ["1", "At most 1 worker"],
+  ["2", "At most 2 workers"],
+  ["3", "At most 3 workers"],
+  ["4", "At most 4 workers"],
+];
+
 export function SettingsPage({
   settings,
   onChange,
@@ -254,6 +262,26 @@ export function SettingsPage({
       </Group>
       {platformInfo && (
         <Group title="Advanced">
+          {platformInfo.platform === "web" ? (
+            <p className="settings-page-note">
+              Map indexing is available in the desktop app.
+            </p>
+          ) : (
+            <>
+              <ChoiceField
+                label="Map index workers"
+                choices={MAP_INDEX_WORKERS}
+                selected={settings.mapIndexWorkers}
+                onChange={(value) => onChange("mapIndexWorkers", value)}
+                disabled={readOnly}
+              />
+              <p className="settings-page-note">
+                Applies to the next scan. Indexing uses up to four workers and
+                never more than half the available CPUs when there are at least
+                two.
+              </p>
+            </>
+          )}
           <SettingsPlatformDetails info={platformInfo} />
         </Group>
       )}
@@ -304,17 +332,20 @@ function ChoiceField<Value extends string>({
   choices,
   selected,
   onChange,
+  disabled,
 }: {
   label: string;
   choices: readonly Choice<Value>[];
   selected: Value;
   onChange: (value: Value) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="settings-page-choice">
       <span>{label}</span>
       <select
         value={selected}
+        disabled={disabled}
         onChange={(event) => {
           const current = event.currentTarget.value;
           const choice = choices.find(([value]) => value === current);

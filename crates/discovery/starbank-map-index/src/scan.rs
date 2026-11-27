@@ -1,6 +1,7 @@
 use std::{
 	error::Error,
 	fmt, io,
+	num::NonZeroUsize,
 	path::{Path, PathBuf},
 	sync::{
 		Arc,
@@ -40,6 +41,8 @@ pub struct IndexLimits {
 	pub max_archive_bytes: u64,
 	/// Maximum aggregate stored metadata, before adding the inverted index.
 	pub max_metadata_bytes: usize,
+	/// Optional lower ceiling on map archive workers for this scan.
+	pub max_workers: Option<NonZeroUsize>,
 }
 
 impl Default for IndexLimits {
@@ -50,6 +53,7 @@ impl Default for IndexLimits {
 			max_archives: MAX_ARCHIVES,
 			max_archive_bytes: MAX_ARCHIVE_BYTES,
 			max_metadata_bytes: MAX_METADATA_BYTES,
+			max_workers: None,
 		}
 	}
 }
@@ -62,6 +66,7 @@ impl IndexLimits {
 			max_archives: self.max_archives.min(MAX_ARCHIVES),
 			max_archive_bytes: self.max_archive_bytes.min(MAX_ARCHIVE_BYTES),
 			max_metadata_bytes: self.max_metadata_bytes.min(MAX_METADATA_BYTES),
+			max_workers: self.max_workers,
 		}
 	}
 }
@@ -272,8 +277,7 @@ fn inspect_maps(
 	let mut retained = 0_usize;
 	let mut cache_hits = 0;
 	let mut completed = 0;
-	let worker_limit =
-		thread::available_parallelism().map_or(1, |cpus| (cpus.get() / 2).clamp(1, MAX_WORKERS));
+	let worker_limit = worker_limit(thread::available_parallelism().ok(), limits.max_workers);
 	process_work(
 		&enumeration.work,
 		worker_limit,
@@ -356,6 +360,11 @@ fn inspect_maps(
 
 fn sort_issues(issues: &mut [IndexIssue]) {
 	issues.sort_by(|left, right| left.path.cmp(&right.path));
+}
+
+fn worker_limit(available: Option<NonZeroUsize>, requested: Option<NonZeroUsize>) -> usize {
+	let automatic = available.map_or(1, |cpus| (cpus.get() / 2).clamp(1, MAX_WORKERS));
+	requested.map_or(automatic, |max| automatic.min(max.get()))
 }
 
 fn process_work(
@@ -441,3 +450,6 @@ fn metadata_size(path: &Path, metadata: &MapMetadata) -> usize {
 			.map(|name| std::mem::size_of::<String>() + name.len())
 			.sum::<usize>()
 }
+
+#[cfg(test)]
+mod worker_tests;

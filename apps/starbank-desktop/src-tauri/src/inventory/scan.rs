@@ -32,12 +32,18 @@ pub(super) enum MapCache<'a> {
 	Rebuild(&'a Path),
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct MapScanOptions<'a> {
+	pub(super) cache: MapCache<'a>,
+	pub(super) max_workers: Option<NonZeroUsize>,
+}
+
 type CollectedInventory = (Projection, Option<ManualRoot>, Option<PreparedCacheUpdate>);
 
 pub(super) fn collect_inventory(
 	manual: Option<&ManualRoot>,
 	map_roots: &[PathBuf],
-	cache: MapCache<'_>,
+	options: MapScanOptions<'_>,
 	ids: &OpaqueIds,
 	generation: u64,
 	cancellation: &Cancellation,
@@ -109,7 +115,7 @@ pub(super) fn collect_inventory(
 		.filter(|root| is_native_disk_path(root))
 		.cloned()
 		.collect::<Vec<_>>();
-	let cache_path = match cache {
+	let cache_path = match options.cache {
 		MapCache::Reuse(path) => path,
 		MapCache::Rebuild(path) => Some(path),
 	};
@@ -120,12 +126,13 @@ pub(super) fn collect_inventory(
 		limits: IndexLimits {
 			max_entries: MAP_SCAN_ENTRIES,
 			max_archives: MAP_SCAN_ARCHIVES,
+			max_workers: options.max_workers,
 			..IndexLimits::default()
 		},
 	};
 	progress.indexing_maps();
 	let notify = |update: starbank_map_index::Progress<'_>| progress.inspected_archive(update);
-	let result = match cache {
+	let result = match options.cache {
 		MapCache::Reuse(_) => scan_maps(request, cancellation, notify).map(|report| (report, None)),
 		MapCache::Rebuild(_) if roots.is_empty() => {
 			return Err(InventoryError::MapIndexRebuildFailed);

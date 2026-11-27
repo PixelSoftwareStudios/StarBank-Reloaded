@@ -1,10 +1,11 @@
-use std::{collections::BTreeMap, path::PathBuf, sync::Mutex};
+use std::{collections::BTreeMap, num::NonZeroUsize, path::PathBuf, sync::Mutex};
 
 use serde::Serialize;
 use starbank_map_index::{Cancellation, known_cache_roots};
-use tauri::{Manager as _, State, WebviewWindow, ipc::Channel};
+use tauri::{AppHandle, Manager as _, State, WebviewWindow, ipc::Channel};
 
 use crate::commands::{self, CommandError, DesktopEngine, OpenedBank};
+use crate::settings::SettingsStore;
 
 mod authority;
 mod backup_status;
@@ -26,7 +27,7 @@ use progress::InventoryProgressPublisher;
 use projection::OpaqueIds;
 pub(crate) use projection::{InventoryReason, InventorySnapshot, InventoryStatus};
 use root_record::{ManualRoot, RootRecordStore};
-use scan::{MapCache, check_cancelled, collect_inventory};
+use scan::{MapCache, MapScanOptions, check_cancelled, collect_inventory};
 
 const PICK_FOLDER_TITLE: &str = "Select SC2 Bank Folder";
 const OPEN_REQUEST: &str = "open";
@@ -152,8 +153,12 @@ impl InventoryService {
 		&self,
 		mode: ScanMode,
 		progress: Channel<InventoryProgress>,
+		app: &AppHandle,
 	) -> Result<InventorySnapshot, InventoryError> {
-		self.scan_with_progress(mode, &known_cache_roots(), |update| {
+		let max_workers = SettingsStore::for_app(app)
+			.and_then(|store| store.map_index_worker_limit())
+			.unwrap_or(None);
+		self.scan_with_workers(mode, &known_cache_roots(), max_workers, |update| {
 			// A closed webview must not interrupt a scan or its native state.
 			let _ = progress.send(update);
 		})
@@ -168,10 +173,21 @@ impl InventoryService {
 		self.scan_with_progress(mode, map_roots, |_| {})
 	}
 
+	#[cfg(test)]
 	fn scan_with_progress(
 		&self,
 		mode: ScanMode,
 		map_roots: &[PathBuf],
+		notify: impl FnMut(InventoryProgress),
+	) -> Result<InventorySnapshot, InventoryError> {
+		self.scan_with_workers(mode, map_roots, None, notify)
+	}
+
+	fn scan_with_workers(
+		&self,
+		mode: ScanMode,
+		map_roots: &[PathBuf],
+		max_workers: Option<NonZeroUsize>,
 		notify: impl FnMut(InventoryProgress),
 	) -> Result<InventorySnapshot, InventoryError> {
 		let rebuilding = matches!(mode, ScanMode::RebuildMapIndex);
@@ -186,7 +202,7 @@ impl InventoryService {
 		let ((mut snapshot, banks), accepted_root, rebuilt_cache) = collect_inventory(
 			lease.root.as_ref(),
 			map_roots,
-			cache,
+			MapScanOptions { cache, max_workers },
 			&lease.ids,
 			lease.generation,
 			&lease.cancellation,
@@ -322,7 +338,7 @@ pub(crate) async fn refresh_inventory(
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
-			.scan(ScanMode::Refresh, progress)
+			.scan(ScanMode::Refresh, progress, &app)
 	})
 	.await
 	.map_err(|_| InventoryError::Unavailable)?
@@ -336,7 +352,7 @@ pub(crate) async fn rebuild_map_index(
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
-			.scan(ScanMode::RebuildMapIndex, progress)
+			.scan(ScanMode::RebuildMapIndex, progress, &app)
 	})
 	.await
 	.map_err(|_| InventoryError::Unavailable)?
@@ -350,7 +366,7 @@ pub(crate) async fn use_automatic_inventory(
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
-			.scan(ScanMode::Automatic, progress)
+			.scan(ScanMode::Automatic, progress, &app)
 	})
 	.await
 	.map_err(|_| InventoryError::Unavailable)?
@@ -377,7 +393,7 @@ pub(crate) async fn select_inventory_folder(
 	let app = window.app_handle().clone();
 	tauri::async_runtime::spawn_blocking(move || {
 		app.state::<InventoryService>()
-			.scan(ScanMode::Manual(path), progress)
+			.scan(ScanMode::Manual(path), progress, &app)
 			.map(Some)
 	})
 	.await
