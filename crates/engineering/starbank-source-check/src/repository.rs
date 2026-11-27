@@ -8,6 +8,8 @@ use crate::layout::check_source;
 
 const RUST_PATHSPEC: &str = "*.rs";
 const ARCHIVE_EXCLUSION: &str = ":(exclude,top)original/";
+// Publisher formatting is preserved and checked by the vendored byte-integrity gate.
+const GLIB_VENDOR_EXCLUSION: &str = ":(exclude,top)crates/vendor/glib/";
 const GIT_SYMLINK_MODE: &[u8] = b"120000 ";
 
 pub(crate) fn run() -> ExitCode {
@@ -52,7 +54,12 @@ fn check_repository() -> io::Result<bool> {
 fn list_sources(options: &[&str]) -> io::Result<Vec<u8>> {
 	let mut args = vec!["ls-files", "-z"];
 	args.extend_from_slice(options);
-	args.extend_from_slice(&["--", RUST_PATHSPEC, ARCHIVE_EXCLUSION]);
+	args.extend_from_slice(&[
+		"--",
+		RUST_PATHSPEC,
+		ARCHIVE_EXCLUSION,
+		GLIB_VENDOR_EXCLUSION,
+	]);
 	git(&args)
 }
 

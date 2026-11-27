@@ -1,3 +1,4 @@
 # Preserve the archive and test fixture bytes across checkouts.
 /original/** -text
 /crates/**/tests/fixtures/** -text whitespace=cr-at-eol
+/crates/vendor/glib/** -text whitespace=-blank-at-eof

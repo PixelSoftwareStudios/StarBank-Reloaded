@@ -24,6 +24,10 @@ jobs:
       - run: rustup show
       - run: cargo fmt --all -- --check
       - run: python3 docs/verification/scripts/validate.py
+      - name: Verify the pinned GLib security backport
+        run: |
+          python3 crates/vendor/verification/glib/check.py
+          python3 crates/vendor/verification/glib/test_check.py
       - run: cargo run --locked -p starbank-source-check
 
   native:
