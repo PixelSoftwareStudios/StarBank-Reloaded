@@ -145,10 +145,36 @@ BOM-marked UTF-16 bank inputs. The map checks passed for a readable
 a path outside scope, a symlink, missing game provenance and a metadata
 mismatch. Their diagnostics remained redacted. Zero game banks and zero game maps were verified.
 
-An owner-authorized private capture remains necessary for the real-file
-parts of REQ-FMT-01, REQ-SIG-01 and REQ-MPQ-01. The runner can check local
-outputs after capture. In-game acceptance for REQ-SIG-03 also needs a
-separately authorized game-side verification.
+On November 27, 2026, the owner supplied an existing local Banks folder for
+read-only compatibility verification. Two UTF-8 banks were copied into a
+private temporary corpus outside the checkout. They contained 3,580 and
+5,268 bytes, with 5 and 7 sections and 38 and 58 values respectively. Both
+are recorded as `owner_file`; their original game build and capture steps
+are unknown. No bank payloads, identities, filenames, checksums, or private
+manifest were committed.
+
+Python's standard-library XML parser independently supplied the ordered
+projections. An independently assembled canonical byte stream and
+`hashlib` SHA-1 matched both stored signatures using the original folder
+and filename context. The pinned native and release WASM adapters agreed
+on every projected value, exact unchanged export, and exact re-signed
+output. The corpus runner also passed both explicit-context CLI inspection
+and required-signature checks. This run used Rust 1.100.0, Node 24.22.3 and
+wasm-bindgen 0.2.129 on macOS 14.7.2 arm64.
+
+Separate CLI checks on the copies rejected a wrong context, produced no
+files during signing and edit previews, created exclusive signed copies
+identical to their inputs, and applied one grouped integer edit per bank.
+An independent XML/SHA-1 check verified each edited result and its other
+projected values. Headless Chromium 159.0.8154.6 displayed all 96 original
+lexemes across Table and Raw view switches; the second import ran offline.
+No screenshots were taken. Re-reading the original files confirmed their
+bytes, size, file identity, mode, modification time and change time were
+unchanged.
+
+These results cover the two existing owner files. Broader game-version
+coverage, documented game captures, authorized game maps for REQ-MPQ-01,
+and game-side acceptance of edited files for REQ-SIG-03 remain open.
 
 [Format fixtures](../../crates/formats/sc2bank/tests/fixtures/README.md) ·
 [Map fixtures](../../crates/discovery/starbank-map-index/tests/fixtures/README.md) ·
