@@ -172,6 +172,12 @@ No screenshots were taken. Re-reading the original files confirmed their
 bytes, size, file identity, mode, modification time and change time were
 unchanged.
 
+Read-only native discovery against the supplied author folder found exactly
+the same two live banks and retained their account/player scope. CLI
+required-signature validation also passed for both originals without
+explicit context flags, using canonical path inference. Their bytes and
+recorded metadata remained unchanged after these checks.
+
 These results cover the two existing owner files. Broader game-version
 coverage, documented game captures, authorized game maps for REQ-MPQ-01,
 and game-side acceptance of edited files for REQ-SIG-03 remain open.
