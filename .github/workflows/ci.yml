@@ -63,6 +63,9 @@ jobs:
           STARBANK_ENOSPC_TMPFS="$fixture" cargo nextest run --workspace --locked \
             --run-ignored only --no-tests fail --success-output immediate \
             -E 'package(=starbank-fs) & binary(=linux_enospc)'
+      - name: Exercise APFS staging space exhaustion
+        if: runner.os == 'macOS'
+        run: sh crates/platform/starbank-fs/verification/macos-enospc.sh
       - name: Probe exclusive handle-relative NTFS publication
         if: runner.os == 'Windows'
         run: >-

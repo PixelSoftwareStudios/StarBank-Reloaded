@@ -26,7 +26,21 @@ These cases cover observable effects of process termination while the operating 
 
 A child-only `RLIMIT_FSIZE` fixture on macOS APFS used an 8 KiB buffer and ignored `SIGXFSZ`. The control write advanced by 1 KiB before the retry returned `EFBIG`. The public adapter returned the same native error while writing the stage for both Create New and Replace Expected. The parent verified the opened fingerprint and bytes, the absence of the new destination, and removal of the partial stages. A subsequent verified create confirmed that the directory lease was available. The fixture uses small disposable files and leaves the host's file-size limits unchanged. [Apple resource limits](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/setrlimit.2.html) [Apple write errors](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/write.2.html)
 
-This is an observed kernel write failure. Disk exhaustion, device sync errors, and power-loss ordering require separate evidence.
+This is an observed kernel write failure. The capacity test below supplies separate disk-exhaustion evidence. Device sync errors and power-loss ordering remain open.
+
+### APFS capacity exhaustion
+
+On macOS 14.7.2 arm64 with Rust 1.100.0, a headless 128 MiB sparse APFS image reported 134,176,768 bytes of filesystem capacity. The test wrote and synced 124,379,136 bytes of filler, leaving 8,388,608 bytes available. A native 16 MiB control write returned `ENOSPC` (28), with zero payload bytes accepted. Both Create New and Replace Expected then returned `RejectedUnchanged` with the same errno from `write pending file`.
+
+The original bank retained its complete fingerprint, bytes, mode and custom extended attribute. No new destination or owned pending file remained. Removing the filler recovered capacity and a small verified Create New succeeded, proving the lease was released. The guarded test also rejected an ordinary unmounted directory before creating fixtures. The harness detached its own image and removed the successful run's scratch files. Failed runs retain their detached image for diagnosis; failed mount inspection or detachment retains the fixture without deleting its backing file. [Test](../tests/macos_enospc.rs) · [Harness](macos-enospc.sh)
+
+```sh
+sh crates/platform/starbank-fs/verification/macos-enospc.sh
+```
+
+The harness requires macOS, the repository Rust toolchain, cargo-nextest and at least 1 GiB of free host space. It creates a private image under `/private/tmp`, verifies a distinct local APFS mount capped at 128 MiB, and only fills that fixture. The test stays ignored in ordinary runs; the harness requires one nonempty ignored-test run. The integrated run passed through cargo-nextest 0.9.151 (CI pins 0.9.152), and the normal filesystem suite passed 29 tests with three ignored qualification helpers. Formatting, strict Clippy, ShellCheck, the source gate and workflow validation passed. CI now invokes this harness on its macOS native leg; hosted execution remains unverified.
+
+This proves rejection under insufficient APFS staging capacity, not zero-free-block cleanup, device failure, failed synchronization or physical power loss. No game bank or existing volume was used.
 
 The earlier host probe used the same APFS type to verify the Darwin interfaces. The current tests exercise the product adapter with the configured writer synchronization, while the late-conflict fixture deliberately ignores the cooperative lease.
 
