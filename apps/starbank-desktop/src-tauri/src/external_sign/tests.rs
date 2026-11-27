@@ -39,7 +39,7 @@ fn revoked_and_cross_window_sources_are_refused() -> io::Result<()> {
 }
 
 #[test]
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
 fn create_only_export_keeps_source_and_consumes_the_handle() -> io::Result<()> {
 	let folder = tempfile::tempdir()?;
 	let root = folder.path().canonicalize()?;

@@ -317,19 +317,14 @@ fn publish(
 ) -> Result<OpenedBank, CommandError> {
 	let state = app.state::<DesktopEngine>();
 	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-	let (selected, _) = session.selected_for(target)?;
-	session
-		.editor
-		.validate_native_active_save(&prepared.receipt)
-		.map_err(write_rejected)?;
-	let overwrite = matches!(prepared.destination, Destination::Overwrite { .. });
-	let effect = match prepared.destination {
+	match prepared.destination {
 		Destination::Overwrite { with_backup } => {
+			let selected = validate_save(&session, target, &prepared.receipt)?;
 			let expected = trusted_fingerprint(selected)?.clone();
 			if selected.path != prepared.path {
 				return Err(CommandError::Unavailable);
 			}
-			backup::overwrite(
+			let effect = backup::overwrite(
 				app,
 				&mut session,
 				&prepared.path,
@@ -337,18 +332,51 @@ fn publish(
 				prepared.receipt.bytes(),
 				with_backup,
 				prepared.automatic_backup,
-			)?
+			)?;
+			finish_save(&mut session, target, prepared, effect)
 		}
-		Destination::Create(_) => NativeBackupEffect {
-			backup: None,
-			commit: starbank_fs::commit(
-				&prepared.path,
-				prepared.receipt.bytes(),
-				CommitIntent::CreateNew,
-				max_attachment_bytes(),
-			),
-		},
+		Destination::Create(_) => publish_save_as(&mut session, target, prepared),
+	}
+}
+
+fn validate_save<'a>(
+	session: &'a DesktopSession,
+	target: &ActiveTarget,
+	receipt: &NativeSaveReceipt,
+) -> Result<&'a SelectedBank, CommandError> {
+	let (selected, _) = session.selected_for(target)?;
+	session
+		.editor
+		.validate_native_active_save(receipt)
+		.map_err(write_rejected)?;
+	Ok(selected)
+}
+
+fn publish_save_as(
+	session: &mut DesktopSession,
+	target: &ActiveTarget,
+	prepared: PreparedSave,
+) -> Result<OpenedBank, CommandError> {
+	validate_save(session, target, &prepared.receipt)?;
+	let effect = NativeBackupEffect {
+		backup: None,
+		commit: starbank_fs::commit(
+			&prepared.path,
+			prepared.receipt.bytes(),
+			CommitIntent::CreateNew,
+			max_attachment_bytes(),
+		),
 	};
+	finish_save(session, target, prepared, effect)
+}
+
+fn finish_save(
+	session: &mut DesktopSession,
+	target: &ActiveTarget,
+	prepared: PreparedSave,
+	effect: NativeBackupEffect,
+) -> Result<OpenedBank, CommandError> {
+	let overwrite = matches!(prepared.destination, Destination::Overwrite { .. });
 	let context = WriteContext {
 		operation: if overwrite {
 			RecoveryOperation::SaveOverwrite
@@ -358,13 +386,13 @@ fn publish(
 		destination: &prepared.path,
 		backup: effect.backup.as_ref(),
 	};
-	let committed = verify_write(&mut session, effect.commit, context)?;
+	let committed = verify_write(session, effect.commit, context)?;
 	session.conflict.invalidate();
 	let id = target.document_id.clone();
 	let acknowledged = session
 		.editor
 		.acknowledge_verified_native_active_save(prepared.receipt);
-	let revision = verified_result(&mut session, context, &committed, acknowledged)?;
+	let revision = verified_result(session, context, &committed, acknowledged)?;
 
 	session.backup_selection = None;
 	if !overwrite {
@@ -376,7 +404,7 @@ fn publish(
 		fingerprint: Some(committed.fingerprint().clone()),
 	});
 	let snapshot = session.snapshot(&target.request_id, id, revision, &prepared.path);
-	verified_result(&mut session, context, &committed, snapshot)
+	verified_result(session, context, &committed, snapshot)
 }
 
 pub(crate) fn trusted_fingerprint(selected: &SelectedBank) -> Result<&Fingerprint, CommandError> {

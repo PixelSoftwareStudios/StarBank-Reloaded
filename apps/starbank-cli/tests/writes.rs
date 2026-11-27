@@ -1,4 +1,4 @@
-#![cfg(any(target_os = "macos", target_os = "linux"))]
+#![cfg(any(target_os = "macos", target_os = "linux", windows))]
 
 use std::{collections::BTreeSet, ffi::OsString, fs, path::Path};
 
@@ -188,6 +188,7 @@ fn sign_requires_an_explicit_target_for_effect_and_verifies_lossless_output() {
 
 #[test]
 fn backup_catalog_survives_reopening_and_validates_snapshot_integrity() {
+	const METADATA_SUFFIX: &str = ".json";
 	let fixture = Fixture::new();
 	let source = fixture.write("Source.sc2bank", SOURCE);
 	let create = || {
@@ -210,11 +211,20 @@ fn backup_catalog_survives_reopening_and_validates_snapshot_integrity() {
 		first_path, second_path,
 		"a second backup must never clobber the first"
 	);
-	assert_eq!(fs::read_to_string(first_path).expect("read backup"), SOURCE);
-	assert_eq!(
-		fs::read_to_string(second_path).expect("read backup"),
-		SOURCE
-	);
+	let expected_sha256 = hex::encode(Sha256::digest(SOURCE.as_bytes()));
+	for (snapshot, report) in [(first_path, &first), (second_path, &second)] {
+		assert_eq!(Path::new(snapshot).parent(), source.parent());
+		assert_eq!(fs::read(snapshot).expect("read backup"), SOURCE.as_bytes());
+		assert_eq!(report["result"]["health"], "verified");
+		assert_eq!(report["result"]["sha256"], expected_sha256);
+		let metadata = fs::read(format!("{snapshot}{METADATA_SUFFIX}"))
+			.expect("read adjacent backup metadata");
+		let metadata: serde_json::Value =
+			serde_json::from_slice(&metadata).expect("parse durable backup metadata");
+		assert_eq!(metadata["sha256"], expected_sha256);
+		assert_eq!(metadata["byte_length"], SOURCE.len());
+	}
+	assert_eq!(fs::read(&source).expect("read original"), SOURCE.as_bytes());
 
 	let list = || {
 		command()
@@ -268,14 +278,13 @@ fn backup_restore_previews_exact_bytes_and_preserves_reversal_on_commit() {
 			.args(["--expected-current-sha256", digest, "--json"]);
 		command
 	};
+	let before = file_names(&fixture.path);
 	let failed = restore(&"0".repeat(64))
 		.output()
 		.expect("restore stale target");
 	assert_eq!(json(&failed, 5)["error"]["code"], "input_changed");
+	assert_eq!(file_names(&fixture.path), before);
 
-	let before_count = fs::read_dir(&fixture.path)
-		.expect("enumerate fixture")
-		.count();
 	let dry_run = restore(&known_digest)
 		.arg("--dry-run")
 		.output()
@@ -288,12 +297,7 @@ fn backup_restore_previews_exact_bytes_and_preserves_reversal_on_commit() {
 		create["result"]["sha256"]
 	);
 	assert_eq!(fs::read_to_string(&source).expect("read live"), current);
-	assert_eq!(
-		fs::read_dir(&fixture.path)
-			.expect("enumerate fixture")
-			.count(),
-		before_count
-	);
+	assert_eq!(file_names(&fixture.path), before);
 
 	let commit = restore(&known_digest)
 		.output()
@@ -309,16 +313,15 @@ fn backup_restore_previews_exact_bytes_and_preserves_reversal_on_commit() {
 		);
 		assert_eq!(fs::read_to_string(&source).expect("read live"), SOURCE);
 	}
-	#[cfg(target_os = "linux")]
+	#[cfg(any(target_os = "linux", windows))]
 	{
 		assert_eq!(json(&commit, 7)["error"]["code"], "unsupported_storage");
 		assert_eq!(fs::read_to_string(&source).expect("read live"), current);
 		assert_eq!(
-			fs::read_dir(&fixture.path)
-				.expect("enumerate fixture")
-				.count(),
-			before_count
+			fs::read(historic).expect("read historical backup"),
+			SOURCE.as_bytes()
 		);
+		assert_eq!(file_names(&fixture.path), before);
 	}
 }
 

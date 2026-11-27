@@ -14,7 +14,7 @@ mod backup_storage;
 mod contract;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod native;
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 mod unsupported;
 #[cfg(windows)]
 mod windows;
@@ -42,8 +42,8 @@ pub use starbank_backup::{
 	RetentionPolicy,
 };
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
-pub use unsupported::read_snapshot;
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-pub use unsupported::{check_replace_scope, commit};
+pub use unsupported::{check_replace_scope, commit, read_snapshot};
 #[cfg(windows)]
-pub use windows::{WindowsDirectoryIdentity, WindowsFileIdentity, read_snapshot};
+pub use windows::{
+	WindowsDirectoryIdentity, WindowsFileIdentity, check_replace_scope, commit, read_snapshot,
+};

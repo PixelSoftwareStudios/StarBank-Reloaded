@@ -1,4 +1,4 @@
-//! Candidate Windows create-only transaction. Public platform activation is separate.
+//! Verified Windows create-only transaction on ordinary local NTFS.
 
 use super::{
 	Observation,

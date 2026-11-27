@@ -1,4 +1,4 @@
-//! Windows read-only snapshots of ordinary local files.
+//! Windows snapshots and verified create-only persistence of ordinary local files.
 #![allow(
 	unsafe_code,
 	reason = "Win32 handle operations are isolated in this platform boundary"
@@ -31,16 +31,12 @@ use windows_sys::Win32::{
 	System::WindowsProgramming::{DRIVE_CDROM, DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOVABLE},
 };
 
-use crate::{FileSnapshot, Fingerprint, StorageError};
+use crate::{CommitIntent, CommitOutcome, FileSnapshot, Fingerprint, StorageError};
 
-#[cfg(test)]
 mod create;
 mod identity;
-#[cfg(test)]
 mod publication;
-#[cfg(test)]
 mod stage_security;
-#[cfg(test)]
 mod sync;
 
 pub use identity::{WindowsDirectoryIdentity, WindowsFileIdentity};
@@ -50,6 +46,7 @@ const SPECIAL_ATTRIBUTES: u32 = FILE_ATTRIBUTE_DEVICE
 	| FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
 	| FILE_ATTRIBUTE_RECALL_ON_OPEN
 	| FILE_ATTRIBUTE_REPARSE_POINT;
+const REPLACEMENT_UNAVAILABLE: &str = "verified native replacement is unavailable on Windows";
 const DIRECTORY_ACCESS: u32 = FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE;
 const LOCAL_ROOT_GUID_CAPACITY: u32 = 64;
 const NO_REPARSE_OR_RECALL: u32 = FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_OPEN_NO_RECALL;
@@ -121,6 +118,32 @@ impl Observation {
 			modified: basic.LastWriteTime,
 			changed: basic.ChangeTime,
 		})
+	}
+}
+
+/// Checks whether verified native replacement is available.
+///
+/// # Errors
+///
+/// Always returns [`StorageError::Unsupported`] on Windows.
+pub fn check_replace_scope(_path: &Path) -> Result<(), StorageError> {
+	Err(StorageError::Unsupported(REPLACEMENT_UNAVAILABLE))
+}
+
+/// Publishes a new file in a qualified local NTFS directory below the drive root.
+///
+/// Replacement is rejected before opening either the source or destination.
+pub fn commit(
+	path: &Path,
+	bytes: &[u8],
+	intent: CommitIntent<'_>,
+	max_bytes: usize,
+) -> CommitOutcome {
+	match intent {
+		CommitIntent::CreateNew => create::commit_candidate(path, bytes, max_bytes),
+		CommitIntent::ReplaceExpected(_) => {
+			CommitOutcome::RejectedUnchanged(StorageError::Unsupported(REPLACEMENT_UNAVAILABLE))
+		}
 	}
 }
 

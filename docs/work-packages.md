@@ -70,7 +70,8 @@ Depends on: 04,05.
 - [x] Verify the APFS save, backup and restore paths with a synthetic bank. Exercise process termination and retained bytes around replacement. [Native storage evidence](../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
 - [x] Exercise staging space exhaustion on disposable APFS and Linux tmpfs fixtures. Verify refusal before publication and preservation of existing bank bytes. [Storage fault evidence](../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
 - [x] Verify sibling and distinct-root create-only rename and collision refusal in the hosted Windows local NTFS probe. [Probe evidence](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md#hosted-ntfs-probe)
-- [ ] Qualify production Windows NTFS create-only and replacement separately. Windows storage remains read-only. Qualify Linux replacement with hidden metadata and physical power-loss recovery. [Windows create probe](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md) · [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
+- [x] Qualify the Windows local NTFS create-only transaction under a reduced token, including collisions, process interruption, real staging disk-full rejection and explicit verified retry. [Windows create evidence](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md)
+- [ ] Complete native Windows CLI/app create-copy integration checks. Qualify Windows replacement separately, Linux replacement with hidden metadata and physical power-loss recovery. [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 

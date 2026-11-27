@@ -5,7 +5,9 @@ use std::io;
 use std::os::windows::fs::OpenOptionsExt;
 use std::path::Path;
 
-use starbank_fs::{CommitIntent, CommitOutcome, StorageError, commit, read_snapshot};
+use starbank_fs::{
+	CommitIntent, CommitOutcome, StorageError, check_replace_scope, commit, read_snapshot,
+};
 use windows_sys::Win32::{
 	Foundation::ERROR_SHARING_VIOLATION,
 	Storage::FileSystem::{FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE},
@@ -121,13 +123,26 @@ fn rejects_file_and_parent_reparse_points() -> io::Result<()> {
 }
 
 #[test]
-fn windows_commit_rejects_before_opening_the_target() -> io::Result<()> {
+fn windows_replacement_remains_unavailable() -> io::Result<()> {
 	let directory = tempfile::TempDir::new()?;
 	let file = directory.path().join("Destination.SC2Bank");
+	fs::write(&file, b"original")?;
+	let original = read_snapshot(&file, MAX_BYTES).expect("read occupied target");
 	assert!(matches!(
-		commit(&file, b"synthetic", CommitIntent::CreateNew, MAX_BYTES),
+		check_replace_scope(&file),
+		Err(StorageError::Unsupported(_))
+	));
+	assert!(matches!(
+		commit(
+			&file,
+			b"synthetic",
+			CommitIntent::ReplaceExpected(original.fingerprint()),
+			MAX_BYTES,
+		),
 		CommitOutcome::RejectedUnchanged(StorageError::Unsupported(_))
 	));
-	assert!(!file.exists());
+	let after = read_snapshot(&file, MAX_BYTES).expect("read unchanged target");
+	assert_eq!(after.fingerprint(), original.fingerprint());
+	assert_eq!(after.bytes(), original.bytes());
 	Ok(())
 }

@@ -30,7 +30,7 @@ pnpm --filter starbank-desktop run dev
 cargo run --locked -p starbank-cli -- --help
 ```
 
-The desktop app opens local banks and browses banks from an authorized SC2 folder. Verified overwrite and restore are available on qualified macOS APFS targets. macOS and Linux support create-only signed copies and confirmation-gated batch backups. Windows supports reading banks and editing in memory. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing, backups and read-only map metadata inspection. [CLI guide](apps/starbank-cli/README.md) · [Verified platform scope](docs/verification/IMPLEMENTATION.md) · [Local packages](docs/verification/DISTRIBUTION.md)
+The desktop app opens local banks and browses banks from an authorized SC2 folder. Verified overwrite and restore are available on qualified macOS APFS targets. macOS and Linux support create-only signed copies and confirmation-gated batch backups. Windows supports editing and create-only Save As, export and external signed copies in qualified local NTFS directories below the drive root; Windows overwrite, desktop backups, restore and save-on-close remain unavailable. The CLI supports JSON inspection, validation, diff, discovery, dry-run, patching, signing, backups and read-only map metadata inspection. [CLI guide](apps/starbank-cli/README.md) · [Verified platform scope](docs/verification/IMPLEMENTATION.md) · [Local packages](docs/verification/DISTRIBUTION.md)
 
 `just --list` lists the local test, build, and packaging recipes.
 

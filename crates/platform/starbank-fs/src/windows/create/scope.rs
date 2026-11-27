@@ -10,15 +10,15 @@ use sha2::{Digest as _, Sha256};
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{self, Read};
-use std::os::windows::io::{AsRawHandle, FromRawHandle};
+use std::os::windows::io::AsRawHandle;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use windows_sys::Win32::{
-	Foundation::{GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+	Foundation::GENERIC_READ,
 	Storage::FileSystem::{
 		FILE_CASE_SENSITIVE_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_GENERIC_WRITE,
 		FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE,
-		FileCaseSensitiveInfo, GetVolumeInformationByHandleW, READ_CONTROL, ReOpenFile,
+		FileCaseSensitiveInfo, GetVolumeInformationByHandleW, READ_CONTROL,
 	},
 };
 
@@ -153,7 +153,9 @@ fn open_writable_parent(
 	destination: &Path,
 ) -> Result<File, StorageError> {
 	let Some(grandparent) = directory._ancestors.last() else {
-		return reopen_drive_root(&directory.parent);
+		return Err(StorageError::Unsupported(
+			"creating files directly in a Windows drive root is unavailable",
+		));
 	};
 	let leaf = destination
 		.parent()
@@ -173,29 +175,6 @@ fn open_writable_parent(
 	cap_primitives::fs::open(grandparent, Path::new(leaf), &options).map_err(|error| {
 		StorageError::io("open writable directory relative to held ancestor", error)
 	})
-}
-
-fn reopen_drive_root(root: &File) -> Result<File, StorageError> {
-	// A scope with no ancestors uses the original Win32-opened drive root. ReOpenFile
-	// documents CreateFile-origin handles. An unsupported reopen fails before staging.
-	// https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-reopenfile
-	// SAFETY: root stays live; directory flags and no-delete sharing apply to the new handle.
-	let handle = unsafe {
-		ReOpenFile(
-			root.as_raw_handle(),
-			GENERIC_WRITE | FILE_READ_ATTRIBUTES | FILE_TRAVERSE,
-			DIRECTORY_SHARING,
-			DIRECTORY_FLAGS,
-		)
-	};
-	if handle == INVALID_HANDLE_VALUE {
-		return Err(StorageError::io(
-			"reopen writable drive root",
-			io::Error::last_os_error(),
-		));
-	}
-	// SAFETY: ReOpenFile transferred ownership of this successful handle.
-	Ok(unsafe { File::from_raw_handle(handle) })
 }
 
 fn require_ntfs(directory: &File) -> Result<(), StorageError> {

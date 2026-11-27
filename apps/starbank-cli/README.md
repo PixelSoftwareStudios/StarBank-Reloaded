@@ -38,7 +38,7 @@ Restore reports the projected `diff` and the snapshot's `signature` at the live 
 
 In-place writes and restores check that native storage supports replacing the live bank before creating an adjacent backup. A dry-run can preview the bytes even when the target is read-only.
 
-Native file reads and exclusive output creation are available on macOS and Linux. In-place replacement is currently limited to supported local APFS storage. The Windows adapter supports local read-only snapshots and discovery. Windows writes require a qualified replacement backend.
+Native file reads and exclusive output creation are available on macOS and Linux. Windows supports exclusive outputs and adjacent backup snapshots with JSON sidecars in qualified local NTFS directories below the drive root. Occupied destinations are never replaced. In-place replacement and restore remain limited to supported local APFS storage; Windows and Linux return unsupported before creating a protective backup or changing the live bank.
 
 ## Map metadata
 
