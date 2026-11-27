@@ -3,7 +3,10 @@ import {
   lazy,
   type ReactNode,
   Suspense,
+  useEffect,
+  useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -34,6 +37,10 @@ import {
 } from "./editor-actions";
 import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
+import {
+  type TableValidationRequest,
+  useTableDraftValidation,
+} from "./table-draft-validation";
 import { TableEditor } from "./table-editor";
 
 type EditorView = NonNullable<ReturnType<typeof useEditorState>["view"]>;
@@ -129,18 +136,51 @@ export function BankEditor({
   const target = { id: document.id, revision: document.revision };
   const tableDraft = draft?.kind === "table" ? draft : undefined;
   const rawDraft = draft?.kind === "raw" ? draft : undefined;
-  const prepared = tableDraft
-    ? prepareTableDraft(document.sections, tableDraft.values)
-    : undefined;
   const stale = draft !== undefined && draft.revision !== document.revision;
   const {
     onEditValues,
+    onValidateValues,
     onReplaceXml,
     onDraftChange,
     onStructure,
     onDiff,
     onRevert,
   } = controller;
+  const hasValidator = onValidateValues !== undefined;
+  const prepared = useMemo(() => {
+    if (!tableDraft) return undefined;
+    if (!hasValidator)
+      return prepareTableDraft(document.sections, tableDraft.values);
+    return {
+      edits: Array.from(tableDraft.values, ([id, value]) => ({ id, value })),
+      invalid: undefined,
+    };
+  }, [document.sections, tableDraft, hasValidator]);
+  const validationRequest = useMemo(
+    () =>
+      hasValidator && !stale && prepared?.edits.length
+        ? {
+            target: { id: document.id, revision: document.revision },
+            edits: prepared.edits,
+          }
+        : undefined,
+    [document.id, document.revision, hasValidator, prepared, stale],
+  );
+  const validation = useTableDraftValidation(
+    validationRequest,
+    onValidateValues,
+    busy,
+  );
+  const validationPending = validation?.kind === "pending";
+  const tableIssues =
+    validation?.kind === "checked" ? validation.issues : undefined;
+  const hasInvalidTableEdits = Boolean(
+    prepared?.invalid?.size || tableIssues?.size,
+  );
+  const [waitingTableSwitch, setWaitingTableSwitch] = useState<{
+    request: TableValidationRequest;
+    nextView: EditorView;
+  }>();
   const hasDraft = draft !== undefined || profileDraft !== undefined;
   const pending = busy || hasDraft;
   useLayoutEffect(() => {
@@ -277,7 +317,8 @@ export function BankEditor({
   }
 
   function applyTable(nextView?: EditorView) {
-    if (!prepared || prepared.invalid.size > 0 || !onEditValues) return;
+    if (!prepared || hasInvalidTableEdits || validationPending || !onEditValues)
+      return;
     if (prepared.edits.length > 0)
       submitDraft(
         "table",
@@ -330,19 +371,33 @@ export function BankEditor({
         submitDraft("raw", () => onReplaceXml(target, rawDraft.text), nextView);
       }
     } else if (selectedView === "table" && prepared) {
+      if (validationPending && validationRequest && onEditValues) {
+        setWaitingTableSwitch({ request: validationRequest, nextView });
+        return;
+      }
       const message = stale
         ? staleMessage
         : !onEditValues
           ? "The Table draft cannot currently be applied."
-          : prepared.invalid.size > 0
-            ? "Check the marked values. Use commas only between three-digit groups."
-            : undefined;
+          : (tableIssues?.values().next().value ??
+            (prepared.invalid?.size
+              ? "Check the marked values. Use commas only between three-digit groups."
+              : undefined));
       if (message) setDraftSwitch({ kind: "table", nextView, message });
       else applyTable(nextView);
     } else {
       showView(nextView);
     }
   }
+
+  const finishTableSwitch = useEffectEvent(selectView);
+  useEffect(() => {
+    if (!waitingTableSwitch) return;
+    const matching = waitingTableSwitch.request === validationRequest;
+    if (matching && (validationPending || busy)) return;
+    setWaitingTableSwitch(undefined);
+    if (matching) finishTableSwitch(waitingTableSwitch.nextView);
+  }, [busy, validationPending, validationRequest, waitingTableSwitch]);
 
   const tableVisible = selectedView === "table";
   const rawVisible = selectedView === "raw";
@@ -462,6 +517,10 @@ export function BankEditor({
             sections={document.sections}
             values={tableDraft?.values}
             invalid={prepared?.invalid}
+            issues={tableIssues}
+            validationError={
+              validation?.kind === "failed" ? validation.message : undefined
+            }
             canEdit={
               Boolean(onEditValues) &&
               !busy &&
@@ -652,7 +711,9 @@ export function BankEditor({
           <button
             className="editor-button editor-primary"
             type="button"
-            disabled={busy || stale || Boolean(prepared?.invalid.size)}
+            disabled={
+              busy || stale || hasInvalidTableEdits || validationPending
+            }
             onClick={apply}
           >
             {draft.kind === "raw" ? "Apply XML" : "Apply edits"}

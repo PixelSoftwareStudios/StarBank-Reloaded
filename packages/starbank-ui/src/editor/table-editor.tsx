@@ -36,6 +36,8 @@ export function TableEditor({
   sections,
   values,
   invalid,
+  issues,
+  validationError,
   canEdit,
   onChange,
   layout = "separate",
@@ -47,6 +49,8 @@ export function TableEditor({
   sections: readonly EditorSection[];
   values?: ReadonlyMap<string, string>;
   invalid?: ReadonlySet<string>;
+  issues?: ReadonlyMap<string, string>;
+  validationError?: string;
   canEdit: boolean;
   onChange: (rows: readonly EditorRow[], value: string) => void;
   layout?: "separate" | "unified";
@@ -181,7 +185,9 @@ export function TableEditor({
       groupNumbers && edited === undefined && row.id !== editing
         ? groupNumberLexeme(row.type, value)
         : value;
-    const invalidValue = invalid?.has(row.id) ?? false;
+    const issue = issues?.get(row.id);
+    const invalidValue = issue !== undefined || invalid?.has(row.id) === true;
+    const issueId = issue ? `${instructionsId}-${row.id}` : undefined;
     const name = rowLabel(row);
     return (
       <tr
@@ -241,7 +247,9 @@ export function TableEditor({
               aria-label={`${name} value`}
               aria-invalid={invalidValue || undefined}
               data-table-draft={edited !== undefined || undefined}
-              aria-describedby={invalidValue ? instructionsId : undefined}
+              aria-describedby={
+                issueId ?? (invalidValue ? instructionsId : undefined)
+              }
               data-bank-field={windowed ? "value" : undefined}
               readOnly={!editable}
               value={shownValue}
@@ -251,6 +259,11 @@ export function TableEditor({
             />
           ) : (
             <span>{shownValue}</span>
+          )}
+          {issueId && (
+            <span id={issueId} className="sr-only">
+              {issue}
+            </span>
           )}
         </td>
       </tr>
@@ -401,6 +414,16 @@ export function TableEditor({
         {hasHiddenDraft && (
           <p className="empty-message" role="status">
             The row filter hides some staged edits.
+          </p>
+        )}
+        {issues && issues.size > 0 && (
+          <p className="editor-error" role="status">
+            {[...new Set(issues.values())].join(" ")}
+          </p>
+        )}
+        {validationError && (
+          <p className="editor-error" role="status">
+            {validationError}
           </p>
         )}
         {invalid && invalid.size > 0 && (

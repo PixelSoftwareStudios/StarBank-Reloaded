@@ -554,6 +554,23 @@ function DesktopApp() {
         message: outcome.message ?? "The bank diff could not be read.",
       };
     },
+    onValidateValues: async (target, edits) => {
+      const { reply, bytes } = await dispatch(target, {
+        kind: "validate_values",
+        payload: { edits },
+      });
+      if (
+        reply.result.kind !== "value_validation" ||
+        reply.document_id !== target.id ||
+        reply.revision !== target.revision ||
+        bytes !== undefined
+      ) {
+        throw new Error(
+          "The bank engine did not check edits for this revision.",
+        );
+      }
+      return reply.result.payload.issues;
+    },
     onEditValues: (target, edits) =>
       update(target, { kind: "set_values", payload: { edits } }),
     onReplaceXml: (target, xml) =>

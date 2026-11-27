@@ -11,6 +11,8 @@ import {
   type EngineSnapshot,
   type EngineSourceEncoding,
   type EngineTarget,
+  type EngineValueEdit,
+  type EngineValueValidationIssue,
   engineRequest,
   profileLoadForFile,
 } from "starbank-engine-client/protocol";
@@ -135,6 +137,24 @@ export class BrowserBankSession {
       throw new Error("The bank engine did not return the opening backup.");
     }
     return bytes;
+  }
+
+  async validateValues(
+    target: EditorTarget,
+    edits: readonly EngineValueEdit[],
+  ): Promise<readonly EngineValueValidationIssue[]> {
+    const { reply, bytes } = await this.#dispatch(
+      { kind: "validate_values", payload: { edits } },
+      this.#target(target),
+    );
+    if (
+      reply.result.kind !== "value_validation" ||
+      reply.revision !== target.revision ||
+      bytes !== undefined
+    ) {
+      throw new Error("The bank engine did not check edits for this revision.");
+    }
+    return reply.result.payload.issues;
   }
 
   async diff(target: EditorTarget): Promise<EngineDiff> {

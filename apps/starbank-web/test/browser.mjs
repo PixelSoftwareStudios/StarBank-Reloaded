@@ -451,8 +451,29 @@ async function verify(name) {
     await context.addInitScript(() => {
       const BrowserWorker = globalThis.Worker;
       globalThis.Worker = class extends BrowserWorker {
+        #holdNextValidation = false;
+        #heldValidationId;
+
         constructor(url, options) {
           super(url, options);
+          globalThis.addEventListener("starbank-test-hold-validation", () => {
+            this.#holdNextValidation = true;
+          });
+          this.addEventListener("message", (event) => {
+            if (
+              this.#heldValidationId === undefined ||
+              event.data.id !== this.#heldValidationId
+            )
+              return;
+            event.stopImmediatePropagation();
+            this.#heldValidationId = undefined;
+            globalThis.releaseFixtureValidation = () => {
+              delete globalThis.releaseFixtureValidation;
+              this.dispatchEvent(
+                new MessageEvent("message", { data: event.data }),
+              );
+            };
+          });
           globalThis.addEventListener(
             "starbank-test-stop-worker",
             () => {
@@ -460,6 +481,17 @@ async function verify(name) {
             },
             { once: true },
           );
+        }
+
+        postMessage(request, transfer) {
+          if (
+            this.#holdNextValidation &&
+            JSON.parse(request.control).command.kind === "validate_values"
+          ) {
+            this.#holdNextValidation = false;
+            this.#heldValidationId = request.id;
+          }
+          super.postMessage(request, transfer);
         }
       };
       Object.defineProperty(navigator, "clipboard", {

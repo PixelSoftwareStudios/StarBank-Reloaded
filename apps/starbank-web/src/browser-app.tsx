@@ -46,6 +46,7 @@ export function StarBankWeb() {
   }, [preferences.settings.theme, preferences.settings.textSize]);
   const session = useRef<BrowserBankSession>(null);
   const actionInProgress = useRef(false);
+  const validationInProgress = useRef<Promise<unknown>>(null);
   const [document, setDocument] = useState<BrowserBankDocument>();
   const [openedFile, setOpenedFile] = useState<File>();
   const [busy, setBusy] = useState(false);
@@ -122,6 +123,9 @@ export function StarBankWeb() {
     actionInProgress.current = true;
     setBusy(true);
     try {
+      // A discarded draft can still have a read-only command in the worker.
+      const validation = validationInProgress.current;
+      if (validation) await validation.catch(() => {});
       return await action();
     } finally {
       actionInProgress.current = false;
@@ -158,6 +162,18 @@ export function StarBankWeb() {
     status,
     onDraftChange: setHasDraft,
     onOpenFile: maxBankBytes === undefined ? undefined : openBank,
+    onValidateValues: async (target, edits) => {
+      if (actionInProgress.current || validationInProgress.current)
+        throw new Error("Wait for the current bank action to finish.");
+      activeDocument(target);
+      const validation = bankSession().validateValues(target, edits);
+      validationInProgress.current = validation;
+      try {
+        return await validation;
+      } finally {
+        validationInProgress.current = null;
+      }
+    },
     onEditValues: (target, edits) =>
       apply(target, { kind: "set_values", payload: { edits } }),
     onStructure: (target, change) =>

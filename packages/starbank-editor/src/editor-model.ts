@@ -2,6 +2,7 @@ import type {
   EngineDiff,
   EngineRevertTarget,
   EngineStructureChange,
+  EngineValueValidationIssue,
 } from "starbank-engine-client/protocol";
 import type { EditorProfileController } from "./simple-profile-model";
 
@@ -69,6 +70,10 @@ export interface BankEditorController {
   onOpen?: () => Promise<EditorActionResult>;
   onReveal?: EditorAction;
   onOpenFile?: (file: File) => Promise<EditorActionResult>;
+  onValidateValues?: (
+    target: EditorTarget,
+    edits: readonly EditorValueEdit[],
+  ) => Promise<readonly EngineValueValidationIssue[]>;
   onEditValues?: (
     target: EditorTarget,
     edits: readonly EditorValueEdit[],
