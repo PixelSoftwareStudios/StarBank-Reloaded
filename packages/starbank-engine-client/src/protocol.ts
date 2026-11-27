@@ -32,6 +32,24 @@ export interface EngineValueEdit {
   readonly value: string;
 }
 
+const engineValueValidationIssue = v.object({
+  id: v.string(),
+  code: v.picklist([
+    "unknown_value",
+    "duplicate_value",
+    "opaque_value",
+    "value_too_large",
+    "invalid_integer",
+    "invalid_fixed",
+    "unsupported_kind",
+  ]),
+  message: v.string(),
+});
+
+export type EngineValueValidationIssue = v.InferOutput<
+  typeof engineValueValidationIssue
+>;
+
 export const STRUCTURED_VALUE_KINDS = [
   "int",
   "fixed",
@@ -94,6 +112,10 @@ export type EngineCommand =
   | { readonly kind: "replace_raw_text" }
   | {
       readonly kind: "set_values";
+      readonly payload: { readonly edits: readonly EngineValueEdit[] };
+    }
+  | {
+      readonly kind: "validate_values";
       readonly payload: { readonly edits: readonly EngineValueEdit[] };
     }
   | { readonly kind: "structure"; readonly payload: EngineStructureChange }
@@ -192,6 +214,10 @@ export type EngineSourceEncoding = v.InferOutput<typeof sourceEncoding>;
 const emptyPayload = v.object({});
 const resultSchema = v.variant("kind", [
   v.object({ kind: v.literal("snapshot"), payload: engineSnapshot }),
+  v.object({
+    kind: v.literal("value_validation"),
+    payload: v.object({ issues: v.array(engineValueValidationIssue) }),
+  }),
   v.object({ kind: v.literal("profile"), payload: profileSchema }),
   v.object({
     kind: v.literal("profile_preview"),

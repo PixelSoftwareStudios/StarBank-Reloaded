@@ -173,6 +173,35 @@ describe("local file adapter and protocol", () => {
     }
   });
 
+  test("decodes validation issues and rejects malformed issue records", () => {
+    const scope = {
+      schema_version: 1,
+      request_id: "check",
+      document_id: "d1",
+      revision: "2",
+    };
+    const issue = {
+      id: "v1",
+      code: "invalid_integer",
+      message: "Enter an integer with optional comma grouping.",
+    };
+    const reply = (issues: unknown[]) =>
+      JSON.stringify({
+        ...scope,
+        result: { kind: "value_validation", payload: { issues } },
+      });
+    expect(decodeEngineReply(reply([issue]), "check").result).toEqual({
+      kind: "value_validation",
+      payload: { issues: [issue] },
+    });
+    expect(() =>
+      decodeEngineReply(reply([{ ...issue, code: "unknown" }]), "check"),
+    ).toThrow("invalid reply");
+    expect(() =>
+      decodeEngineReply(reply([{ ...issue, id: undefined }]), "check"),
+    ).toThrow("invalid reply");
+  });
+
   test("preserves maximum revision text and rejects an uncorrelated response", () => {
     const revision = "18446744073709551615";
     const request = engineRequest(

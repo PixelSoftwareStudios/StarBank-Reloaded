@@ -16,6 +16,7 @@ mod reply;
 mod request;
 mod snapshot;
 mod structure;
+mod values;
 
 use self::diff::WireOccurrenceKind;
 use self::error::ProtocolError;
@@ -23,6 +24,7 @@ use self::profile::{ProfilePreview, Profiles};
 use self::reply::{ReplyResult, Scope};
 use self::request::{Action, ContextOptions, OpenOptions, Operation, Target, WireEdit};
 use self::snapshot::{Snapshot, WireSignatureStatus};
+use self::values::WireValueIssue;
 
 pub use self::native_restore::{
 	NativeRestoreError, NativeRestoreOutcome, NativeRestorePolicy, NativeRestoreReceipt,
@@ -59,6 +61,7 @@ struct OpenDocument {
 
 enum Output {
 	Snapshot,
+	ValueValidation(Vec<WireValueIssue>),
 	Profile,
 	ProfilePreview(ProfilePreview),
 	Diff(OpeningDiff),
@@ -179,6 +182,12 @@ impl Engine {
 		};
 		match result {
 			Ok(Output::Snapshot) => active.snapshot(request_id),
+			Ok(Output::ValueValidation(issues)) => WireReply::encode(
+				Some(request_id),
+				active.scope(),
+				ReplyResult::ValueValidation { issues },
+				None,
+			),
 			Ok(Output::Profile) => match active.profiles.view(&active.session) {
 				Ok(profile) => WireReply::encode(
 					Some(request_id),
@@ -300,6 +309,12 @@ fn execute(
 		}
 		Operation::OpeningRaw => return Ok(Output::Raw(session.opening.to_vec())),
 		Operation::SetValues(edits) => session.set_values(expected, &interpret_edits(&edits)?),
+		Operation::ValidateValues(edits) => {
+			return session
+				.validate_values(expected, &interpret_edits(&edits)?)
+				.map(|issues| Output::ValueValidation(issues.into_iter().map(Into::into).collect()))
+				.map_err(|error| ProtocolError::editor(&error, ProtocolError::Internal));
+		}
 		Operation::Structure(edit) => session
 			.apply_structure(expected, edit.interpret()?)
 			.map(|result| result.revision),

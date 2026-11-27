@@ -32,6 +32,7 @@ pub(super) enum Operation {
 	RawText,
 	OpeningRaw,
 	SetValues(Vec<WireEdit>),
+	ValidateValues(Vec<WireEdit>),
 	Structure(WireStructure),
 	Diff,
 	Revert(RevertOptions),
@@ -101,7 +102,7 @@ struct RawContextOptions<'a> {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SetValuesOptions<'a> {
+struct ValueEdits<'a> {
 	#[serde(borrow)]
 	edits: Vec<&'a RawValue>,
 }
@@ -141,6 +142,7 @@ enum CommandKind {
 	RawText,
 	OpeningRaw,
 	SetValues,
+	ValidateValues,
 	Structure,
 	Diff,
 	Revert,
@@ -227,20 +229,23 @@ fn decode_action(
 	};
 	let operation = match kind {
 		CommandKind::Open => return Err(ProtocolError::InvalidRequest),
-		CommandKind::SetValues => {
-			let SetValuesOptions { edits } = required_payload(payload)?;
-			if edits.is_empty() {
+		CommandKind::SetValues | CommandKind::ValidateValues => {
+			let ValueEdits { edits } = required_payload(payload)?;
+			if edits.is_empty() && matches!(kind, CommandKind::SetValues) {
 				return Err(ProtocolError::EmptyEdit);
 			}
 			if edits.len() > MAX_OPERATIONS {
 				return Err(ProtocolError::TooManyEdits);
 			}
-			Operation::SetValues(
-				edits
-					.into_iter()
-					.map(decode_payload)
-					.collect::<Result<_, _>>()?,
-			)
+			let edits = edits
+				.into_iter()
+				.map(decode_payload)
+				.collect::<Result<_, _>>()?;
+			if matches!(kind, CommandKind::SetValues) {
+				Operation::SetValues(edits)
+			} else {
+				Operation::ValidateValues(edits)
+			}
 		}
 		CommandKind::Structure => Operation::Structure(required_payload(payload)?),
 		CommandKind::Revert => Operation::Revert(required_payload(payload)?),

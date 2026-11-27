@@ -14,6 +14,7 @@ mod protocol;
 mod raw;
 mod session;
 mod structure;
+mod values;
 
 pub use checkpoint::DirtySections;
 pub use diff::{
@@ -30,5 +31,6 @@ pub use protocol::{
 	PROTOCOL_VERSION, WireReply, max_attachment_bytes,
 };
 pub use raw::RawNumberKind;
-pub use session::{Session, ValueChange};
+pub use session::Session;
 pub use structure::{StructuralOutcome, StructureChange};
+pub use values::{ValueChange, ValueIssue, ValueIssueCode};

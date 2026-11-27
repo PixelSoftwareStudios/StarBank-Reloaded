@@ -8,6 +8,7 @@ use super::diff::WireDiff;
 use super::error::ProtocolError;
 use super::profile::{ProfilePreview, ProfileView};
 use super::snapshot::{Snapshot, WireSignatureStatus};
+use super::values::WireValueIssue;
 
 /// Encoded reply and an optional binary payload carried outside JSON.
 pub struct WireReply {
@@ -36,6 +37,9 @@ struct Response<'a> {
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
 pub(super) enum ReplyResult<'a> {
 	Snapshot(Snapshot<'a>),
+	ValueValidation {
+		issues: Vec<WireValueIssue>,
+	},
 	Profile(ProfileView<'a>),
 	ProfilePreview(ProfilePreview),
 	Diff(WireDiff<'a>),

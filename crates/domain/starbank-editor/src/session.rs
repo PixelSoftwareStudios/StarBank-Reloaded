@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use sc2bank::{BankDocument, KeyId, Limits, SectionId, ValueEdit, ValueId, parse, serialize};
 use starbank_core::Revision;
@@ -9,19 +9,9 @@ use crate::{
 	checkpoint::Checkpoint,
 	history::{Direction, History},
 	identity::{Identities, Occurrence},
-	normalize_value,
 	prepare::SaveOrder,
 	raw::validate_raw_numbers,
 };
-
-/// A proposed exact value replacement in an atomic transaction.
-#[derive(Clone, Copy, Debug)]
-pub struct ValueChange<'value> {
-	/// Identifier from the current document projection.
-	pub id: OccurrenceId,
-	/// XML-decoded text, possibly including validated numeric grouping.
-	pub value: &'value str,
-}
 
 /// Single owner of one open document and its revision, checkpoints and edit history.
 #[derive(Debug)]
@@ -115,73 +105,6 @@ impl Session {
 	/// Looks up the editor ID for a value in the checked document.
 	pub fn id_of_value(&self, id: ValueId) -> Option<OccurrenceId> {
 		self.ids.id(Occurrence::Value(id))
-	}
-
-	/// Applies all checked changes in one revision and one undo step.
-	///
-	/// # Errors
-	///
-	/// Rejects stale revisions, invalid values, repeated targets and limit violations.
-	pub fn set_values(
-		&mut self,
-		expected: Revision,
-		changes: &[ValueChange<'_>],
-	) -> Result<Revision, EditorError> {
-		self.require_revision(expected)?;
-		if changes.len() > usize::try_from(self.limits.nodes).unwrap_or(usize::MAX) {
-			return Err(EditorError::EditLimit);
-		}
-		let mut requested = BTreeMap::new();
-		for change in changes {
-			if change.value.len() > self.limits.scalar_bytes {
-				return Err(EditorError::EditLimit);
-			}
-			let Some(Occurrence::Value(value)) = self.ids.resolve(change.id) else {
-				return Err(EditorError::UnknownValue(change.id));
-			};
-			if requested.insert(value, change).is_some() {
-				return Err(EditorError::DuplicateValue(change.id));
-			}
-		}
-		if requested.is_empty() {
-			return Ok(self.revision);
-		}
-		let mut normalized = Vec::with_capacity(requested.len());
-		for value in self
-			.document
-			.sections()
-			.iter()
-			.flat_map(|section| section.keys())
-			.flat_map(|key| key.values())
-		{
-			let Some(change) = requested.remove(&value.id()) else {
-				continue;
-			};
-			let attribute = value
-				.attribute()
-				.ok_or(EditorError::OpaqueValue(change.id))?;
-			if change.value == attribute.value() {
-				continue;
-			}
-			let lexeme = normalize_value(attribute.kind(), change.value).map_err(|source| {
-				EditorError::InvalidValue {
-					id: change.id,
-					source,
-				}
-			})?;
-			normalized.push((value.id(), lexeme));
-		}
-		if let Some((_, change)) = requested.first_key_value() {
-			return Err(EditorError::UnknownValue(change.id));
-		}
-		let edits: Vec<_> = normalized
-			.iter()
-			.map(|(id, text)| ValueEdit {
-				id: *id,
-				value: text.as_ref(),
-			})
-			.collect();
-		self.commit_value_edits(&edits)
 	}
 
 	pub(crate) fn commit_value_edits(
