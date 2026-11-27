@@ -171,3 +171,84 @@ fn invalid_script_metadata_preserves_readable_map_fields_and_reports_warnings()
 	assert!(metadata.has_script);
 	Ok(())
 }
+
+const MEMBER_LOCAL_RECOVERY: &[u8] = include_bytes!("fixtures/member-local-recovery.s2ma");
+const FIXTURE_ZLIB_PREFIX: &[u8] = &[0x02, 0x38, 0x8d];
+
+#[test]
+fn damaged_compressed_members_preserve_other_members_and_exact_warnings()
+-> Result<(), Box<dyn std::error::Error>> {
+	let temp = tempfile::tempdir()?;
+	let root = temp.path().canonicalize()?;
+	let maps = root.join("maps");
+	fs::create_dir(&maps)?;
+	let script_damaged = maps.join("damaged-script.s2ma");
+	let header_damaged = maps.join("damaged-header.s2ma");
+	let codec_offsets: Vec<_> = MEMBER_LOCAL_RECOVERY
+		.windows(FIXTURE_ZLIB_PREFIX.len())
+		.enumerate()
+		.filter_map(|(offset, bytes)| (bytes == FIXTURE_ZLIB_PREFIX).then_some(offset))
+		.collect();
+	let [script_offset, header_offset] = codec_offsets.as_slice() else {
+		panic!("fixture has two one-sector compressed members");
+	};
+	for (path, codec_offset) in [
+		(&script_damaged, script_offset),
+		(&header_damaged, header_offset),
+	] {
+		let mut archive = MEMBER_LOCAL_RECOVERY.to_vec();
+		// Leave the MPQ codec tag intact and corrupt the following zlib header.
+		archive[codec_offset + 1] = 0;
+		fs::write(path, archive)?;
+	}
+	fs::write(maps.join("clean.s2ma"), MEMBER_LOCAL_RECOVERY)?;
+
+	let cache = root.join("metadata.json");
+	let request = IndexRequest {
+		roots: &[maps],
+		cache_path: Some(&cache),
+		generation: 1,
+		limits: IndexLimits::default(),
+	};
+	let cold = scan_maps(request, &Cancellation::default(), |_| {})?;
+	let warm = scan_maps(request, &Cancellation::default(), |_| {})?;
+	assert_eq!((cold.cache_hits, warm.cache_hits), (0, 1));
+	assert_eq!(cold.index.maps(), warm.index.maps());
+	assert_eq!(cold.index.maps().len(), 3);
+
+	for report in [&cold, &warm] {
+		assert_eq!(report.issues.len(), 2);
+		for (path, expected) in [
+			(&script_damaged, MetadataEntry::MapScript),
+			(&header_damaged, MetadataEntry::DocumentHeader),
+		] {
+			assert!(report.issues.iter().any(|issue| issue.path == *path
+				&& matches!(
+					issue.kind,
+					IndexIssueKind::Archive(MpqError::InvalidEntry(entry)) if entry == expected
+				)));
+		}
+	}
+
+	let metadata_for = |path: &Path| {
+		&cold
+			.index
+			.maps()
+			.iter()
+			.find(|record| record.archive == path)
+			.expect("map with damaged optional member retained")
+			.metadata
+	};
+	let metadata = metadata_for(&script_damaged);
+	assert_eq!(metadata.title.as_deref(), Some("Header after damage"));
+	assert_eq!(metadata.title_source, Some(MapTitleSource::DocumentHeader));
+	assert!(!metadata.has_script);
+	assert!(metadata.author.is_none() && metadata.bank_names.is_empty());
+
+	let metadata = metadata_for(&header_damaged);
+	assert!(metadata.title.is_none() && metadata.title_source.is_none());
+	assert_eq!(metadata.author.as_deref(), Some("Fixture Studio"));
+	assert_eq!(metadata.bank_names, ["linkedbank"]);
+	assert!(metadata.has_script);
+	Ok(())
+}

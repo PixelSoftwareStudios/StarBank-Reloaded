@@ -1,5 +1,5 @@
 use cap_std::fs::File;
-use starbank_mpq::{MetadataArchive, MetadataEntry, MpqError};
+use starbank_mpq::{Limit, MetadataArchive, MetadataEntry, MpqError};
 
 use crate::{IndexIssueKind, MapMetadata, metadata::parse_script, parse_metadata};
 
@@ -66,7 +66,11 @@ fn read_optional_member(
 ) -> Result<Option<Vec<u8>>, IndexIssueKind> {
 	match archive.read(entry) {
 		Ok(bytes) => Ok(bytes),
-		Err(error @ MpqError::UnsupportedEntry(_)) => {
+		Err(
+			error @ (MpqError::UnsupportedEntry(_)
+			| MpqError::InvalidEntry(_)
+			| MpqError::LimitExceeded(Limit::EntryBytes | Limit::EntrySectors)),
+		) => {
 			warnings.push(IndexIssueKind::Archive(error));
 			Ok(None)
 		}
