@@ -30,3 +30,5 @@ python3 crates/vendor/verification/glib/test_check.py
 ```
 
 The unmaintained dependency warnings still need scoped review. Cargo inventory does not cover the separately linked opt-in native StormLib components or approve their notices. Asset rights, the authored release license, package signing, hosted execution and final distribution clearance remain open. [Native component inventory](../../crates/adapters/starbank-mpq-stormlib/verification/NATIVE_APPEND.md) · [Distribution evidence](DISTRIBUTION.md)
+
+The CI source job verifies the vendored bytes and its negative tests before running pinned cargo-audit 0.22.2 with `--deny unsound`. The frontend job runs the default `pnpm audit` immediately after its frozen install. The exact online commands passed locally against the recorded database and lockfiles; the original Rust lock failed the unsoundness gate. No advisory exception was added. Hosted job results are not available under the configured GitHub CLI account.

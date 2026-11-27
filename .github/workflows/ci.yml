@@ -29,6 +29,12 @@ jobs:
           python3 crates/vendor/verification/glib/check.py
           python3 crates/vendor/verification/glib/test_check.py
       - run: cargo run --locked -p starbank-source-check
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-audit@0.22.2
+          fallback: none
+      - name: Audit locked Rust dependencies
+        run: cargo audit --deny unsound
 
   native:
     name: Rust native on ${{ matrix.os }}
@@ -201,6 +207,8 @@ jobs:
           test "$("$bindgen_dir/wasm-bindgen" --version)" = "wasm-bindgen $bindgen_version"
           printf '%s\n' "$bindgen_dir" >> "$GITHUB_PATH"
       - run: pnpm install --frozen-lockfile
+      - name: Audit locked frontend dependencies
+        run: pnpm audit
       # Building generates the release WASM bindings used by the web app and adapter parity.
       - run: pnpm build
       - run: pnpm check
