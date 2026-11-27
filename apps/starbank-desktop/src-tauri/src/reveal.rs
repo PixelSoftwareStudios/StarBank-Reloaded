@@ -1,4 +1,4 @@
-//! Reveals the file pinned to the active desktop document in the OS file manager.
+//! Reveals the active desktop bank or its parent directory in the OS file manager.
 
 use std::{
 	path::Path,
@@ -13,6 +13,9 @@ use crate::{
 	commands::{CommandError, DesktopEngine},
 	save::{ActiveTarget, DesktopSession},
 };
+
+#[cfg(any(target_os = "linux", all(unix, test)))]
+mod linux;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub(crate) enum RevealIssue {
@@ -37,13 +40,16 @@ pub(crate) fn can_reveal_bank() -> bool {
 	#[cfg(windows)]
 	let available = explorer_executable().is_some();
 
-	#[cfg(not(any(target_os = "macos", windows)))]
+	#[cfg(target_os = "linux")]
+	let available = Path::new(linux::OPENER).is_file();
+
+	#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 	let available = false;
 
 	available
 }
 
-/// Requests the OS to select the file identified by the current document and revision.
+/// Requests the OS to reveal the bank identified by the current document and revision.
 #[tauri::command]
 pub(crate) async fn reveal_active_bank(
 	app: AppHandle,
@@ -201,12 +207,41 @@ fn finish_launch(_child: Child) -> Result<(), RevealIssue> {
 	Ok(())
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(target_os = "linux")]
+fn file_manager(path: &Path) -> Option<Command> {
+	linux::command(path)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 fn file_manager(_path: &Path) -> Option<Command> {
 	None
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(target_os = "linux")]
+fn finish_launch(mut child: Child) -> Result<(), RevealIssue> {
+	use std::time::{Duration, Instant};
+
+	const HANDOFF_WINDOW: Duration = Duration::from_millis(400);
+	const POLL_INTERVAL: Duration = Duration::from_millis(20);
+	let deadline = Instant::now() + HANDOFF_WINDOW;
+	loop {
+		match child.try_wait() {
+			Ok(Some(status)) if status.success() => return Ok(()),
+			Ok(Some(_)) | Err(_) => return Err(RevealIssue::Failed),
+			Ok(None) => {}
+		}
+		let remaining = deadline.saturating_duration_since(Instant::now());
+		if remaining.is_zero() {
+			// xdg-open can remain attached to the chosen file manager until it closes.
+			// Acknowledge dispatch and reap the process without holding the editor action.
+			drop(tauri::async_runtime::spawn_blocking(move || child.wait()));
+			return Ok(());
+		}
+		std::thread::sleep(remaining.min(POLL_INTERVAL));
+	}
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 fn finish_launch(_child: Child) -> Result<(), RevealIssue> {
 	Err(RevealIssue::Unavailable)
 }
