@@ -19,6 +19,18 @@ The Windows MSVC test link failed locally because `link.exe` was unavailable. No
 3. First qualify handle-based `SetFileInformationByHandle(FileRenameInfo)` with `ReplaceIfExists = FALSE`, the held parent as `RootDirectory` and a single destination filename. The Windows documentation describes the relative parent form. Test it in the actual NTFS environment and verify that a concurrent occupant is preserved. Avoid a path-only fallback or cross-volume copy mode while this binding is unresolved. [Microsoft FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) [Microsoft SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)
 4. Capture name collision and other native return codes immediately. Reopen under the held scope and verify the stage identity and digest at the requested name, stage name absence, and the intended file security. Separately qualify available unprivileged namespace durability behavior. If the call or verification leaves an ambiguous result, retain any staged or published files for explicit inspection. [Microsoft FileIdInfo](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info)
 
+## Handle-relative rename probe
+
+The Windows-only unit test exercises the proposed kernel operation on synthetic files in a fresh temporary directory through the current local path resolver. It requires the opened directory handle to report NTFS. It flushes a complete, uniquely scoped stage, places competing names after staging, then calls `SetFileInformationByHandle(FileRenameInfo)` with an inline UTF-16 leaf, the held parent handle, and replacement disabled. It checks ordinary and case-alias collisions against the original occupant identity and bytes, and verifies the stage file ID, unchanged parent, digest and missing stage name after publication. The test records the collision codes and observed identities. [Probe source](../src/windows/rename_qualification.rs)
+
+Run this opt-in test on an actual Windows host under an ordinary user with a case-insensitive local NTFS temporary directory. Record the Windows build and test output.
+
+```powershell
+cargo test --locked -p starbank-fs --lib local_ntfs_handle_relative_create_only_publication -- --ignored --nocapture
+```
+
+The probe covers the rename and read-back boundary. The synthetic stage inherits directory security. Private staging DACLs, the namespace durability available to an unprivileged process, externally changing directory scope, checkpoint termination, and production failure classification still require qualification. The recorded macOS authoring pass compiled the probe with strict Windows MSVC cross-Clippy. Local PE linking with LLVM LLD 22.1.8 failed for absent Windows SDK import libraries, including `kernel32.lib` and `ntdll.lib`. The probe remains unexecuted on native Windows. The `windows-2025` CI job selects it explicitly through nextest and fails if no test matches. Hosted execution remains pending.
+
 ## Native acceptance
 
 | Fixture | Expected observation |

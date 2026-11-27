@@ -390,3 +390,6 @@ unsafe fn query<T: Default>(
 	}
 	Ok(value)
 }
+
+#[cfg(test)]
+mod rename_qualification;

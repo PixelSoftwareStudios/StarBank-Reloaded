@@ -63,6 +63,12 @@ jobs:
           STARBANK_ENOSPC_TMPFS="$fixture" cargo nextest run --workspace --locked \
             --run-ignored only --no-tests fail --success-output immediate \
             -E 'package(=starbank-fs) & binary(=linux_enospc)'
+      - name: Probe exclusive handle-relative NTFS publication
+        if: runner.os == 'Windows'
+        run: >-
+          cargo nextest run --locked -p starbank-fs --lib
+          --run-ignored only --no-tests fail --success-output immediate
+          -E 'test(=windows::rename_qualification::local_ntfs_handle_relative_create_only_publication)'
       - run: cargo test --workspace --doc --locked
       - run: cargo doc --workspace --no-deps --locked
         env:
