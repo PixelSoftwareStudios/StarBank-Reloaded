@@ -96,6 +96,10 @@ impl Failure {
 		}
 	}
 
+	pub(crate) fn has_artifact(&self) -> bool {
+		self.backup_path.is_some() || self.recovery_path.is_some()
+	}
+
 	pub(crate) fn with_backup_path(mut self, path: &Path) -> Self {
 		self.backup_path = Some(path.to_string_lossy().into_owned());
 		self

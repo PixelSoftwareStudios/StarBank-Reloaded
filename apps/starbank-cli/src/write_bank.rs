@@ -16,7 +16,7 @@ use crate::{
 	discovery::DisplayPath,
 	failure::{ErrorCode, Failure, Status},
 	input,
-	output::{self, CommandName},
+	output::{self, CommandName, Publication},
 	patch::Patch,
 };
 
@@ -151,7 +151,11 @@ pub(crate) fn write(
 		)?
 	};
 
-	output::report(json, operation.command_name(), &report, |out| {
+	let publication = match report.outcome {
+		Outcome::Prepared | Outcome::Unchanged => Publication::None,
+		Outcome::CommittedVerified | Outcome::CommitUncertain => Publication::Possible,
+	};
+	let delivery = output::report(json, operation.command_name(), &report, |out| {
 		writeln!(
 			out,
 			"{:?}. Signature {:?}. {} projected section changes.",
@@ -170,8 +174,8 @@ pub(crate) fn write(
 			)?;
 		}
 		Ok(())
-	})?;
-	Ok(status)
+	});
+	Ok(output::finish(delivery, status, publication))
 }
 
 fn publish(

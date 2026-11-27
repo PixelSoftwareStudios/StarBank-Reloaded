@@ -57,7 +57,7 @@ A command report has `schema_version`, `command` and `result` fields. Preconditi
 | 3 | Invalid bank, edit, signature, context, backup or map input. |
 | 4 | File or output I/O failure. |
 | 5 | Fingerprint conflict or existing destination. |
-| 6 | Publication may have occurred and needs inspection. |
+| 6 | Inspect before retrying. Publication may have occurred, or the command could not deliver its report after a write. |
 | 7 | Unsupported format, storage capability or platform feature. |
 
 The version 1 patch schema uses the exact byte digest reported by `inspect`. Locate a value by zero-based `section`, `key` and `value` positions in the ordered `contents` arrays for that digest. Lexemes are JSON strings.

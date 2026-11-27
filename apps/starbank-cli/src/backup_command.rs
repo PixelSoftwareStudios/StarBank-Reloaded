@@ -14,7 +14,7 @@ use crate::{
 	diff::BankDiff,
 	discovery::DisplayPath,
 	failure::{ErrorCode, Failure, Status},
-	output::{self, CommandName},
+	output::{self, CommandName, Publication},
 };
 
 pub(crate) fn run(command: BackupCommand, json: bool) -> Result<Status, Failure> {
@@ -77,10 +77,14 @@ fn create(source: &BankSource, json: bool) -> Result<Status, Failure> {
 	let id = catalog.create(source, BackupPlacement::Adjacent)?;
 	let (record, health) = catalog.get(&id).ok_or_else(invalid_backup_path)?;
 	let report = RecordReport::new(record, health);
-	output::report(json, CommandName::BackupCreate, &report, |out| {
+	let delivery = output::report(json, CommandName::BackupCreate, &report, |out| {
 		writeln!(out, "Verified backup at {:?}.", report.path.display)
-	})?;
-	Ok(Status::Success)
+	});
+	Ok(output::finish(
+		delivery,
+		Status::Success,
+		Publication::Possible,
+	))
 }
 
 fn restore(
@@ -176,7 +180,13 @@ fn restore(
 			}
 		}
 	};
-	output::report(json, CommandName::BackupRestore, &report, |out| {
+	let publication = match report.outcome {
+		RestoreOutcome::Prepared => Publication::None,
+		RestoreOutcome::CommittedVerified | RestoreOutcome::CommitUncertain => {
+			Publication::Possible
+		}
+	};
+	let delivery = output::report(json, CommandName::BackupRestore, &report, |out| {
 		writeln!(
 			out,
 			"{:?} for {:?}. Signature {:?}.",
@@ -205,8 +215,8 @@ fn restore(
 			)?;
 		}
 		Ok(())
-	})?;
-	Ok(status)
+	});
+	Ok(output::finish(delivery, status, publication))
 }
 
 fn decode_digest(value: &str, message: &'static str) -> Result<[u8; SHA256_BYTES], Failure> {

@@ -10,7 +10,7 @@ use crate::{
 	discovery::discover,
 	failure::{ErrorCode, Failure, Status},
 	map,
-	output::{self, CommandName},
+	output::{self, CommandName, Publication},
 	write_bank::{self, Operation, Target},
 };
 
@@ -60,10 +60,12 @@ pub(crate) fn run() -> ExitCode {
 }
 
 fn report_failure(json: bool, error: &Failure) -> Status {
-	match output::failure(json, error) {
-		Ok(()) => error.status,
-		Err(_) => Status::Io,
-	}
+	let publication = if error.has_artifact() {
+		Publication::Possible
+	} else {
+		Publication::None
+	};
+	output::finish(output::failure(json, error), error.status, publication)
 }
 
 fn execute(command: Command, json: bool) -> Result<Status, Failure> {
