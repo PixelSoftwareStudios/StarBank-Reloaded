@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppShell,
   type BankEditorController,
@@ -38,6 +38,13 @@ import { ClipboardDialog, ExportDialog, SwitchBankDialog } from "./web-dialogs";
 
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 
+interface AcceptedOpen {
+  readonly previous: BrowserBankDocument | null;
+  readonly target: EngineTarget;
+  readonly name: string;
+  readonly file: File;
+}
+
 export function StarBankWeb() {
   const preferences = useBrowserSettings();
 
@@ -50,6 +57,11 @@ export function StarBankWeb() {
   const actionInProgress = useRef(false);
   const validationInProgress = useRef<Promise<unknown>>(null);
   const currentDocument = useRef<BrowserBankDocument>(null);
+  const acceptedOpen = useRef<AcceptedOpen>(null);
+  const [openRecovery, setOpenRecovery] = useState<{
+    opening: AcceptedOpen;
+    stopped: boolean;
+  }>();
   const [document, setDocument] = useState<BrowserBankDocument>();
   const [refreshRequest, setRefreshRequest] = useState<{
     displayed: EditorTarget;
@@ -61,16 +73,23 @@ export function StarBankWeb() {
       ? refreshRequest
       : undefined;
   const refreshTarget = pendingRefresh?.observed;
-  const snapshotUnavailable = refreshTarget === null;
+  const snapshotUnavailable =
+    refreshTarget === null || openRecovery?.stopped === true;
   const [openedFile, setOpenedFile] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState<EngineProfile>();
   const [status, setStatus] = useState("Loading the bank engine…");
   const [maxBankBytes, setMaxBankBytes] = useState<number>();
   const [hasDraft, setHasDraft] = useState(false);
+  const currentDraft = useRef(false);
+  const reportDraft = useCallback((present: boolean) => {
+    currentDraft.current = present;
+    setHasDraft(present);
+  }, []);
   const [exportTarget, setExportTarget] = useState<EditorTarget>();
   const showExport =
-    (pendingRefresh === undefined || snapshotUnavailable) &&
+    ((pendingRefresh === undefined && openRecovery === undefined) ||
+      snapshotUnavailable) &&
     exportTarget?.id === document?.id &&
     exportTarget?.revision === document?.revision &&
     exportTarget !== undefined;
@@ -127,12 +146,19 @@ export function StarBankWeb() {
     return session.current;
   }
 
-  function activeDocument(target: EditorTarget): BrowserBankDocument {
+  function displayedDocument(target: EditorTarget): BrowserBankDocument {
     const document = currentDocument.current;
     if (document?.id !== target.id || document.revision !== target.revision) {
       throw new Error("The bank changed before the action could start.");
     }
     return document;
+  }
+
+  function activeDocument(target: EditorTarget): BrowserBankDocument {
+    if (acceptedOpen.current) {
+      throw new Error("Finish opening the accepted bank first.");
+    }
+    return displayedDocument(target);
   }
 
   function publishDocument(next: BrowserBankDocument) {
@@ -187,14 +213,18 @@ export function StarBankWeb() {
 
   function openBank(file: File): Promise<EditorActionResult> {
     return runBankAction(async () => {
-      if (hasDraft) {
+      if (acceptedOpen.current) {
+        throw new Error("Finish opening the accepted bank first.");
+      }
+      if (currentDraft.current) {
         return {
           ok: false,
           message: "Apply or discard your draft before opening another bank.",
         };
       }
       if (refreshTarget) throw new SnapshotRefreshRequired(refreshTarget);
-      const discardCurrent = document?.dirty ?? false;
+      const previous = currentDocument.current;
+      const discardCurrent = previous?.dirty ?? false;
       if (discardCurrent) {
         const proceed = await new Promise<boolean>((resolve) => {
           setPendingOpen({ nextName: file.name, save: false, resolve });
@@ -202,30 +232,113 @@ export function StarBankWeb() {
         if (!proceed)
           return { ok: false, message: "The current bank is still open." };
       }
-      publishDocument(await bankSession().open(file, discardCurrent));
-      setOpenedFile(file);
-      setProfile(undefined);
-      return { ok: true };
+      if (currentDraft.current || currentDocument.current !== previous) {
+        throw new Error(
+          "The editor changed before the new bank could be opened.",
+        );
+      }
+      const accepted = await bankSession().acceptOpen(
+        file,
+        discardCurrent,
+        previous?.id,
+      );
+      const opening = {
+        previous,
+        target: accepted.target,
+        name: accepted.name,
+        file,
+      };
+      acceptedOpen.current = opening;
+      return displayOpening(opening, () => bankSession().projectOpen(accepted));
     });
+  }
+
+  async function displayOpening(
+    opening: AcceptedOpen,
+    load: () => Promise<BrowserBankDocument>,
+    successMessage?: string,
+  ): Promise<EditorActionResult> {
+    function stillOpening() {
+      return (
+        acceptedOpen.current === opening &&
+        currentDocument.current === opening.previous
+      );
+    }
+
+    try {
+      if (!stillOpening()) throw new Error("The selected bank changed.");
+      if (currentDraft.current) {
+        throw new Error("Discard the previous bank draft before finishing.");
+      }
+      const next = await load();
+      if (
+        !stillOpening() ||
+        next.id !== opening.target.document_id ||
+        next.revision !== opening.target.expected_revision
+      ) {
+        throw new Error(
+          "The bank engine did not return the accepted document.",
+        );
+      }
+      if (currentDraft.current) {
+        throw new Error("Discard the previous bank draft before finishing.");
+      }
+      acceptedOpen.current = null;
+      setOpenRecovery(undefined);
+      setOpenedFile(opening.file);
+      setProfile(undefined);
+      publishDocument(next);
+      return { ok: true, message: successMessage };
+    } catch (error) {
+      if (!stillOpening()) throw error;
+      const target =
+        error instanceof SnapshotRefreshRequired &&
+        error.target.document_id === opening.target.document_id &&
+        revisionAtLeast(
+          error.target.expected_revision,
+          opening.target.expected_revision,
+        )
+          ? error.target
+          : opening.target;
+      const stopped = isUnavailableEngine(
+        error instanceof SnapshotRefreshRequired ? error.cause : error,
+      );
+      const updated = { ...opening, target };
+      acceptedOpen.current = updated;
+      setOpenRecovery({ opening: updated, stopped });
+      setExportTarget(undefined);
+      return {
+        ok: false,
+        message: stopped
+          ? "The bank engine stopped. Reload StarBank Web to open another bank."
+          : currentDraft.current
+            ? "Discard the previous bank draft before finishing."
+            : "The bank was accepted, but its XML could not be displayed.",
+      };
+    }
   }
 
   const controller: BankEditorController = {
     document,
     busy,
     status,
-    onDraftChange: setHasDraft,
+    onDraftChange: reportDraft,
     snapshotUnavailable,
-    onRefreshSnapshot: refreshTarget
-      ? async (target) => {
-          const result = await updateDocument(target, ({ name }) =>
-            bankSession().refresh(name, refreshTarget),
-          );
-          return { ...result, message: result.message ?? "Editor refreshed." };
-        }
-      : undefined,
+    onRefreshSnapshot:
+      !openRecovery && refreshTarget
+        ? async (target) => {
+            const result = await updateDocument(target, ({ name }) =>
+              bankSession().refresh(name, refreshTarget),
+            );
+            return {
+              ...result,
+              message: result.message ?? "Editor refreshed.",
+            };
+          }
+        : undefined,
     onRecoveryCopy: snapshotUnavailable
       ? async (target) => {
-          activeDocument(target);
+          displayedDocument(target);
           setExportTarget(target);
           return { ok: true };
         }
@@ -402,6 +515,25 @@ export function StarBankWeb() {
         platformInfo={__STARBANK_PLATFORM_INFO__}
         name="StarBank Web"
         editor={controller}
+        openRecovery={
+          openRecovery && {
+            name: openRecovery.opening.name,
+            finish: openRecovery.stopped
+              ? undefined
+              : () =>
+                  runBankAction(() =>
+                    displayOpening(
+                      openRecovery.opening,
+                      () =>
+                        bankSession().refresh(
+                          openRecovery.opening.name,
+                          openRecovery.opening.target,
+                        ),
+                      "Bank opened.",
+                    ),
+                  ),
+          }
+        }
         preferences={preferences}
         workspaceAccessory={
           maxBankBytes !== undefined && (
@@ -413,6 +545,7 @@ export function StarBankWeb() {
                 busy ||
                 hasDraft ||
                 pendingRefresh !== undefined ||
+                openRecovery !== undefined ||
                 showExport ||
                 copyPreview !== undefined
               }
@@ -431,7 +564,7 @@ export function StarBankWeb() {
           prepare={(name, context) =>
             runBankAction(async () =>
               snapshotUnavailable
-                ? recoveryCopy(activeDocument(exportTarget), name, context)
+                ? recoveryCopy(displayedDocument(exportTarget), name, context)
                 : exportCopy(exportTarget, name, context),
             )
           }

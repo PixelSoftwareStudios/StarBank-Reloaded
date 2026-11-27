@@ -57,6 +57,15 @@ export interface BrowserBankDocument extends BankEditorDocument {
   readonly sourceEncoding: EngineSourceEncoding;
 }
 
+interface BankSnapshot {
+  readonly target: EngineTarget;
+  readonly snapshot: EngineSnapshot;
+}
+
+interface AcceptedBankOpen extends BankSnapshot {
+  readonly name: string;
+}
+
 interface PreparedBank {
   readonly bytes: ArrayBuffer;
   readonly signatureStatus: EngineSignatureStatus;
@@ -89,7 +98,11 @@ export class BrowserBankSession {
     return this.#update(name, { kind: "snapshot" }, target);
   }
 
-  async open(file: File, discardCurrent = false): Promise<BrowserBankDocument> {
+  async acceptOpen(
+    file: File,
+    discardCurrent: boolean,
+    previousId?: string,
+  ): Promise<AcceptedBankOpen> {
     const { maxBankBytes } = await this.client.ready();
     const { bytes, name } = await readBankFile(file, maxBankBytes).catch(
       (error: unknown) => {
@@ -103,7 +116,15 @@ export class BrowserBankSession {
       kind: "open",
       payload: discardCurrent ? { discard_current: true } : undefined,
     };
-    return this.#update(name, command, undefined, bytes);
+    const accepted = await this.#snapshot(command, undefined, bytes);
+    if (accepted.target.document_id === previousId) {
+      throw new Error("The bank engine did not acknowledge a new document.");
+    }
+    return { ...accepted, name };
+  }
+
+  projectOpen(accepted: AcceptedBankOpen): Promise<BrowserBankDocument> {
+    return this.#project(accepted.name, accepted);
   }
 
   async edit(
@@ -263,11 +284,23 @@ export class BrowserBankSession {
     target?: EngineTarget,
     attachment?: ArrayBuffer,
   ) {
-    const { reply } = await this.#dispatch(command, target, attachment);
+    return this.#project(
+      name,
+      await this.#snapshot(command, target, attachment),
+    );
+  }
+
+  async #snapshot(
+    command: EngineCommand,
+    target?: EngineTarget,
+    attachment?: ArrayBuffer,
+  ): Promise<BankSnapshot> {
+    const { reply, bytes } = await this.#dispatch(command, target, attachment);
     if (
       reply.result.kind !== "snapshot" ||
       reply.document_id === null ||
-      reply.revision === null
+      reply.revision === null ||
+      bytes !== undefined
     ) {
       throw new Error("The bank engine did not return a document.");
     }
@@ -280,9 +313,19 @@ export class BrowserBankSession {
     ) {
       throw new Error("The bank engine did not return the requested snapshot.");
     }
-    const accepted = { document_id, expected_revision: revision };
+    return {
+      target: { document_id, expected_revision: revision },
+      snapshot: reply.result.payload,
+    };
+  }
+
+  async #project(
+    name: string,
+    { target, snapshot }: BankSnapshot,
+  ): Promise<BrowserBankDocument> {
+    const { document_id, expected_revision: revision } = target;
     try {
-      const raw = await this.#dispatch({ kind: "raw_text" }, accepted);
+      const raw = await this.#dispatch({ kind: "raw_text" }, target);
       if (
         raw.reply.result.kind !== "raw_text" ||
         raw.bytes === undefined ||
@@ -296,13 +339,13 @@ export class BrowserBankSession {
         name,
         document_id,
         revision,
-        reply.result.payload,
+        snapshot,
         raw.bytes,
         raw.reply.result.payload.source_encoding,
       );
     } catch (error) {
-      if (!target || error instanceof SnapshotRefreshRequired) throw error;
-      throw new SnapshotRefreshRequired(accepted, error);
+      if (error instanceof SnapshotRefreshRequired) throw error;
+      throw new SnapshotRefreshRequired(target, error);
     }
   }
 

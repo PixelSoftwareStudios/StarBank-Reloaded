@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { EditorPane } from "../editor/editor-pane";
+import { EditorPane, type OpenRecovery } from "../editor/editor-pane";
 import type { BankEditorController } from "../editor/index";
 import {
   type BankListItem,
@@ -55,6 +55,7 @@ export function AppShell({
   inventory = NO_INVENTORY,
   mapOptions,
   editor,
+  openRecovery,
   preferences,
   workspaceAccessory,
   tools,
@@ -66,6 +67,7 @@ export function AppShell({
   inventory?: MapInventory;
   mapOptions?: MapOptions;
   editor?: BankEditorController;
+  openRecovery?: OpenRecovery;
   preferences?: PreferencesController;
   workspaceAccessory?: ReactNode;
   tools?: ReactNode;
@@ -133,13 +135,14 @@ export function AppShell({
       <main className="bank-workspace min-h-0 min-w-0 [grid-area:workspace] has-[>.open-requests]:grid has-[>.open-requests]:grid-rows-[auto_minmax(0,1fr)] min-[42rem]:flex min-[42rem]:flex-col">
         {workspaceAccessory}
         <div
-          className="editor-surface min-h-0 min-[42rem]:h-full min-[42rem]:flex-[1_1_0]"
+          className={`editor-surface min-h-0 min-[42rem]:h-full min-[42rem]:flex-[1_1_0]${openRecovery && !showSettings ? " grid grid-rows-[auto_minmax(0,1fr)]" : ""}`}
           hidden={showSettings}
         >
           {editor ? (
             <EditorPane
               name={name}
               controller={editor}
+              openRecovery={openRecovery}
               settings={settings}
               onOpenSettings={onOpenSettings}
               tools={tools}
