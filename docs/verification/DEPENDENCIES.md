@@ -9,6 +9,19 @@ On 2026-11-27, cargo-audit 0.22.2 used RustSec database commit `c5279d0b0c9e8b70
 | pnpm-lock.yaml SHA-256 `f4c357f904793787ccb6133a7c1220c54e96a09f11ed39ab286075583f0ba1c9` | `pnpm audit --json` | Registry response reported 224 dependencies and zero advisories at every severity. |
 | Selected Cargo graph with all workspace features | `cargo deny --all-features list --format json --layout crate`, cargo-deny 0.20.2 | 478 inventory entries; no detected license for 18 authored packages. The remaining entries have detected expressions, not an approved distribution policy. |
 
+## Installed frontend license inventory
+
+On 2026-11-27, pnpm 12.23.0 reported the following installed dependency inventories on macOS arm64.
+
+| Project | Package/version pairs | Reported license expressions |
+| --- | ---: | --- |
+| Workspace root | 2 | MIT OR Apache-2.0 |
+| Shared UI | 72 | 0BSD, Apache-2.0, ISC, MIT |
+| Web app | 61 | Apache-2.0, BSD-3-Clause, BlueOak-1.0.0, ISC, MIT, MPL-2.0 |
+| Desktop app | 47 | Apache-2.0, Apache-2.0 OR MIT, BSD-3-Clause, BlueOak-1.0.0, ISC, MIT, MPL-2.0 |
+
+The root inventory covered Biome 2.6.9 and its macOS arm64 CLI package. The three project inventories overlap and cover 127 distinct name/version pairs altogether. Every reported entry had a license expression. Other platforms' optional packages, separately bundled native components, authored package licensing, and distribution clearance remain separate review items.
+
 ## GLib iterator backport
 
 The locked Linux desktop graph reaches GLib 0.18.5 through Tauri's GTK 3/WebKitGTK dependencies. The checked macOS, Windows, CLI and WASM graphs do not use that library. No compatible official 0.18 release contains the fix. Updating only the GLib registry version cannot satisfy the pinned GTK dependency constraints. [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2024-0429.html) · [Official fix](https://github.com/gtk-rs/gtk-rs-core/commit/b5a4071e439bef2b5eea76c3aa25e5ae84839e34) · [Backport discussion](https://github.com/gtk-rs/gtk-rs-core/pull/1991)
@@ -24,6 +37,10 @@ Use the pinned tools and a fresh RustSec database for a new audit. Record the da
 ```sh
 cargo audit --file Cargo.lock --deny unsound
 pnpm audit --json
+pnpm licenses list --json
+pnpm --dir packages/starbank-ui licenses list --json
+pnpm --dir apps/starbank-web licenses list --json
+pnpm --dir apps/starbank-desktop licenses list --json
 cargo deny --all-features list --format json --layout crate
 python3 crates/vendor/verification/glib/check.py
 python3 crates/vendor/verification/glib/test_check.py
