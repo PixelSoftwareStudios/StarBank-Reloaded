@@ -82,6 +82,22 @@ jobs:
           cargo nextest run --locked -p starbank-fs --lib
           --run-ignored only --no-tests fail --success-output immediate
           -E 'test(=windows::rename_qualification::local_ntfs_handle_relative_create_only_publication)'
+      - name: Qualify Windows single-instance launch delivery
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $selection = @('--locked', '-p', 'starbank-instance', '--lib', '--run-ignored', 'only',
+            '-E', 'test(/^windows::tests::qualify_/)')
+          $listingJson = cargo nextest list @selection --message-format json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $listing = $listingJson | ConvertFrom-Json -AsHashtable
+          $selected = @($listing['rust-suites'].Values |
+            ForEach-Object { $_['testcases'].Values } |
+            Where-Object { $_.ignored -and $_['filter-match'].status -eq 'matches' })
+          if ($selected.Count -ne 5) {
+            throw "Expected five ignored Windows qualification tests, found $($selected.Count)."
+          }
+          cargo nextest run @selection --no-tests fail --test-threads 1 --success-output immediate
       - name: Verify the pinned native StormLib append backend
         if: matrix.os == 'macos-15'
         shell: bash
