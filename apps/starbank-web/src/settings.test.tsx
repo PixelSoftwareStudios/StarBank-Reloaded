@@ -285,7 +285,9 @@ test("the map index worker selector is native-only and respects read-only prefer
       platformInfo={{ version: "0.1.0", platform: "macos" }}
     />,
   );
-  expect(desktop).toContain("Map index workers</span><select disabled=");
+  expect(desktop).toMatch(
+    /Map index workers<\/span><select\b[^>]*\sdisabled=""/u,
+  );
   expect(desktop).toContain(
     '<option value="2" selected="">At most 2 workers</option>',
   );
@@ -308,7 +310,9 @@ test("settings offer map index rebuild alongside refresh when supported", () => 
       }}
     />,
   );
-  expect(settings).toContain('<button type="button">Refresh</button>');
+  expect(settings).toMatch(
+    /<button\b(?![^>]*\sdisabled=)[^>]*\stype="button"[^>]*>Refresh<\/button>/u,
+  );
   expect(settings).toContain("Rebuild map index</button>");
 });
 
@@ -330,11 +334,13 @@ test("settings present archive progress with cancellation when preferences are r
       }}
     />,
   );
-  expect(settings).toContain("<legend>Bank discovery</legend>");
+  expect(settings).toMatch(/<legend\b[^>]*>Bank discovery<\/legend>/u);
   expect(settings).toContain('aria-label="Bank discovery progress"');
   expect(settings).toContain('max="5" value="2"');
   expect(settings).toContain("2 of 5 map archives inspected");
-  expect(settings).toContain('<button type="button">Cancel scan</button>');
+  expect(settings).toMatch(
+    /<button\b(?![^>]*\sdisabled=)[^>]*\stype="button"[^>]*>Cancel scan<\/button>/u,
+  );
   expect(settings).not.toContain("Rebuild map index</button>");
 });
 
@@ -365,7 +371,7 @@ test.each([
         platformInfo={{ version: "1.2.3", platform }}
       />,
     );
-    expect(markup).toContain("<legend>Advanced</legend>");
+    expect(markup).toMatch(/<legend\b[^>]*>Advanced<\/legend>/u);
     expect(markup).toContain("<dt>Version</dt><dd>1.2.3</dd>");
     expect(markup).toContain(`<dt>Platform</dt><dd>${platformName}</dd>`);
     expect(markup).toContain(storage);

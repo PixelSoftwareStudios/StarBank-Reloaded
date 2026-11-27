@@ -68,7 +68,6 @@ import { useDesktopSettings } from "./use-desktop-settings";
 import { openInventoryBank, useInventory } from "./use-inventory";
 import { useNativeCloseGuard } from "./use-native-close-guard";
 import "starbank-ui/styles.css";
-import "starbank-ui/settings.css";
 
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 

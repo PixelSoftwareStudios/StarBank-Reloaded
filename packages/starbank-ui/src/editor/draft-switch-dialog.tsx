@@ -1,4 +1,9 @@
 import { useEffect, useId, useRef } from "react";
+import {
+  buttonClasses,
+  dialogClasses,
+  dialogHeaderClasses,
+} from "../shared/control-styles";
 import type { EditorDraft } from "./index";
 
 export type DraftSwitchKind = EditorDraft["kind"] | "simple";
@@ -55,7 +60,7 @@ export function DraftSwitchDialog({
 
   return (
     <dialog
-      className="editor-dialog"
+      className={dialogClasses}
       aria-labelledby={heading}
       aria-describedby={description}
       ref={dialog}
@@ -64,27 +69,29 @@ export function DraftSwitchDialog({
         close("cancel");
       }}
     >
-      <header className="editor-dialog-header">
-        <h2 id={heading}>{copy.title}</h2>
+      <header className={dialogHeaderClasses}>
+        <h2 className="font-semibold" id={heading}>
+          {copy.title}
+        </h2>
       </header>
       <p id={description}>{message}</p>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button
-          className="editor-button"
+          className={buttonClasses()}
           type="button"
           onClick={() => close("cancel")}
         >
           Cancel
         </button>
         <button
-          className="editor-button"
+          className={buttonClasses()}
           type="button"
           onClick={() => close("discard")}
         >
           Discard and switch
         </button>
         <button
-          className="editor-button editor-primary"
+          className={buttonClasses("primary")}
           type="button"
           onClick={() => close("repair")}
         >

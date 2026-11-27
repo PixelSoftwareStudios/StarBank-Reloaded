@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  settingsButtonClasses,
+  settingsChoiceClasses,
+  settingsControlClasses,
+} from "../settings/settings-controls";
+import { focusOutlineClasses } from "../shared/control-styles";
 
 const BANK_PAGE_SIZE = 80;
+
+export const inventoryMetadataClasses =
+  "block text-[0.75rem] font-normal text-muted";
+export const inventoryStatusClasses = "text-[0.8125rem] text-muted";
+
+const truncatedStatusClasses = `min-w-0 truncate ${inventoryStatusClasses}`;
+const actionClasses = `${focusOutlineClasses} rounded-control border border-control-edge bg-field px-[0.45rem] py-[0.2rem] text-[0.8125rem] text-ink`;
+const inventoryRowClasses = `${focusOutlineClasses} block w-full rounded-control border border-transparent px-[0.45rem] py-[0.3rem] text-start text-[0.875rem]`;
 
 export interface BankListItem {
   id: string;
@@ -90,11 +104,18 @@ export function AccountScopePicker({
   if (scope.choices.length <= 1) return null;
   const sidebar = variant === "sidebar";
   return (
-    <label className={sidebar ? "inventory-account" : "settings-page-choice"}>
+    <label
+      className={sidebar ? "w-[min(68%,9rem)] min-w-0" : settingsChoiceClasses}
+    >
       <span className={sidebar ? "sr-only" : undefined}>
         {sidebar ? "Bank account or player" : "Account"}
       </span>
       <select
+        className={
+          sidebar
+            ? `${focusOutlineClasses} w-full rounded-sm border border-line bg-field px-[0.3rem] py-[0.2rem] text-[0.8125rem] text-ink`
+            : settingsControlClasses
+        }
         value={scope.selected}
         onChange={(event) => scope.select(event.currentTarget.value)}
       >
@@ -190,33 +211,45 @@ export function InventoryActions({
   scanning,
   rootName,
   onRebuildMapIndex,
+  variant = "sidebar",
 }: {
   controls: InventoryControls;
   scanning: boolean;
   rootName?: string | null;
   onRebuildMapIndex?: () => void;
+  variant?: "sidebar" | "settings";
 }) {
+  const buttonClasses = `${variant === "settings" ? settingsButtonClasses : actionClasses} disabled:cursor-not-allowed [&:hover:where(:not(:disabled))]:border-focus disabled:text-muted`;
   const { onSelectDirectory, onRefresh, onUseAutomatic, onCancel } = controls;
   return (
-    <div className="inventory-actions">
+    <div className="[margin-block-start:0.5rem] flex flex-wrap gap-[0.3rem]">
       {rootName && (
-        <p className="inventory-root" title={rootName}>
+        <p
+          className={`basis-full leading-[1.25] ${truncatedStatusClasses}`}
+          title={rootName}
+        >
           <span className="sr-only">Bank folder </span>
           {rootName}
         </p>
       )}
       {onSelectDirectory && (
-        <button type="button" disabled={scanning} onClick={onSelectDirectory}>
+        <button
+          className={buttonClasses}
+          type="button"
+          disabled={scanning}
+          onClick={onSelectDirectory}
+        >
           Select Folder…
         </button>
       )}
       {onRefresh && !scanning && (
-        <button type="button" onClick={onRefresh}>
+        <button className={buttonClasses} type="button" onClick={onRefresh}>
           Refresh
         </button>
       )}
       {onRebuildMapIndex && !scanning && (
         <button
+          className={buttonClasses}
           type="button"
           onClick={onRebuildMapIndex}
           title="Re-read all cached map archives"
@@ -225,12 +258,16 @@ export function InventoryActions({
         </button>
       )}
       {onUseAutomatic && !scanning && (
-        <button type="button" onClick={onUseAutomatic}>
+        <button
+          className={buttonClasses}
+          type="button"
+          onClick={onUseAutomatic}
+        >
           Use auto-detect
         </button>
       )}
       {onCancel && scanning && (
-        <button type="button" onClick={onCancel}>
+        <button className={buttonClasses} type="button" onClick={onCancel}>
           Cancel scan
         </button>
       )}
@@ -245,7 +282,7 @@ function BankScopeLabel({ bank }: { bank: BankListItem }) {
   const text = bank.displayPath || scope;
   if (!text) return null;
   return (
-    <span className="inventory-bank-scope" title={text}>
+    <span className={`${inventoryMetadataClasses} wrap-anywhere`} title={text}>
       {text}
     </span>
   );
@@ -254,7 +291,7 @@ function BankScopeLabel({ bank }: { bank: BankListItem }) {
 function BankMatchLabel({ count }: { count: number }) {
   if (count === 1) return null;
   return (
-    <span className="inventory-bank-match">
+    <span className={inventoryMetadataClasses}>
       {count === 0
         ? "Unmatched map"
         : `Ambiguous map match (${count} candidates)`}
@@ -278,14 +315,18 @@ export function BankBrowser({
   const heading = "Banks";
   const account = accountScope.selected;
   return (
-    <section className="inventory-banks" aria-label={heading}>
-      <div className="inventory-bank-heading">
+    <section
+      className="flex min-h-0 flex-col gap-[0.35rem] overflow-auto border-line [border-block-start-width:1px] [padding-block-start:0.5rem]"
+      aria-label={heading}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-[0.35rem]">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <AccountScopePicker scope={accountScope} variant="sidebar" />
       </div>
-      <fieldset className="inventory-bank-filters">
+      <fieldset className="flex shrink-0 flex-wrap gap-[0.3rem]">
         <legend className="sr-only">Bank file filters</legend>
         <button
+          className={`${actionClasses} aria-pressed:bg-selected aria-pressed:font-semibold [&:hover]:border-focus`}
           type="button"
           aria-pressed={filter.kind === "all"}
           onClick={() => onFilterChange("all")}
@@ -293,6 +334,7 @@ export function BankBrowser({
           All banks
         </button>
         <button
+          className={`${actionClasses} aria-pressed:bg-selected aria-pressed:font-semibold [&:hover]:border-focus`}
           type="button"
           aria-pressed={filter.kind === "unmatched"}
           onClick={() => onFilterChange("unmatched")}
@@ -301,7 +343,10 @@ export function BankBrowser({
         </button>
       </fieldset>
       {filter.kind === "map" && currentMapName && (
-        <p className="inventory-map-context" title={currentMapName}>
+        <p
+          className={`shrink-0 ${truncatedStatusClasses}`}
+          title={currentMapName}
+        >
           {currentMapName}
         </p>
       )}
@@ -339,20 +384,21 @@ function BankList({
             ? "No banks associated with this map."
             : "No bank files found.";
     return (
-      <p className="empty-message text-sm" role="status">
+      <p className="shrink-0 text-sm text-muted" role="status">
         {message}
       </p>
     );
   }
 
   return (
-    <div className="inventory-bank-list">
+    <div className="min-h-0 max-h-[28dvh] overflow-auto overscroll-contain min-[42rem]:max-h-none">
       <ul aria-label="Bank files">
         {banks.slice(0, limit).map((bank) => {
           const backupLabel = bankBackupLabel(model, bank.id);
           return (
             <li key={bank.id}>
               <button
+                className={`${inventoryRowClasses} disabled:cursor-not-allowed disabled:text-muted aria-[current=true]:border-s-[color:var(--selection-edge)] aria-[current=true]:bg-selected [&:hover:where(:not(:disabled,[aria-current=true]))]:bg-hover`}
                 type="button"
                 aria-current={
                   model.selectedBankId === bank.id ? "true" : undefined
@@ -360,11 +406,13 @@ function BankList({
                 disabled={model.disabled}
                 onClick={() => model.onOpenBank(bank.id)}
               >
-                <span className="inventory-bank-name">{bank.name}</span>
+                <span className="block wrap-anywhere">{bank.name}</span>
                 <BankMatchLabel count={bank.mapIds.length} />
                 <BankScopeLabel bank={bank} />
                 {backupLabel && (
-                  <span className="inventory-bank-backup">{backupLabel}</span>
+                  <span className={inventoryMetadataClasses}>
+                    {backupLabel}
+                  </span>
                 )}
               </button>
             </li>
@@ -373,7 +421,7 @@ function BankList({
       </ul>
       {banks.length > limit && (
         <button
-          className="inventory-more"
+          className={`${inventoryRowClasses} bg-field text-ink [&:hover]:border-focus [&:hover]:bg-hover`}
           type="button"
           onClick={() => setLimit(limit + BANK_PAGE_SIZE)}
         >

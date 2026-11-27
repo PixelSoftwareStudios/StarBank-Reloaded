@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { buttonClasses } from "starbank-ui/controls";
 import type { ConflictReview } from "./transport";
 import { XmlComparisonView } from "./xml-comparison";
 
@@ -89,7 +90,7 @@ export function BankConflictDialog({
       <div className="mt-4 flex flex-wrap justify-end gap-2">
         <button
           type="button"
-          className="editor-button"
+          className={buttonClasses()}
           onClick={cancel}
           disabled={busy}
         >
@@ -97,7 +98,7 @@ export function BankConflictDialog({
         </button>
         <button
           type="button"
-          className="editor-button"
+          className={buttonClasses()}
           onClick={loadReview}
           disabled={busy}
         >
@@ -105,7 +106,7 @@ export function BankConflictDialog({
         </button>
         <button
           type="button"
-          className="editor-button"
+          className={buttonClasses()}
           disabled={busy || !review}
           onClick={() => {
             if (review) void run(() => reopen(review.id));
@@ -116,7 +117,7 @@ export function BankConflictDialog({
         {saveAs && (
           <button
             type="button"
-            className="editor-button"
+            className={buttonClasses()}
             onClick={() => void run(saveAs)}
             disabled={busy}
           >

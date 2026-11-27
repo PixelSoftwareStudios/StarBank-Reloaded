@@ -1,4 +1,9 @@
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+  buttonClasses,
+  dialogClasses,
+  dialogHeaderClasses,
+} from "../shared/control-styles";
 
 export function EditorDialog({
   title,
@@ -19,15 +24,17 @@ export function EditorDialog({
 
   return (
     <dialog
-      className="editor-dialog"
+      className={dialogClasses}
       aria-labelledby={heading}
       onClose={onDismiss}
       ref={ref}
     >
-      <header className="editor-dialog-header">
-        <h2 id={heading}>{title}</h2>
+      <header className={dialogHeaderClasses}>
+        <h2 className="font-semibold" id={heading}>
+          {title}
+        </h2>
         <button
-          className="editor-button"
+          className={buttonClasses()}
           type="button"
           onClick={() => ref.current?.close()}
         >

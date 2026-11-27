@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { buttonClasses } from "starbank-ui/controls";
 import type {
   EngineSignatureStatus,
   EngineSigningContext,
@@ -164,7 +165,7 @@ export function ManualSigningSheet({
         {error ? <p role="alert">{error}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <button
-            className="editor-button"
+            className={buttonClasses()}
             disabled={working}
             onClick={dismiss}
             type="button"
@@ -172,7 +173,7 @@ export function ManualSigningSheet({
             Cancel
           </button>
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             disabled={working}
             onClick={(event) => {
@@ -182,7 +183,7 @@ export function ManualSigningSheet({
             Check signature
           </button>
           <button
-            className="editor-button editor-primary"
+            className={buttonClasses("primary")}
             type="submit"
             disabled={working}
           >

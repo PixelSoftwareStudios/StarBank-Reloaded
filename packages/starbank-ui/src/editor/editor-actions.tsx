@@ -1,6 +1,12 @@
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Settings, Wrench } from "lucide-react";
 import { type DragEvent, Fragment, type Ref, useRef } from "react";
+import {
+  buttonClasses,
+  menuContentClasses,
+  menuDividerClasses,
+  menuItemClasses,
+} from "../shared/control-styles";
 import { EditorHelpButton, EditorTooltip } from "../shared/editor-tooltip";
 import type {
   BankEditorController,
@@ -37,12 +43,12 @@ export function ToolsMenuTrigger({
     >
       <Dropdown.Trigger
         ref={ref}
-        className="editor-button"
+        className={buttonClasses()}
         aria-label="Tools"
         aria-describedby={descriptionId}
         disabled={disabled}
       >
-        <Wrench aria-hidden="true" className="settings-icon" />
+        <Wrench aria-hidden="true" className="settings-icon size-4" />
       </Dropdown.Trigger>
     </EditorTooltip>
   );
@@ -107,7 +113,7 @@ export function OpenBankButton({
         />
       )}
       <EditorHelpButton
-        className="editor-button"
+        className={buttonClasses()}
         help="Choose a local bank file"
         placement="bottom"
         disabled={disabled}
@@ -244,10 +250,13 @@ export function EditorActions({
     .filter(({ items }) => items.length > 0);
 
   return (
-    <div className="editor-file-actions" ref={root}>
+    <div
+      className="editor-file-actions ms-auto flex flex-wrap items-center gap-2"
+      ref={root}
+    >
       {onUndo && (
         <EditorHelpButton
-          className="editor-button"
+          className={buttonClasses()}
           help="Undo the last bank change"
           aria-keyshortcuts={UNDO_SHORTCUT}
           disabled={disabled}
@@ -258,7 +267,7 @@ export function EditorActions({
       )}
       {onRedo && (
         <EditorHelpButton
-          className="editor-button"
+          className={buttonClasses()}
           help="Redo the last reverted bank change"
           aria-keyshortcuts={REDO_SHORTCUT}
           disabled={disabled}
@@ -269,7 +278,7 @@ export function EditorActions({
       )}
       {onReset && (
         <EditorHelpButton
-          className="editor-button editor-reset"
+          className={buttonClasses("reset")}
           help="Restore the originally opened bank values"
           disabled={disabled}
           onClick={() => {
@@ -285,9 +294,9 @@ export function EditorActions({
         </EditorHelpButton>
       )}
       {primary && (
-        <div className="editor-save-split">
+        <div className="editor-save-split inline-flex">
           <EditorHelpButton
-            className="editor-button editor-primary"
+            className={`${buttonClasses("primary")}${groupedMenu.length > 0 ? " rounded-e-none" : ""}`}
             help={primary.help}
             aria-keyshortcuts={
               primary.action === save ? SAVE_SHORTCUT : undefined
@@ -304,11 +313,14 @@ export function EditorActions({
                 disabled={disabled}
               >
                 <Dropdown.Trigger
-                  className="editor-button editor-primary editor-save-menu"
+                  className={`${buttonClasses("primary")} editor-save-menu h-auto min-w-7 rounded-s-none [border-inline-start-color:color-mix(in_srgb,currentColor_32%,transparent)]`}
                   aria-label="More save options"
                   disabled={disabled}
                 >
-                  <ChevronDown aria-hidden="true" />
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="mx-auto block size-3.5"
+                  />
                 </Dropdown.Trigger>
               </EditorTooltip>
               <Dropdown.Portal>
@@ -316,18 +328,18 @@ export function EditorActions({
                   side="top"
                   align="end"
                   sideOffset={5}
-                  className="editor-action-popover"
+                  className={menuContentClasses}
                   aria-label="Save options"
                 >
                   {groupedMenu.map(({ group, items }, index) => (
                     <Fragment key={group}>
                       {index > 0 && (
-                        <Dropdown.Separator className="editor-menu-divider" />
+                        <Dropdown.Separator className={menuDividerClasses} />
                       )}
                       {items.map(({ id, label, action }) => (
                         <Dropdown.Item
                           key={id}
-                          className="editor-menu-item"
+                          className={menuItemClasses}
                           onSelect={() => run(() => action(target))}
                         >
                           {label}
@@ -348,13 +360,13 @@ export function EditorActions({
 export function SettingsButton({ open }: { open?: () => void }) {
   return open ? (
     <EditorHelpButton
-      className="editor-button"
+      className={buttonClasses()}
       aria-label="Settings"
       help="Open editor settings"
       placement="bottom"
       onClick={open}
     >
-      <Settings aria-hidden="true" className="settings-icon" />
+      <Settings aria-hidden="true" className="settings-icon size-4" />
     </EditorHelpButton>
   ) : null;
 }

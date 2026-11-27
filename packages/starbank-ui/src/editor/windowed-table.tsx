@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { buttonClasses } from "../shared/control-styles";
 import type { EditorRow } from "./index";
 
 const OVERSCAN_ROWS = 8;
@@ -191,6 +192,7 @@ export function WindowedTable({
         key={`gap-${from}`}
       >
         <td
+          className="border-0 p-0"
           colSpan={columns}
           style={{ height: (to - from) * position.rowHeight }}
         />
@@ -211,10 +213,13 @@ export function WindowedTable({
 
   return (
     <>
-      <nav className="editor-table-navigation" aria-label="Bank row navigation">
+      <nav
+        className="editor-table-navigation flex flex-wrap items-center gap-x-2 gap-y-1 pb-1 text-muted"
+        aria-label="Bank row navigation"
+      >
         <button
           aria-controls={tableId}
-          className="editor-button"
+          className={buttonClasses()}
           disabled={first === 0}
           type="button"
           onClick={() => scrollTo(first - position.count)}
@@ -226,7 +231,7 @@ export function WindowedTable({
         </span>
         <button
           aria-controls={tableId}
-          className="editor-button"
+          className={buttonClasses()}
           disabled={last >= rows.length}
           type="button"
           onClick={() => scrollTo(first + position.count)}
@@ -234,16 +239,24 @@ export function WindowedTable({
           Next rows
         </button>
       </nav>
-      <div className="editor-windowed-table" ref={viewport} onScroll={refresh}>
+      <div
+        className="editor-windowed-table min-h-0 max-h-[100dvb] flex-1 overflow-auto [overflow-anchor:none] [--editor-windowed-row-height:2.125rem]"
+        ref={viewport}
+        onScroll={refresh}
+      >
         <table
           aria-label={label}
+          className="w-full table-fixed border-separate border-spacing-0"
           aria-rowcount={rows.length + 1}
           id={tableId}
           onFocus={trackFocus}
           onBlur={releaseFocus}
           onKeyDown={moveTab}
         >
-          <thead ref={heading}>
+          <thead
+            className="sticky top-0 z-[1] bg-[var(--subtle-surface)]"
+            ref={heading}
+          >
             <tr aria-rowindex={1}>{header}</tr>
           </thead>
           <tbody>{body}</tbody>

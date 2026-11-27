@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useId, useState } from "react";
 import {
+  settingsButtonClasses,
+  settingsChoiceClasses,
+  settingsControlClasses,
+} from "starbank-ui/controls";
+import {
   type BackupPreferences,
   decodeBackupPreferences,
   MAX_BACKUP_RETENTION,
@@ -91,7 +96,7 @@ export function BackupPreferencesFields({
   const messageId = useId();
   return (
     <>
-      <div className="settings-page-choice">
+      <div className={settingsChoiceClasses}>
         <span>Managed backup folder</span>
         {preferences && (
           <strong className="min-w-0 break-words">
@@ -102,13 +107,14 @@ export function BackupPreferencesFields({
         )}
       </div>
       {preferences?.location.mode === "needs_authorization" && (
-        <p className="settings-page-note" role="status">
+        <p className="wrap-anywhere text-[0.8125rem] text-muted" role="status">
           Choose this folder again or use the app default. Writes that require a
           managed backup are paused.
         </p>
       )}
-      <div className="settings-page-actions">
+      <div className="flex flex-wrap items-center gap-2">
         <button
+          className={settingsButtonClasses}
           type="button"
           onClick={choose}
           disabled={disabled || !preferences}
@@ -116,7 +122,12 @@ export function BackupPreferencesFields({
           Choose backup folder…
         </button>
         {preferences?.location.mode !== "default" && preferences && (
-          <button type="button" onClick={useDefault} disabled={disabled}>
+          <button
+            className={settingsButtonClasses}
+            type="button"
+            onClick={useDefault}
+            disabled={disabled}
+          >
             Use app default
           </button>
         )}
@@ -158,12 +169,12 @@ function BackupRetentionField({
       value <= MAX_BACKUP_RETENTION);
   return (
     <>
-      <div className="settings-page-actions">
-        <label className="settings-page-choice">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className={settingsChoiceClasses}>
           Newest managed backups per bank
           <input
             type="text"
-            className="settings-retention-input"
+            className={`${settingsControlClasses} accent-focus`}
             inputMode="numeric"
             size={8}
             value={draft}
@@ -175,6 +186,7 @@ function BackupRetentionField({
           />
         </label>
         <button
+          className={settingsButtonClasses}
           type="button"
           disabled={disabled || !valid || value === keepNewest}
           onClick={() => setKeepNewest(value)}
@@ -182,7 +194,7 @@ function BackupRetentionField({
           Save retention
         </button>
       </div>
-      <p id={messageId} className="settings-page-note">
+      <p id={messageId} className="wrap-anywhere text-[0.8125rem] text-muted">
         {valid
           ? "Leave blank to keep all backups. The retention setting identifies older backups for review."
           : ISSUE_MESSAGES.invalid_retention}

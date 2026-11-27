@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { buttonClasses } from "../shared/control-styles";
 import type { RunEditorAction } from "./editor-actions";
 import type {
   EditorProfileController,
@@ -8,6 +9,10 @@ import type {
   EditorTarget,
   MatchedEditorProfile,
 } from "./index";
+
+const profileInputClasses =
+  "min-w-0 rounded-control px-1.5 py-1 [border:1px_solid_var(--border)]";
+const previewCellClasses = "p-1 text-start wrap-anywhere";
 
 export function ProfilePicker({
   controller,
@@ -26,14 +31,15 @@ export function ProfilePicker({
     !disabled && (!controller.requireAuthor || author.trim() !== "");
 
   return (
-    <details className="profile-picker">
-      <summary>Bank profile</summary>
-      <div className="profile-picker-body">
+    <details className="profile-picker text-[0.8125rem]">
+      <summary className="w-fit cursor-pointer">Bank profile</summary>
+      <div className="profile-picker-body my-2 grid gap-1.5">
         {controller.requireAuthor && (
-          <label>
+          <label className="grid gap-1">
             Map author handle supplied by you
             <input
               type="text"
+              className={profileInputClasses}
               value={author}
               disabled={disabled}
               autoComplete="off"
@@ -42,7 +48,7 @@ export function ProfilePicker({
             />
           </label>
         )}
-        <div className="profile-picker-actions">
+        <div className="profile-picker-actions flex flex-wrap gap-1.5">
           <input
             ref={fileInput}
             type="file"
@@ -61,7 +67,7 @@ export function ProfilePicker({
             }}
           />
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             disabled={!canPick}
             onClick={() => fileInput.current?.click()}
@@ -70,7 +76,7 @@ export function ProfilePicker({
           </button>
           {controller.current.status !== "unloaded" && (
             <button
-              className="editor-button"
+              className={buttonClasses()}
               disabled={disabled}
               type="button"
               onClick={() => run(() => controller.onClear(target))}
@@ -97,12 +103,14 @@ export function SimpleEditor({
 }) {
   const inputPrefix = useId();
   return (
-    <div className="simple-fields">
+    <div className="simple-fields h-full overflow-auto p-2">
       {profile.groups.map((group) => (
-        <fieldset key={group.fields[0]?.id}>
-          <legend>{group.label}</legend>
+        <fieldset className="[&+fieldset]:mt-3" key={group.fields[0]?.id}>
+          <legend className="text-start font-semibold">{group.label}</legend>
           {group.description && (
-            <p className="simple-description">{group.description}</p>
+            <p className="simple-description block [color:var(--muted-foreground)]">
+              {group.description}
+            </p>
           )}
           {group.fields.map((field) => {
             const input =
@@ -113,11 +121,15 @@ export function SimpleEditor({
               (draft !== undefined && draft.field_id !== field.id);
             const inputId = `${inputPrefix}-${field.id}`;
             return (
-              <label key={field.id} htmlFor={inputId} className="simple-field">
+              <label
+                key={field.id}
+                htmlFor={inputId}
+                className="simple-field grid grid-cols-2 items-center gap-2 py-1"
+              >
                 <span>
                   {field.label}
                   {field.description && (
-                    <small className="simple-description">
+                    <small className="simple-description block [color:var(--muted-foreground)]">
                       {field.description}
                     </small>
                   )}
@@ -126,6 +138,7 @@ export function SimpleEditor({
                   <input
                     id={inputId}
                     type="checkbox"
+                    className="justify-self-start"
                     data-profile-draft={input !== undefined || undefined}
                     checked={
                       input?.kind === "checked"
@@ -144,6 +157,7 @@ export function SimpleEditor({
                   <input
                     id={inputId}
                     type="text"
+                    className={`${profileInputClasses} read-only:[color:var(--muted-foreground)]`}
                     data-profile-draft={input !== undefined || undefined}
                     inputMode={field.kind === "number" ? "decimal" : "text"}
                     value={input?.kind === "text" ? input.value : field.value}
@@ -165,30 +179,38 @@ export function SimpleEditor({
       ))}
       {draft?.preview && (
         <section
-          className="simple-preview"
+          className="simple-preview mt-4"
           aria-label="Proposed profile changes"
         >
           {draft.preview.changes.length > 0 && (
-            <table>
-              <caption>Proposed profile changes</caption>
+            <table className="w-full">
+              <caption className="text-start font-semibold">
+                Proposed profile changes
+              </caption>
               <thead>
                 <tr>
-                  <th scope="col">Field</th>
-                  <th scope="col">Current</th>
-                  <th scope="col">Proposed</th>
+                  <th className={previewCellClasses} scope="col">
+                    Field
+                  </th>
+                  <th className={previewCellClasses} scope="col">
+                    Current
+                  </th>
+                  <th className={previewCellClasses} scope="col">
+                    Proposed
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {draft.preview.changes.map((change) => (
                   <tr key={change.id}>
-                    <th scope="row">
+                    <th className={previewCellClasses} scope="row">
                       {profile.groups
                         .flatMap((group) => group.fields)
                         .find((field) => field.id === change.field_id)?.label ??
                         change.field_id}
                     </th>
-                    <td>{change.previous}</td>
-                    <td>{change.value}</td>
+                    <td className={previewCellClasses}>{change.previous}</td>
+                    <td className={previewCellClasses}>{change.value}</td>
                   </tr>
                 ))}
               </tbody>

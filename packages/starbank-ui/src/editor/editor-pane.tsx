@@ -72,24 +72,24 @@ export function EditorPane({
 
   return (
     <div
-      className="editor-welcome-frame"
+      className="editor-welcome-frame grid h-full min-h-[17rem] grid-rows-[auto_minmax(0,1fr)] p-3.5"
       {...fileDropHandlers(controller.onOpenFile, busy, run)}
     >
-      <div className="editor-header-bar">
-        <div className="editor-open-actions">
+      <div className="editor-header-bar flex min-w-0 items-center gap-1.5 justify-end">
+        <div className="editor-open-actions ms-auto flex flex-none items-center justify-end gap-1.5">
           <OpenBankButton controller={controller} disabled={busy} run={run} />
           {tools}
           <SettingsButton open={onOpenSettings} />
         </div>
       </div>
-      <div className="editor-welcome">
+      <div className="editor-welcome grid min-h-0 place-content-center justify-items-center gap-3 px-6 py-8 text-center">
         <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
           {mapContext?.map.name ?? name}
         </h1>
         {mapContext && (
           <MapContextDetails context={mapContext} disabled={busy} />
         )}
-        <p className="empty-message" role="status">
+        <p className="empty-message text-muted" role="status">
           {busy
             ? "Opening bank…"
             : notice ||

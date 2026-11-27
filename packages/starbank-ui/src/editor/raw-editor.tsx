@@ -18,6 +18,33 @@ import { tags } from "@lezer/highlight";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 
 const externalUpdate = Annotation.define<boolean>();
+const editorTheme = EditorView.theme({
+  "&": {
+    height: "100%",
+    minHeight: "0",
+    border: "1px solid var(--shell-divider)",
+    borderRadius: "var(--control-radius)",
+    background: "var(--map-field-bg)",
+    overflow: "hidden",
+  },
+  ".cm-scroller": {
+    overflow: "auto",
+    fontFamily: "ui-monospace, monospace",
+  },
+  ".cm-gutters": {
+    color: "var(--shell-muted)",
+    background: "var(--map-pane-bg)",
+    borderColor: "var(--shell-divider)",
+  },
+  ".cm-selectionLayer .cm-selectionBackground": {
+    background: "var(--map-selected-bg)",
+  },
+  ".cm-cursor": { borderColor: "var(--shell-fg)" },
+  ".cm-panels": {
+    color: "var(--shell-fg)",
+    background: "var(--map-pane-bg)",
+  },
+});
 const highlighting = HighlightStyle.define([
   { tag: [tags.tagName, tags.angleBracket], color: "var(--xml-tag)" },
   { tag: tags.attributeName, color: "var(--xml-attribute)" },
@@ -82,6 +109,7 @@ export default function RawEditor({
         drawSelection(),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+        editorTheme,
         syntaxHighlighting(highlighting),
         EditorView.contentAttributes.of({ "aria-label": "Bank XML" }),
         mode.current.of(editingMode(true)),
@@ -133,5 +161,5 @@ export default function RawEditor({
     });
   }, [wrap]);
 
-  return <div className="editor-raw" ref={host} />;
+  return <div className="editor-raw h-full min-h-0" ref={host} />;
 }

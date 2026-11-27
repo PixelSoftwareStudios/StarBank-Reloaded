@@ -1,12 +1,8 @@
 @import "tailwindcss";
 
-@import "../editor/editor.css";
-@import "../editor/bank-breadcrumbs.css";
-@import "../editor/simple-editor.css";
-
-@import "../inventory/inventory-browser.css";
-
 @source "../";
+@source "../../../../apps/starbank-web/src";
+@source "../../../../apps/starbank-desktop/src";
 
 @theme inline {
   --color-canvas: var(--workspace-bg);
@@ -23,6 +19,13 @@
 }
 
 :root {
+  --editor-danger: #9e2635;
+  --editor-unsaved: #88530d;
+  --primary-action-bg: #2466a6;
+  --primary-action-text: white;
+  --xml-tag: #075bb4;
+  --xml-attribute: #795813;
+  --xml-value: #3a7230;
   color-scheme: light dark;
   --workspace-bg: #f7f8fa;
   --map-pane-bg: #fff;
@@ -50,6 +53,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --editor-danger: #ff9da8;
+    --editor-unsaved: #e4ae62;
+    --primary-action-bg: #477fbc;
+    --primary-action-text: #070e16;
+    --xml-tag: #a0c9ff;
+    --xml-attribute: #edc580;
+    --xml-value: #b4de9e;
     --workspace-bg: #141518;
     --map-pane-bg: #1a1b1f;
     --shell-fg: #f0f0f4;
@@ -62,185 +72,42 @@
   }
 }
 
-.starbank-shell {
-  @apply grid bg-canvas text-ink;
-  grid-template:
-    "workspace" minmax(12rem, 1fr)
-    "maps" auto;
-  min-height: 100dvh;
+:root[data-starbank-text-size="small"] {
+  font-size: 87.5%;
 }
 
-.bank-workspace {
-  grid-area: workspace;
+:root[data-starbank-text-size="large"] {
+  font-size: 112.5%;
 }
 
-.map-pane {
-  @apply grid border-line bg-surface;
-  grid-area: maps;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 0.625rem;
-  border-block-start-width: 1px;
-}
-
-.map-divider {
-  block-size: 1px;
-  border: 0;
-  background: var(--shell-divider);
-}
-
-.empty-message {
-  @apply text-muted;
-}
-
-.map-search {
-  position: relative;
-  display: block;
-}
-
-.map-search > svg {
-  position: absolute;
-  inset-inline-start: 0.625rem;
-  inset-block-start: 50%;
-  inline-size: 0.9375rem;
-  block-size: 0.9375rem;
-  translate: 0 -50%;
-  color: var(--shell-muted);
-  pointer-events: none;
-}
-
-.map-search input {
-  @apply w-full rounded-control border border-control-edge bg-field text-sm;
-  min-block-size: var(--control-height);
-  padding: 0.25rem 0.5rem;
-  padding-inline-start: 1.9rem;
-  color: inherit;
-}
-
-.map-search input::placeholder {
-  color: var(--shell-muted);
-}
-
-.map-list {
-  min-height: 0;
-  max-height: 32dvh;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
-.map-list button {
-  width: 100%;
-  padding: 0.32rem 0.5rem;
-  border: 1px solid transparent;
-  border-radius: var(--control-radius);
-  text-align: start;
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-}
-
-.map-list button:hover {
-  @apply bg-hover;
-}
-
-.map-list button[aria-current="true"] {
-  @apply bg-selected font-semibold;
-  border-inline-start-color: var(--selection-edge);
-}
-
-.map-list .empty-message:empty {
-  display: none;
-}
-
-.map-options label {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding-block: 0.125rem;
-  font-size: 0.8125rem;
-  line-height: 1.35;
-}
-
-.map-options input {
-  flex-shrink: 0;
-  inline-size: 0.875rem;
-  block-size: 0.875rem;
-  margin-block-start: 0.2rem;
-  accent-color: var(--map-focus);
-}
-
-.map-options label:has(input:disabled) {
-  color: var(--shell-muted);
-}
-
-.map-options-more {
-  display: block;
-  margin-inline-start: auto;
-  min-block-size: 1.5rem;
-  padding-inline: 0.25rem;
-  color: var(--map-focus);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.map-options-more:hover {
-  text-decoration: underline;
-}
-
-.sidebar-splitter {
-  display: none;
-}
-
-.map-search input:focus-visible,
-.map-list button:focus-visible,
-.map-options input:focus-visible,
-.map-options-more:focus-visible,
-.sidebar-splitter:focus-visible {
-  outline: 2px solid var(--map-focus);
-  outline-offset: -2px;
-}
-
-@media (min-width: 42rem) {
-  .starbank-shell {
-    grid-template: "maps workspace" 1fr / var(--map-pane-width) minmax(0, 1fr);
-    height: 100dvh;
-    min-height: 22rem;
+@supports (color: light-dark(white, black)) {
+  :root[data-starbank-theme] {
+    --workspace-bg: light-dark(#f7f8fa, #141518);
+    --map-pane-bg: light-dark(#fff, #1a1b1f);
+    --shell-fg: light-dark(#202127, #f0f0f4);
+    --shell-muted: light-dark(#525765, #a9aeb9);
+    --shell-divider: light-dark(#d8dae0, #36373e);
+    --map-field-bg: light-dark(#f7f8fa, #24252a);
+    --map-hover-bg: light-dark(#edf1f8, #252b33);
+    --map-selected-bg: light-dark(#d8e8ff, #304b67);
+    --map-focus: light-dark(#2466a6, #79a9e4);
   }
 
-  .bank-workspace {
-    display: flex;
-    flex-direction: column;
+  :root[data-starbank-theme="light"] {
+    color-scheme: light;
   }
 
-  .editor-surface,
-  .settings-surface {
-    flex: 1 1 0;
-    min-block-size: 0;
+  :root[data-starbank-theme="dark"] {
+    color-scheme: dark;
   }
 
-  .map-pane {
-    min-height: 0;
-    border-block-start: 0;
-    border-inline-end: 1px solid var(--shell-divider);
-  }
-
-  .map-list {
-    max-height: none;
-  }
-
-  .sidebar-splitter {
-    display: block;
-    grid-area: maps;
-    justify-self: end;
-    width: 0.625rem;
-    height: 100%;
-    z-index: 1;
-    border: 0;
-    translate: 50% 0;
-    cursor: col-resize;
-    touch-action: none;
-  }
-
-  .sidebar-splitter:hover {
-    background: color-mix(in srgb, var(--map-focus) 24%, transparent);
+  :root[data-starbank-theme] {
+    --editor-danger: light-dark(#9e2635, #ff9da8);
+    --editor-unsaved: light-dark(#88530d, #e4ae62);
+    --primary-action-bg: light-dark(#2466a6, #477fbc);
+    --primary-action-text: light-dark(white, #070e16);
+    --xml-tag: light-dark(#075bb4, #a0c9ff);
+    --xml-attribute: light-dark(#795813, #edc580);
+    --xml-value: light-dark(#3a7230, #b4de9e);
   }
 }

@@ -32,7 +32,6 @@ import {
 import { LocalBankLibrary } from "./local-bank-library";
 import { useBrowserSettings } from "./use-browser-settings";
 import { ClipboardDialog, ExportDialog, SwitchBankDialog } from "./web-dialogs";
-import "./web-dialogs.css";
 
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 

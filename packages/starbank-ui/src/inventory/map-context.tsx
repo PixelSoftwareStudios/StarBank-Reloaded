@@ -111,20 +111,25 @@ export function MapContextDetails({
   const labels = chooseBank ? bankOptionLabels(choices) : [];
   return (
     <>
-      <div className="editor-map-metadata">
+      <div className="flex flex-wrap justify-between gap-x-3 gap-y-[0.175rem] wrap-anywhere text-[0.75rem] leading-[1.4] text-muted">
         <span>Created by {map.author || "Unknown"}</span>
         <MapArchiveDate millis={map.modifiedAtMillis} showUnknown />
       </div>
       {context.uncertainMatch && (
-        <span className="editor-map-file-label">Possible map match</span>
+        <span className="wrap-anywhere text-[0.75rem] text-muted">
+          Possible map match
+        </span>
       )}
       {!chooseBank && showBankName && activeBank && (
-        <span className="editor-map-file-label">{activeBank.name}</span>
+        <span className="wrap-anywhere text-[0.75rem] text-muted">
+          {activeBank.name}
+        </span>
       )}
       {chooseBank && (
-        <label className="editor-map-bank-choice">
+        <label className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem]">
           {multiple && <span>Multiple bank files detected. Choose one:</span>}
           <select
+            className="max-is-full rounded-[0.3rem] border border-line bg-field px-[0.35rem] py-[0.2rem] text-ink"
             aria-label="Bank file for this map"
             value={activeBank?.id ?? ""}
             disabled={disabled || context.disabled}

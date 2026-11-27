@@ -4,6 +4,7 @@ import type {
   EngineOccurrenceDiff,
   EngineRevertTarget,
 } from "../engine/protocol";
+import { buttonClasses } from "../shared/control-styles";
 import { EditorDialog } from "./editor-dialog";
 
 const CHANGE_PAGE_SIZE = 100;
@@ -23,8 +24,12 @@ function OccurrenceValue({ snapshot }: { snapshot: Snapshot }) {
       <span>{describe(snapshot)}</span>
       {snapshot.value && (
         <>
-          <span className="editor-diff-kind">{snapshot.value.kind}</span>
-          <code>{snapshot.value.text || '""'}</code>
+          <span className="editor-diff-kind mx-[0.35rem] text-muted">
+            {snapshot.value.kind}
+          </span>
+          <code className="whitespace-pre-wrap">
+            {snapshot.value.text || '""'}
+          </code>
         </>
       )}
     </>
@@ -47,8 +52,8 @@ function ChangeRow({
 
   if (change.kind !== "changed") {
     return (
-      <li>
-        <p className="editor-diff-label">
+      <li className="border-t border-line py-[0.4rem] wrap-anywhere">
+        <p className="editor-diff-label font-semibold">
           {change.kind === "added" ? "Added" : "Removed"} {kind}
         </p>
         <OccurrenceValue snapshot={change.payload} />
@@ -63,14 +68,14 @@ function ChangeRow({
     before.value?.text !== after.value?.text;
 
   return (
-    <li>
-      <div className="editor-diff-row">
-        <p className="editor-diff-label">
+    <li className="border-t border-line py-[0.4rem] wrap-anywhere">
+      <div className="editor-diff-row flex items-center justify-between gap-2">
+        <p className="editor-diff-label font-semibold">
           Changed {kind} {name}
         </p>
         {onRevert && (
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             disabled={disabled}
             aria-label={`Revert ${kind} ${name}`}
@@ -81,7 +86,7 @@ function ChangeRow({
         )}
       </div>
       {describeSides && (
-        <dl className="editor-diff-values">
+        <dl className="editor-diff-values grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-[0.15rem]">
           <dt>Opening</dt>
           <dd>
             <OccurrenceValue snapshot={before} />
@@ -114,7 +119,10 @@ export default function EditorDiff({
   return (
     <EditorDialog title="Changes since opening" onDismiss={onDismiss}>
       {notice && (
-        <p className="editor-dialog-notice" role="status">
+        <p
+          className="editor-dialog-notice my-[0.4rem] text-[color:var(--editor-danger)]"
+          role="status"
+        >
           {notice}
         </p>
       )}
@@ -132,7 +140,7 @@ export default function EditorDiff({
           </ul>
           {visible < diff.changes.length && (
             <button
-              className="editor-button"
+              className={buttonClasses()}
               type="button"
               onClick={() => setVisible(visible + CHANGE_PAGE_SIZE)}
             >

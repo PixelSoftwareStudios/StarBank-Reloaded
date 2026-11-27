@@ -2,9 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import type { EditorActionResult } from "starbank-ui";
+import { buttonClasses } from "starbank-ui/controls";
 import { type OpenRequest, readOpenRequests } from "./transport";
-
-import "./open-requests.css";
 
 export { openRequestedBank } from "./transport";
 
@@ -67,21 +66,28 @@ export function OpenRequests({
   const first = queue[0];
   if (!first && !notice) return null;
   return (
-    <aside className="open-requests" aria-label="File open requests">
-      <div className="open-request-text">
+    <aside
+      className="open-requests flex items-center justify-between gap-2 border-b border-line px-2 py-[0.35rem] text-[0.8rem]"
+      aria-label="File open requests"
+    >
+      <div className="min-w-0">
         {first && (
-          <p title={first.name}>
+          <p title={first.name} className="m-0 truncate">
             {first.name}
             {queue.length > 1 && <span> ({queue.length - 1} more)</span>}
           </p>
         )}
-        {notice && <p role="status">{notice}</p>}
+        {notice && (
+          <p role="status" className="m-0 truncate">
+            {notice}
+          </p>
+        )}
       </div>
       {first ? (
-        <div className="open-request-actions">
+        <div className="flex flex-none gap-[0.3rem]">
           <button
             type="button"
-            className="editor-button"
+            className={buttonClasses()}
             disabled={busy || hasDraft}
             title={
               hasDraft ? "Apply or discard the current draft first" : undefined
@@ -97,7 +103,7 @@ export function OpenRequests({
           </button>
           <button
             type="button"
-            className="editor-button"
+            className={buttonClasses()}
             disabled={busy}
             onClick={() => void dismiss(first.id)}
           >
@@ -107,7 +113,7 @@ export function OpenRequests({
       ) : (
         <button
           type="button"
-          className="editor-button"
+          className={buttonClasses()}
           onClick={() => setNotice(undefined)}
         >
           Dismiss

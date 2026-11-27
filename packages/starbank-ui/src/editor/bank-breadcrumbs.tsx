@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
+import { focusOutlineClasses } from "../shared/control-styles";
 
 const TAIL_TOLERANCE = 1;
 const SCROLL_STEP = 48;
@@ -88,7 +89,7 @@ export function BankBreadcrumbs({ segments }: { segments: readonly string[] }) {
     // biome-ignore lint/a11y/useSemanticElements: This is a named scroll group without form controls.
     <div
       aria-label="Bank file path"
-      className="bank-breadcrumbs"
+      className={`bank-breadcrumbs min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:rounded-[0.3125rem] ${focusOutlineClasses}`}
       dir="ltr"
       ref={viewportRef}
       role="group"
@@ -96,7 +97,7 @@ export function BankBreadcrumbs({ segments }: { segments: readonly string[] }) {
       tabIndex={0}
     >
       <ol
-        className="bank-breadcrumbs__path"
+        className="bank-breadcrumbs__path m-0 flex min-h-7 w-max list-none items-center gap-[0.2rem] px-1 whitespace-nowrap text-muted [white-space-collapse:preserve-spaces]"
         ref={listRef}
         // biome-ignore lint/a11y/noRedundantRoles: Safari drops list semantics for lists without markers.
         role="list"
@@ -106,12 +107,15 @@ export function BankBreadcrumbs({ segments }: { segments: readonly string[] }) {
           offset += segment.length + 1;
           return (
             <li
+              className="inline-flex items-center gap-[0.2rem] aria-[current=location]:[&>bdi]:font-semibold aria-[current=location]:[&>bdi]:text-ink"
               aria-current={
                 index === segments.length - 1 ? "location" : undefined
               }
               key={key}
             >
-              {index !== 0 && <ChevronRight aria-hidden="true" />}
+              {index !== 0 && (
+                <ChevronRight aria-hidden="true" className="size-[0.9em]" />
+              )}
               <bdi>{segment}</bdi>
             </li>
           );

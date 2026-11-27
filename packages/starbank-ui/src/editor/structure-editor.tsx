@@ -4,6 +4,7 @@ import {
   type EngineStructuredValueKind,
   STRUCTURED_VALUE_KINDS,
 } from "../engine/protocol";
+import { buttonClasses, focusOutlineClasses } from "../shared/control-styles";
 import { EditorDialog } from "./editor-dialog";
 import type { EditorRow, EditorSection } from "./index";
 
@@ -66,6 +67,9 @@ interface Choice {
   name: string;
 }
 
+const fieldLabelClasses = "grid gap-[0.15rem]";
+const fieldClasses = `min-h-7.5 w-full min-w-0 rounded-sm border border-line bg-field px-[0.4rem] py-[0.2rem] ${focusOutlineClasses}`;
+
 function OccurrenceSelect({
   label,
   choices,
@@ -83,9 +87,10 @@ function OccurrenceSelect({
   for (const { name } of choices) counts.set(name, (counts.get(name) ?? 0) + 1);
 
   return (
-    <label>
+    <label className={fieldLabelClasses}>
       <span id={labelId}>{label}</span>
       <select
+        className={fieldClasses}
         aria-labelledby={labelId}
         disabled={choices.length === 0}
         value={current ?? ""}
@@ -176,13 +181,17 @@ function StructureForm({
   }
 
   return (
-    <form className="editor-dialog-fields" onSubmit={submit}>
+    <form
+      className="editor-dialog-fields mt-[0.4rem] grid gap-[0.4rem]"
+      onSubmit={submit}
+    >
       {(fields === "name" || fields === "name_and_value") && (
-        <label>
+        <label className={fieldLabelClasses}>
           {kind === "add_value" || kind === "rename_value"
             ? "Element name"
             : "Name"}
           <input
+            className={fieldClasses}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             required={kind === "add_value" || kind === "rename_value"}
@@ -191,9 +200,10 @@ function StructureForm({
       )}
       {(fields === "value" || fields === "name_and_value") && (
         <>
-          <label>
+          <label className={fieldLabelClasses}>
             <span id={typeLabel}>Value type</span>
             <select
+              className={fieldClasses}
               aria-labelledby={typeLabel}
               value={valueKind}
               onChange={(event) => {
@@ -210,9 +220,10 @@ function StructureForm({
               ))}
             </select>
           </label>
-          <label>
+          <label className={fieldLabelClasses}>
             Value
             <input
+              className={fieldClasses}
               value={value}
               onChange={(event) => setValue(event.currentTarget.value)}
             />
@@ -220,7 +231,7 @@ function StructureForm({
         </>
       )}
       <button
-        className="editor-button editor-primary editor-structure-submit"
+        className={`${buttonClasses("primary")} editor-structure-submit justify-self-end`}
         type="submit"
         disabled={disabled || !available}
       >
@@ -275,14 +286,18 @@ export default function StructureEditor({
   return (
     <EditorDialog title="Edit bank structure" onDismiss={onDismiss}>
       {notice && (
-        <p className="editor-dialog-notice" role="status">
+        <p
+          className="editor-dialog-notice my-[0.4rem] text-[color:var(--editor-danger)]"
+          role="status"
+        >
           {notice}
         </p>
       )}
-      <div className="editor-dialog-fields">
-        <label>
+      <div className="editor-dialog-fields grid gap-[0.4rem]">
+        <label className={fieldLabelClasses}>
           <span id={actionLabel}>Action</span>
           <select
+            className={fieldClasses}
             aria-labelledby={actionLabel}
             value={operation.kind}
             onChange={(event) => {

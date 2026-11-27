@@ -33,7 +33,7 @@ export function SidebarSplitter({
 
   return (
     <hr
-      className="sidebar-splitter"
+      className="sidebar-splitter hidden min-[42rem]:z-1 min-[42rem]:block min-[42rem]:h-full min-[42rem]:w-2.5 min-[42rem]:translate-x-1/2 min-[42rem]:touch-none min-[42rem]:cursor-col-resize min-[42rem]:justify-self-end min-[42rem]:border-0 min-[42rem]:[grid-area:maps] min-[42rem]:hover:bg-[color-mix(in_srgb,var(--map-focus)_24%,transparent)] focus-visible:[outline:2px_solid_var(--map-focus)] focus-visible:-outline-offset-2"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled || undefined}
       aria-orientation="vertical"

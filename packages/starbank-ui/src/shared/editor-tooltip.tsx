@@ -1,6 +1,8 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ComponentProps, ReactElement } from "react";
 
+import { tooltipClasses } from "./control-styles";
+
 const EDITOR_TOOLTIP_DELAY_MS = 400;
 
 interface TooltipOptions {
@@ -25,7 +27,7 @@ export function EditorTooltip({
         <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
-            className="editor-tooltip"
+            className={tooltipClasses}
             side={placement}
             sideOffset={5}
           >

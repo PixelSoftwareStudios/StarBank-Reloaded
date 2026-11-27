@@ -4,6 +4,7 @@ import {
   SEARCH_SHORTCUT,
   useMapSearchShortcut,
 } from "../editor/keyboard-shortcuts";
+import { focusOutlineClasses } from "../shared/control-styles";
 import {
   type AccountScopeSelection,
   BankBrowser,
@@ -11,11 +12,20 @@ import {
   type BankFilter,
   InventoryActions,
   type InventoryControls,
+  inventoryMetadataClasses,
+  inventoryStatusClasses,
   mapsWithUnbackedBanks,
 } from "./inventory-browser";
 import { MapArchiveDate } from "./map-context";
 
 const MAP_PAGE_SIZE = 80;
+const mapListClasses =
+  "min-h-0 max-h-[32dvh] overflow-auto overscroll-contain min-[42rem]:max-h-none";
+const mapRowClasses = `${focusOutlineClasses} w-full rounded-control border border-transparent px-2 py-[0.32rem] text-start wrap-anywhere text-[0.875rem] leading-[1.35]`;
+const mapOptionLabelClasses =
+  "flex items-start gap-2 py-0.5 text-[0.8125rem] leading-[1.35] has-[input:disabled]:text-muted [.starbank-shell[data-density=comfortable]_&]:py-[0.35rem]";
+const mapOptionInputClasses = `${focusOutlineClasses} size-3.5 shrink-0 accent-focus [margin-block-start:0.2rem]`;
+const mapDividerClasses = "border-0 bg-line [block-size:1px]";
 
 export interface MapListItem {
   id: string;
@@ -166,16 +176,24 @@ export function MapSidebar({
   }
 
   return (
-    <aside className="map-pane min-w-0 p-3" id={id} aria-labelledby={titleId}>
+    <aside
+      className="map-pane grid min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2.5 border-t border-line bg-surface p-3 [grid-area:maps] min-[42rem]:min-h-0 min-[42rem]:border-e min-[42rem]:border-t-0"
+      id={id}
+      aria-labelledby={titleId}
+    >
       <header>
         <h2 className="text-sm font-semibold" id={titleId}>
           Map List
         </h2>
-        <hr className="map-divider my-2" />
-        <label className="map-search">
+        <hr className={`my-2 ${mapDividerClasses}`} />
+        <label className="relative block">
           <span className="sr-only">Search maps</span>
-          <Search aria-hidden="true" />
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute start-2.5 size-[0.9375rem] text-muted [inset-block-start:50%] [translate:0_-50%]"
+          />
           <input
+            className={`${focusOutlineClasses} w-full rounded-control border border-control-edge bg-field px-2 py-1 ps-[1.9rem] text-sm text-inherit [min-block-size:var(--control-height)] placeholder:text-muted`}
             ref={search}
             aria-keyshortcuts={ready ? SEARCH_SHORTCUT : undefined}
             type="search"
@@ -197,22 +215,33 @@ export function MapSidebar({
         )}
       </header>
 
-      <div className={browser ? "inventory-map-bank" : "inventory-maps"}>
-        <div className="map-list">
+      <div
+        className={
+          browser
+            ? "grid min-h-0 gap-2 overflow-auto min-[42rem]:grid-rows-[minmax(0,3fr)_minmax(min(6.75rem,52%),2fr)]"
+            : "min-h-0 overflow-auto"
+        }
+      >
+        <div
+          className={
+            browser ? mapListClasses : `${mapListClasses} min-[42rem]:h-full`
+          }
+        >
           {ready && (inventory.message || inventory.incomplete) && (
-            <p className="inventory-notice" role="status">
+            <p className={inventoryStatusClasses} role="status">
               {inventory.message}
               {inventory.message && inventory.incomplete && " "}
               {inventory.incomplete &&
                 "Some inventory results could not be loaded."}
             </p>
           )}
-          <p className="empty-message text-sm" role="status">
+          <p className="text-sm text-muted empty:hidden" role="status">
             {statusMessage()}
           </p>
           {scanning && (
-            <div className="inventory-progress">
+            <div className={`grid gap-1 ${inventoryStatusClasses}`}>
               <progress
+                className="w-full accent-focus"
                 aria-label="Inventory scan progress"
                 max={inventory.total ?? undefined}
                 value={
@@ -231,6 +260,7 @@ export function MapSidebar({
               {maps.slice(0, limit).map((map) => (
                 <li key={map.id}>
                   <button
+                    className={`${mapRowClasses} aria-[current=true]:border-s-[color:var(--selection-edge)] aria-[current=true]:bg-selected aria-[current=true]:font-semibold [&:hover:where(:not([aria-current=true]))]:bg-hover`}
                     type="button"
                     onClick={() => {
                       setBankScope("selected");
@@ -244,11 +274,13 @@ export function MapSidebar({
                   >
                     {map.name}
                     {map.author && (
-                      <span className="inventory-map-author">{map.author}</span>
+                      <span className={inventoryMetadataClasses}>
+                        {map.author}
+                      </span>
                     )}
                     <MapArchiveDate
                       millis={map.modifiedAtMillis}
-                      className="inventory-map-modified"
+                      className={inventoryMetadataClasses}
                     />
                     <MapBackupStatus
                       count={mapsWithMissingBackups.get(map.id)}
@@ -260,7 +292,7 @@ export function MapSidebar({
           )}
           {maps.length > limit && (
             <button
-              className="inventory-more"
+              className={`${mapRowClasses} bg-field text-ink [&:hover]:border-focus [&:hover]:bg-hover`}
               type="button"
               onClick={() => setLimit(limit + MAP_PAGE_SIZE)}
             >
@@ -284,11 +316,12 @@ export function MapSidebar({
       </div>
 
       <div className="map-options">
-        <hr className="map-divider mb-2" />
+        <hr className={`mb-2 ${mapDividerClasses}`} />
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Quick Options</legend>
-          <label>
+          <label className={mapOptionLabelClasses}>
             <input
+              className={mapOptionInputClasses}
               type="checkbox"
               checked={filters.hideBlizzardMaps}
               disabled={!ready || options?.filters?.disabled}
@@ -298,8 +331,9 @@ export function MapSidebar({
             />
             Hide Blizzard maps
           </label>
-          <label>
+          <label className={mapOptionLabelClasses}>
             <input
+              className={mapOptionInputClasses}
               type="checkbox"
               checked={filters.hideMapsWithoutBanks}
               disabled={!ready || options?.filters?.disabled}
@@ -313,8 +347,9 @@ export function MapSidebar({
             Hide maps without bank files
           </label>
           {autoResign && (
-            <label>
+            <label className={mapOptionLabelClasses}>
               <input
+                className={mapOptionInputClasses}
                 type="checkbox"
                 checked={autoResign.enabled}
                 disabled={autoResign.disabled}
@@ -328,7 +363,7 @@ export function MapSidebar({
         </fieldset>
         {options?.onOpenSettings && (
           <button
-            className="map-options-more"
+            className={`${focusOutlineClasses} ms-auto block px-1 text-[0.8125rem] font-semibold text-focus [min-block-size:1.5rem] [&:hover]:underline`}
             type="button"
             onClick={options.onOpenSettings}
           >
@@ -349,7 +384,7 @@ export type {
 function MapBackupStatus({ count }: { count?: number }) {
   if (!count) return null;
   return (
-    <span className="inventory-bank-backup">
+    <span className={inventoryMetadataClasses}>
       {count === 1
         ? "1 bank without a recorded backup"
         : `${count} banks without recorded backups`}

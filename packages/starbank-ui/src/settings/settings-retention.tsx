@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { EditorDialog } from "../editor/editor-dialog";
+import { settingsButtonClasses } from "./settings-controls";
 
 interface OlderBackup {
   readonly name: string;
@@ -70,8 +71,9 @@ export function SettingsRetentionReview({
 
   return (
     <>
-      <div className="settings-page-actions">
+      <div className="flex flex-wrap items-center gap-2">
         <button
+          className={settingsButtonClasses}
           type="button"
           aria-describedby={noteId}
           disabled={
@@ -82,17 +84,17 @@ export function SettingsRetentionReview({
           Review older backups…
         </button>
       </div>
-      <p className="settings-page-note" id={noteId}>
+      <p className="wrap-anywhere text-[0.8125rem] text-muted" id={noteId}>
         {disabledReason ??
           "Read-only review for the open bank in the current managed backup folder."}
       </p>
       {state.kind === "running" && (
-        <p className="settings-page-note" role="status">
+        <p className="wrap-anywhere text-[0.8125rem] text-muted" role="status">
           Verifying managed backups…
         </p>
       )}
       {state.kind === "error" && (
-        <p className="settings-page-note" role="alert">
+        <p className="wrap-anywhere text-[0.8125rem] text-muted" role="alert">
           {state.message}
         </p>
       )}
@@ -146,7 +148,7 @@ export function RetentionReviewContents({
             {report.older.map((backup) => (
               <li key={backup.name} className="break-all py-1">
                 <p>{backup.name}</p>
-                <p className="settings-page-note">
+                <p className="wrap-anywhere text-[0.8125rem] text-muted">
                   {backup.timestampUtc} UTC ·{" "}
                   {backup.byteLength.toLocaleString()} bytes
                 </p>

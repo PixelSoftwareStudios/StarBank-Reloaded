@@ -13,6 +13,7 @@ import {
 import type { EngineDiff } from "../engine/protocol";
 import { type MapContext, MapContextDetails } from "../inventory/map-context";
 import type { AppSettings } from "../settings/settings";
+import { buttonClasses, focusOutlineClasses } from "../shared/control-styles";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
 import { DraftSwitchDialog, type DraftSwitchKind } from "./draft-switch-dialog";
@@ -43,6 +44,12 @@ import {
 import { TableEditor } from "./table-editor";
 
 type EditorView = NonNullable<ReturnType<typeof useEditorState>["view"]>;
+
+const tabClasses = `editor-tab min-h-[var(--control-height)] border-b-2 border-transparent px-4 whitespace-nowrap text-muted data-[state=active]:border-focus data-[state=active]:font-semibold data-[state=active]:text-ink ${focusOutlineClasses}`;
+const viewClasses = "editor-view m-0 h-full min-h-0 min-w-0 overflow-auto p-0";
+const draftStatusClasses = "min-w-0 flex-[1_1_8rem] text-muted wrap-anywhere";
+const statusMarkerClasses =
+  "text-[0.75rem] before:ms-2 before:me-1.5 before:inline-block before:size-1 before:rounded-full before:align-[0.15em] before:content-['']";
 
 export type EditorSettings = Pick<
   AppSettings,
@@ -411,15 +418,15 @@ export function BankEditor({
 
   return (
     <div
-      className="document-editor"
+      className="document-editor [--editor-primary-bg:var(--primary-action-bg)] [--editor-primary-text:var(--primary-action-text)] grid h-full min-h-[30rem] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-2 p-3.5 pb-[calc(0.875rem_+_2px)] text-[0.875rem] min-[42rem]:min-h-0 [.starbank-shell[data-density=comfortable]_&]:gap-3 [.starbank-shell[data-density=comfortable]_&]:p-[1.125rem] [.starbank-shell[data-density=comfortable]_&]:pb-[calc(1.125rem_+_2px)]"
       {...fileDropHandlers(controller.onOpenFile, pending, run)}
     >
-      <header className="editor-header">
-        <div className="editor-header-bar">
+      <header className="editor-header grid gap-[0.3125rem]">
+        <div className="editor-header-bar flex min-w-0 items-center gap-1.5">
           {showBreadcrumbs && document.breadcrumbs && (
             <BankBreadcrumbs segments={document.breadcrumbs} />
           )}
-          <div className="editor-open-actions">
+          <div className="editor-open-actions ms-auto flex flex-none items-center justify-end gap-1.5">
             <OpenBankButton
               controller={controller}
               disabled={pending}
@@ -435,7 +442,12 @@ export function BankEditor({
             <SettingsButton open={onOpenSettings} />
           </div>
         </div>
-        <h1 title={title}>{title}</h1>
+        <h1
+          className="mt-1 truncate text-center text-[1.75rem] leading-[1.2] font-semibold tracking-[-0.025em]"
+          title={title}
+        >
+          {title}
+        </h1>
         {mapContext && (
           <MapContextDetails
             context={mapContext}
@@ -454,7 +466,7 @@ export function BankEditor({
       </header>
 
       <Tabs.Root
-        className="editor-views"
+        className="editor-views grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]"
         value={selectedView}
         activationMode={hasDraft ? "manual" : "automatic"}
         onValueChange={(key) => {
@@ -464,7 +476,7 @@ export function BankEditor({
       >
         <Tabs.List
           aria-label="Bank views"
-          className="editor-tab-list"
+          className="editor-tab-list flex overflow-auto border-b border-line"
           onKeyDown={(event) => {
             // Radix activates the tab from keydown. Its native button click can
             // otherwise activate the newly focused dialog button.
@@ -473,21 +485,21 @@ export function BankEditor({
           }}
         >
           {profile && (
-            <Tabs.Trigger className="editor-tab" value="simple">
+            <Tabs.Trigger className={tabClasses} value="simple">
               Simple View
             </Tabs.Trigger>
           )}
-          <Tabs.Trigger className="editor-tab" value="table">
+          <Tabs.Trigger className={tabClasses} value="table">
             Table View
           </Tabs.Trigger>
-          <Tabs.Trigger className="editor-tab" value="raw">
+          <Tabs.Trigger className={tabClasses} value="raw">
             Raw View
           </Tabs.Trigger>
         </Tabs.List>
         {profile && (
           <Tabs.Content
             value="simple"
-            className="editor-view"
+            className={viewClasses}
             ref={simplePanel}
           >
             <SimpleEditor
@@ -500,7 +512,7 @@ export function BankEditor({
         )}
         <Tabs.Content
           value="table"
-          className="editor-view"
+          className={viewClasses}
           forceMount={tableVisible || retainTable ? true : undefined}
           hidden={!tableVisible}
           ref={tablePanel}
@@ -545,7 +557,7 @@ export function BankEditor({
         </Tabs.Content>
         <Tabs.Content
           value="raw"
-          className="editor-view"
+          className={viewClasses}
           forceMount={keepRawMounted ? true : undefined}
           hidden={!rawVisible}
         >
@@ -655,14 +667,14 @@ export function BankEditor({
       </Suspense>
 
       {profileDraft && (
-        <div className="editor-draft-actions">
-          <p role="status">
+        <div className="editor-draft-actions flex flex-wrap items-center gap-2 border-t border-line pt-2">
+          <p className={draftStatusClasses} role="status">
             {staleProfile
               ? "The bank or profile changed. Discard this draft to continue."
               : "Unapplied Simple View changes"}
           </p>
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             disabled={busy}
             onClick={discardProfileDraft}
@@ -671,7 +683,7 @@ export function BankEditor({
           </button>
           {simpleVisible && (
             <button
-              className="editor-button editor-primary"
+              className={buttonClasses("primary")}
               type="button"
               disabled={busy || staleProfile}
               onClick={profileDraft.preview ? applyProfile : previewProfile}
@@ -683,8 +695,8 @@ export function BankEditor({
       )}
 
       {draft && (
-        <div className="editor-draft-actions">
-          <p role="status">
+        <div className="editor-draft-actions flex flex-wrap items-center gap-2 border-t border-line pt-2">
+          <p className={draftStatusClasses} role="status">
             {stale
               ? "The bank changed while you were editing. Discard this draft to continue."
               : draft.kind === "raw"
@@ -692,7 +704,7 @@ export function BankEditor({
                 : "Unapplied Table View changes"}
           </p>
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             disabled={busy}
             onClick={discardDraft}
@@ -700,7 +712,7 @@ export function BankEditor({
             Discard draft
           </button>
           <button
-            className="editor-button editor-primary"
+            className={buttonClasses("primary")}
             type="button"
             disabled={
               busy || stale || hasInvalidTableEdits || validationPending
@@ -712,14 +724,29 @@ export function BankEditor({
         </div>
       )}
 
-      <footer className="editor-footer">
-        <div className="editor-status" role="status">
+      <footer className="editor-footer row-start-4 justify-between flex flex-wrap items-center gap-2 border-t border-line pt-2">
+        <div
+          className="editor-status min-w-0 flex-[1_1_8rem] text-muted wrap-anywhere"
+          role="status"
+        >
           {status}
           {dirtyStatus && (
-            <span className="editor-dirty-status">{dirtyStatus}</span>
+            <span
+              className={`editor-dirty-status ${statusMarkerClasses} before:bg-[var(--editor-unsaved)]`}
+            >
+              {dirtyStatus}
+            </span>
           )}
-          {document.signatureStatus && <span>{document.signatureStatus}</span>}
-          {controller.backupStatus && <span>{controller.backupStatus}</span>}
+          {document.signatureStatus && (
+            <span className={`${statusMarkerClasses} before:bg-current`}>
+              {document.signatureStatus}
+            </span>
+          )}
+          {controller.backupStatus && (
+            <span className={`${statusMarkerClasses} before:bg-current`}>
+              {controller.backupStatus}
+            </span>
+          )}
         </div>
         <EditorActions
           controller={controller}

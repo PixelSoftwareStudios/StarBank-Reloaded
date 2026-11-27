@@ -1,7 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { StarBankWeb } from "./browser-app";
 import "starbank-ui/styles.css";
-import "starbank-ui/settings.css";
 
 const root = document.getElementById("root");
 if (!root) {

@@ -126,13 +126,16 @@ export function AppShell({
 
   return (
     <div
-      className="starbank-shell"
+      className="starbank-shell grid min-h-dvh grid-rows-[minmax(12rem,1fr)_auto] [grid-template-areas:'workspace'_'maps'] bg-canvas text-ink min-[42rem]:h-dvh min-[42rem]:min-h-88 min-[42rem]:grid-cols-[var(--map-pane-width)_minmax(0,1fr)] min-[42rem]:grid-rows-[1fr] min-[42rem]:[grid-template-areas:'maps_workspace']"
       style={style}
       data-density={settings?.density}
     >
-      <main className="bank-workspace min-w-0">
+      <main className="bank-workspace min-h-0 min-w-0 [grid-area:workspace] has-[>.open-requests]:grid has-[>.open-requests]:grid-rows-[auto_minmax(0,1fr)] min-[42rem]:flex min-[42rem]:flex-col">
         {workspaceAccessory}
-        <div className="editor-surface" hidden={showSettings}>
+        <div
+          className="editor-surface min-h-0 min-[42rem]:h-full min-[42rem]:flex-[1_1_0]"
+          hidden={showSettings}
+        >
           {editor ? (
             <EditorPane
               name={name}
@@ -146,18 +149,18 @@ export function AppShell({
               )}
             />
           ) : (
-            <div className="editor-welcome">
+            <div className="editor-welcome grid min-h-full place-content-center justify-items-center gap-3 px-6 py-8 text-center">
               <h1 className="text-[1.75rem] leading-tight font-semibold">
                 {name}
               </h1>
-              <p className="empty-message">
+              <p className="empty-message text-muted">
                 Bank editing is unavailable in this build.
               </p>
             </div>
           )}
         </div>
         {showSettings && (
-          <div className="settings-surface">
+          <div className="settings-surface min-h-0 min-[42rem]:h-full min-[42rem]:flex-[1_1_0]">
             <Suspense fallback={<p role="status">Loading settings…</p>}>
               <SettingsPage
                 settings={preferences.settings}

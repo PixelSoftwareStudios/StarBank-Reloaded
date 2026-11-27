@@ -7,6 +7,12 @@ import {
 import type { MapInventory } from "../inventory/map-sidebar";
 import { type AppSettings, MAP_PANE_WIDTH } from "./settings";
 import {
+  settingsButtonClasses,
+  settingsChoiceClasses,
+  settingsControlClasses,
+  settingsInputClasses,
+} from "./settings-controls";
+import {
   SettingsPlatformDetails,
   type SettingsPlatformInfo,
 } from "./settings-platform";
@@ -114,19 +120,36 @@ export function SettingsPage({
   }, [focusOnMount]);
 
   return (
-    <section className="settings-page" aria-label="Settings">
-      <header className="settings-page-header">
-        <h1>Settings</h1>
-        <button type="button" ref={back} onClick={onBack}>
+    <section
+      className="grid h-full w-full min-w-0 content-start gap-4.5 overflow-auto bg-canvas p-4 text-start text-ink"
+      aria-label="Settings"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
+        <h1 className="font-[650] text-2xl leading-[1.2] tracking-[-.02em]">
+          Settings
+        </h1>
+        <button
+          className={settingsButtonClasses}
+          type="button"
+          ref={back}
+          onClick={onBack}
+        >
           Back to editor
         </button>
       </header>
 
       {issue && (
-        <div className="settings-page-issue" role="alert">
+        <div
+          className="grid justify-items-start gap-2 border border-line p-2"
+          role="alert"
+        >
           <p>{issue}</p>
           {onRecover && (
-            <button type="button" onClick={onRecover}>
+            <button
+              className={settingsButtonClasses}
+              type="button"
+              onClick={onRecover}
+            >
               Recover settings
             </button>
           )}
@@ -145,7 +168,7 @@ export function SettingsPage({
       <Group title="General" disabled={readOnly}>
         {discovery && <DiscoveryFields discovery={discovery} />}
         {!discovery && !inventory?.controls && (
-          <p className="settings-page-note">
+          <p className="wrap-anywhere text-[0.8125rem] text-muted">
             Automatic bank discovery and account selection are available in the
             desktop app.
           </p>
@@ -186,9 +209,10 @@ export function SettingsPage({
       </Group>
 
       <Group title="Layout" disabled={readOnly}>
-        <label className="settings-page-choice">
+        <label className={settingsChoiceClasses}>
           <span>Map list width</span>
           <input
+            className={settingsInputClasses}
             type="range"
             min={MAP_PANE_WIDTH.min}
             max={MAP_PANE_WIDTH.max}
@@ -238,7 +262,7 @@ export function SettingsPage({
         >
           Auto re-sign banks on save
         </Toggle>
-        <p className="settings-page-note">
+        <p className="wrap-anywhere text-[0.8125rem] text-muted">
           Reset restores the bank as it was opened.
           {revertToSavedAvailable &&
             " Use Revert to Last Save to restore the last verified save."}
@@ -252,7 +276,7 @@ export function SettingsPage({
               onChange={(value) => onChange("automaticBackup", value)}
             />
             {settings.automaticBackup === "off" && (
-              <p className="settings-page-note">
+              <p className="wrap-anywhere text-[0.8125rem] text-muted">
                 Overwriting a bank will proceed without an automatic backup.
               </p>
             )}
@@ -263,7 +287,7 @@ export function SettingsPage({
       {platformInfo && (
         <Group title="Advanced">
           {platformInfo.platform === "web" ? (
-            <p className="settings-page-note">
+            <p className="wrap-anywhere text-[0.8125rem] text-muted">
               Map indexing is available in the desktop app.
             </p>
           ) : (
@@ -275,7 +299,7 @@ export function SettingsPage({
                 onChange={(value) => onChange("mapIndexWorkers", value)}
                 disabled={readOnly}
               />
-              <p className="settings-page-note">
+              <p className="wrap-anywhere text-[0.8125rem] text-muted">
                 Applies to the next scan. Indexing uses up to four workers and
                 never more than half the available CPUs when there are at least
                 two.
@@ -299,8 +323,11 @@ function Group({
   disabled?: boolean;
 }) {
   return (
-    <fieldset className="settings-page-group" disabled={disabled}>
-      <legend>{title}</legend>
+    <fieldset
+      className="grid min-w-0 gap-2 border-b border-line pt-1 pb-1.5"
+      disabled={disabled}
+    >
+      <legend className="font-semibold">{title}</legend>
       {children}
     </fieldset>
   );
@@ -316,8 +343,9 @@ function Toggle({
   children: ReactNode;
 }) {
   return (
-    <label className="settings-page-toggle">
+    <label className="flex items-center gap-2 text-[0.875rem]">
       <input
+        className={settingsInputClasses}
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
@@ -341,9 +369,10 @@ function ChoiceField<Value extends string>({
   disabled?: boolean;
 }) {
   return (
-    <label className="settings-page-choice">
+    <label className={settingsChoiceClasses}>
       <span>{label}</span>
       <select
+        className={settingsControlClasses}
         value={selected}
         disabled={disabled}
         onChange={(event) => {
@@ -398,13 +427,14 @@ function InventoryDiscoveryFields({ inventory }: { inventory: MapInventory }) {
     <>
       {controls && (
         <InventoryActions
+          variant="settings"
           controls={controls}
           rootName={rootName}
           scanning={scanning}
           onRebuildMapIndex={controls.onRebuildMapIndex}
         />
       )}
-      <p className="settings-page-note" role="status">
+      <p className="wrap-anywhere text-[0.8125rem] text-muted" role="status">
         {status}
       </p>
       {scanning && (
@@ -417,7 +447,7 @@ function InventoryDiscoveryFields({ inventory }: { inventory: MapInventory }) {
       {scanning &&
         inventory.scanned !== undefined &&
         inventory.total !== undefined && (
-          <p className="settings-page-note">
+          <p className="wrap-anywhere text-[0.8125rem] text-muted">
             {inventory.scanned} of {inventory.total} map archives inspected
           </p>
         )}
@@ -433,32 +463,42 @@ function DiscoveryFields({
   const root = discovery.root;
   return (
     <>
-      <p className="settings-page-note">
+      <p className="wrap-anywhere text-[0.8125rem] text-muted">
         {root.mode === "manual"
           ? root.label
           : root.mode === "needs_authorization"
             ? "Choose your previous bank folder again to authorize access."
             : "Detect bank folders automatically."}
       </p>
-      <div className="settings-page-actions">
-        <button type="button" onClick={discovery.onChooseFolder}>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          className={settingsButtonClasses}
+          type="button"
+          onClick={discovery.onChooseFolder}
+        >
           Choose bank folder…
         </button>
         <button
+          className={settingsButtonClasses}
           type="button"
           onClick={discovery.onUseAutomatic}
           disabled={root.mode === "automatic"}
         >
           Use auto-detection
         </button>
-        <button type="button" onClick={discovery.onRescan}>
+        <button
+          className={settingsButtonClasses}
+          type="button"
+          onClick={discovery.onRescan}
+        >
           Re-scan
         </button>
       </div>
       {discovery.accounts.length > 0 && (
-        <label className="settings-page-choice">
+        <label className={settingsChoiceClasses}>
           <span>Account</span>
           <select
+            className={settingsControlClasses}
             value={discovery.accountId ?? ""}
             onChange={(event) =>
               discovery.onSelectAccount(event.currentTarget.value || null)

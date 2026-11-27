@@ -1,5 +1,6 @@
 import { type ChangeEvent, useRef, useState } from "react";
 import type { EditorActionResult } from "starbank-ui";
+import { buttonClasses } from "starbank-ui/controls";
 import {
   type BankSelectionSource,
   collectLocalBanks,
@@ -8,7 +9,6 @@ import {
   MAX_LOCAL_BANKS,
   MAX_SELECTED_FILES,
 } from "./local-bank-selection";
-import "./local-bank-library.css";
 
 const BANK_PAGE_SIZE = 80;
 const BANK_FILE_TYPES = ".sc2bank,.xml";
@@ -85,14 +85,16 @@ export function LocalBankLibrary({
   }
 
   return (
-    <details className="local-bank-library">
-      <summary>Local banks</summary>
-      <div className="local-bank-library-body">
-        <p>
+    <details className="local-bank-library border-be border-line bg-surface px-4 py-[0.45rem]">
+      <summary className="w-fit cursor-pointer font-semibold">
+        Local banks
+      </summary>
+      <div className="grid gap-2 pbs-2 pbe-[0.2rem] text-[0.875rem]">
+        <p className="text-muted">
           Choose files or a folder to replace the list. Select a bank to open
           it.
         </p>
-        <div className="local-bank-actions">
+        <div className="flex flex-wrap gap-[0.35rem]">
           <input
             ref={filesInput}
             type="file"
@@ -103,7 +105,7 @@ export function LocalBankLibrary({
             onChange={(event) => importSelection(event, "files")}
           />
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             onClick={() => filesInput.current?.click()}
           >
@@ -123,7 +125,7 @@ export function LocalBankLibrary({
                 onChange={(event) => importSelection(event, "folder")}
               />
               <button
-                className="editor-button"
+                className={buttonClasses()}
                 type="button"
                 onClick={() => folderInput.current?.click()}
               >
@@ -133,7 +135,7 @@ export function LocalBankLibrary({
           )}
           {banks.length > 0 && (
             <button
-              className="editor-button"
+              className={buttonClasses()}
               type="button"
               onClick={() => {
                 setBanks([]);
@@ -144,16 +146,25 @@ export function LocalBankLibrary({
             </button>
           )}
         </div>
-        {notice && <p role="status">{notice}</p>}
+        {notice && (
+          <p className="text-muted" role="status">
+            {notice}
+          </p>
+        )}
         {hasDraft && banks.length > 0 && (
-          <p>Apply or discard your draft before opening another bank.</p>
+          <p className="text-muted">
+            Apply or discard your draft before opening another bank.
+          </p>
         )}
         {banks.length > 0 && (
-          <ul className="local-bank-list" aria-label="Local bank list">
+          <ul
+            className="flex max-block-40 flex-wrap gap-[0.35rem] overflow-auto p-[0.15rem]"
+            aria-label="Local bank list"
+          >
             {banks.slice(0, limit).map(({ file, label }, index) => (
-              <li key={`${index}:${label}`}>
+              <li className="max-inline-full" key={`${index}:${label}`}>
                 <button
-                  className="editor-button"
+                  className={`${buttonClasses()} max-inline-full wrap-anywhere aria-[current=true]:bg-selected`}
                   type="button"
                   title={label}
                   aria-current={file === openedFile ? "true" : undefined}
@@ -168,7 +179,7 @@ export function LocalBankLibrary({
         )}
         {banks.length > limit && (
           <button
-            className="editor-button"
+            className={buttonClasses()}
             type="button"
             onClick={() => setLimit(limit + BANK_PAGE_SIZE)}
           >

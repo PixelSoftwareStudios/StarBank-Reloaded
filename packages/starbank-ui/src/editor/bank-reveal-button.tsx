@@ -1,4 +1,5 @@
 import { FolderOpen } from "lucide-react";
+import { buttonClasses } from "../shared/control-styles";
 import { EditorHelpButton } from "../shared/editor-tooltip";
 import type { RunEditorAction } from "./editor-actions";
 import type { EditorAction, EditorTarget } from "./index";
@@ -17,7 +18,7 @@ export function BankRevealButton({
   const unavailable = "Open in Folder is unavailable on this platform.";
   return (
     <EditorHelpButton
-      className="editor-button"
+      className={buttonClasses()}
       aria-label="Open in Folder"
       aria-description={reveal ? undefined : unavailable}
       aria-disabled={!reveal || busy}
@@ -28,7 +29,7 @@ export function BankRevealButton({
         if (reveal && !busy) run(() => reveal(target));
       }}
     >
-      <FolderOpen aria-hidden="true" className="settings-icon" />
+      <FolderOpen aria-hidden="true" className="settings-icon size-4" />
     </EditorHelpButton>
   );
 }

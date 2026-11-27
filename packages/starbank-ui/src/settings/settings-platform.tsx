@@ -1,3 +1,5 @@
+import { settingsChoiceClasses } from "./settings-controls";
+
 export type SettingsPlatform =
   | "web"
   | "macos"
@@ -46,16 +48,18 @@ export function SettingsPlatformDetails({
   return (
     <>
       <dl>
-        <div className="settings-page-choice">
+        <div className={settingsChoiceClasses}>
           <dt>Version</dt>
           <dd>{info.version}</dd>
         </div>
-        <div className="settings-page-choice">
+        <div className={settingsChoiceClasses}>
           <dt>Platform</dt>
           <dd>{details.name}</dd>
         </div>
       </dl>
-      <p className="settings-page-note">{details.storage}</p>
+      <p className="wrap-anywhere text-[0.8125rem] text-muted">
+        {details.storage}
+      </p>
     </>
   );
 }

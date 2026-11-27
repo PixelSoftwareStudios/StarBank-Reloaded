@@ -6,7 +6,6 @@
     ".": "./src/index.ts",
     "./settings": "./src/settings/settings-page.tsx",
     "./settings-retention": "./src/settings/settings-retention.tsx",
-    "./settings.css": "./src/settings/settings-page.css",
     "./styles.css": "./src/styles/styles.css",
     "./editor": "./src/editor/index.ts",
     "./engine": "./src/engine/client.ts",
@@ -15,7 +14,8 @@
     "./engine/signing-protocol": "./src/engine/signing-protocol.ts",
     "./settings-model": "./src/settings/settings.ts",
     "./browser": "./src/platform/browser.ts",
-    "./bank-encoding": "./src/platform/bank-encoding.ts"
+    "./bank-encoding": "./src/platform/bank-encoding.ts",
+    "./controls": "./src/shared/control-styles.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

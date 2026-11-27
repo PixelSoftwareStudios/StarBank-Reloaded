@@ -1,9 +1,15 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
+import { buttonClasses, focusOutlineClasses } from "../shared/control-styles";
 import { type EditorRow, type EditorSection, groupNumberLexeme } from "./index";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
 const WINDOW_THRESHOLD = 150;
+const tableFieldClasses = `min-w-0 rounded-control border border-control-edge bg-field px-[0.45rem] py-[0.2rem] tabular-nums aria-invalid:border-[color:var(--editor-danger)] ${focusOutlineClasses}`;
+const headerCellClasses =
+  "border-b border-line px-1.5 py-[0.235rem] text-start wrap-anywhere first:w-[32%] [&:nth-child(2)]:w-[17%]";
+const tableErrorClasses =
+  "editor-error p-[0.3rem] text-[color:var(--editor-danger)]";
 const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
 
 type SortOrder = "source" | "ascending" | "descending";
@@ -129,21 +135,37 @@ export function TableEditor({
     : section?.name || "Unnamed section";
   const header = (
     <>
-      {unified && <th scope="col">Section</th>}
-      <th scope="col" aria-sort={sort === "source" ? undefined : sort}>
+      {unified && (
+        <th className={headerCellClasses} scope="col">
+          Section
+        </th>
+      )}
+      <th
+        className={headerCellClasses}
+        scope="col"
+        aria-sort={sort === "source" ? undefined : sort}
+      >
         <button
-          className="editor-name-sort"
+          className={`editor-name-sort inline-flex items-center gap-[0.2rem] rounded-[0.2rem] text-start ${focusOutlineClasses}`}
           type="button"
           title={sortAction[sort]}
           onClick={() => setSort(nextSort[sort])}
         >
           Name
-          {sort === "ascending" && <ChevronUp aria-hidden="true" />}
-          {sort === "descending" && <ChevronDown aria-hidden="true" />}
+          {sort === "ascending" && (
+            <ChevronUp aria-hidden="true" className="size-3 flex-none" />
+          )}
+          {sort === "descending" && (
+            <ChevronDown aria-hidden="true" className="size-3 flex-none" />
+          )}
         </button>
       </th>
-      <th scope="col">Type</th>
-      <th scope="col">Value</th>
+      <th className={headerCellClasses} scope="col">
+        Type
+      </th>
+      <th className={headerCellClasses} scope="col">
+        Value
+      </th>
     </>
   );
 
@@ -183,27 +205,38 @@ export function TableEditor({
     const issueId =
       issue !== undefined ? `${issueDescriptionId}-${row.id}` : undefined;
     const name = rowLabel(row);
+    const cellClasses = `border-b border-line px-1.5 text-start wrap-anywhere ${index === undefined ? "py-[0.235rem]" : "h-[var(--editor-windowed-row-height)] truncate py-0"}`;
     return (
       <tr
         key={row.id}
+        className="[&:hover]:bg-[var(--subtle-surface)]"
         aria-rowindex={index === undefined ? undefined : index + 2}
         data-bank-row-index={index}
       >
         {unified && (
           <td
+            className={cellClasses}
             aria-description={sectionDirty ? "Unsaved changes" : undefined}
             title={windowed ? sectionName : undefined}
           >
             {sectionName || "Unnamed section"}
             {sectionDirty && (
-              <span className="editor-section-dirty" aria-hidden="true" />
+              <span
+                className="editor-section-dirty ms-1.5 inline-block size-1.5 rounded-full bg-[var(--editor-unsaved)] align-middle"
+                aria-hidden="true"
+              />
             )}
           </td>
         )}
-        <th scope="row" title={windowed ? name : undefined}>
+        <th
+          className={`${cellClasses} font-normal`}
+          scope="row"
+          title={windowed ? name : undefined}
+        >
           {editable && (
             <input
               type="checkbox"
+              className={`me-[0.35rem] accent-focus ${focusOutlineClasses}`}
               aria-label={`Select ${name}`}
               data-bank-field={windowed ? "select" : undefined}
               checked={selectedRows.has(row.id)}
@@ -228,15 +261,16 @@ export function TableEditor({
           {name || "Unnamed key"}
         </th>
         <td
-          className="editor-table-type"
+          className={`editor-table-type text-[0.8125rem] text-muted ${cellClasses}`}
           title={windowed ? row.type : undefined}
         >
           {row.type || "Unknown"}
         </td>
-        <td>
+        <td className={cellClasses}>
           {windowed || editable || values?.has(row.id) ? (
             <input
               type="text"
+              className={`${tableFieldClasses} w-full${index === undefined ? "" : " h-[calc(var(--editor-windowed-row-height)_-_0.375rem)]"}`}
               inputMode={row.type === "fixed" ? "decimal" : "text"}
               aria-label={`${name} value`}
               aria-invalid={issue !== undefined || undefined}
@@ -264,17 +298,20 @@ export function TableEditor({
 
   return (
     <div
-      className="editor-table-layout"
+      className={`editor-table-layout grid h-full min-w-0 overflow-hidden ${unified ? "grid-cols-[minmax(0,1fr)]" : "grid-cols-[minmax(6.25rem,22%)_minmax(0,1fr)] max-[31rem]:grid-cols-[minmax(0,1fr)] max-[31rem]:grid-rows-[auto_minmax(0,1fr)]"}`}
       data-layout={layout}
       data-windowed={windowed || undefined}
     >
       {!unified && (
-        <nav className="editor-sections" aria-label="Bank sections">
-          <h2>Sections</h2>
+        <nav
+          className="editor-sections me-2 min-h-0 min-w-0 overflow-auto border-e border-line pe-2 max-[31rem]:me-0 max-[31rem]:mb-2 max-[31rem]:grid max-[31rem]:grid-cols-2 max-[31rem]:items-center max-[31rem]:gap-x-2 max-[31rem]:border-e-0 max-[31rem]:border-b max-[31rem]:pe-0 max-[31rem]:pb-[0.4rem]"
+          aria-label="Bank sections"
+        >
+          <h2 className="pt-[0.3rem] pb-[0.4rem] font-semibold">Sections</h2>
           {sections.length > 1 && (
             <input
               aria-label="Filter sections by name"
-              className="editor-section-filter"
+              className={`editor-section-filter mb-1 min-h-[var(--control-height)] w-full rounded-control border border-control-edge bg-field px-[0.45rem] py-[0.2rem] ${focusOutlineClasses}`}
               type="search"
               placeholder="Filter…"
               value={sectionQuery}
@@ -282,14 +319,18 @@ export function TableEditor({
             />
           )}
           {filteredSections.length === 0 && sectionFilter && (
-            <p className="empty-message" role="status">
+            <p
+              className="empty-message text-muted max-[31rem]:col-span-full"
+              role="status"
+            >
               No matching sections.
             </p>
           )}
-          <div className="editor-section-list">
+          <div className="editor-section-list flex flex-col gap-0.5 max-[31rem]:col-span-full max-[31rem]:flex-row max-[31rem]:overflow-x-auto max-[31rem]:py-[0.15rem]">
             {filteredSections.map((item) => (
               <button
                 key={item.id}
+                className={`block w-full rounded-control border border-transparent px-[0.4rem] py-1 text-start wrap-anywhere [&:hover:not([aria-current=true])]:bg-hover aria-[current=true]:border-s-[color:var(--selection-edge)] aria-[current=true]:bg-selected aria-[current=true]:font-semibold max-[31rem]:w-auto max-[31rem]:whitespace-nowrap ${focusOutlineClasses}`}
                 type="button"
                 aria-current={item.id === section?.id ? "true" : undefined}
                 aria-description={item.dirty ? "Unsaved changes" : undefined}
@@ -302,20 +343,26 @@ export function TableEditor({
               >
                 {item.name || "Unnamed section"}
                 {item.dirty && (
-                  <span className="editor-section-dirty" aria-hidden="true" />
+                  <span
+                    className="editor-section-dirty ms-1.5 inline-block size-1.5 rounded-full bg-[var(--editor-unsaved)] align-middle"
+                    aria-hidden="true"
+                  />
                 )}
               </button>
             ))}
           </div>
         </nav>
       )}
-      <div className="editor-table-scroll">
+      <div
+        className={`editor-table-scroll min-h-0 min-w-0 ${windowed ? "flex flex-col overflow-hidden" : "overflow-auto"}`}
+      >
         {(onOpenStructure || onOpenDiff || section) && (
-          <div className="editor-table-actions">
+          <div className="editor-table-actions mb-[0.35rem] flex flex-wrap gap-[0.35rem]">
             {section && (
               <input
                 aria-label="Filter rows by name"
                 data-table-filter-search
+                className={`${tableFieldClasses} w-auto flex-[1_1_8rem]`}
                 type="search"
                 placeholder="Filter names…"
                 value={rowQuery}
@@ -324,7 +371,7 @@ export function TableEditor({
             )}
             {onOpenStructure && (
               <button
-                className="editor-button"
+                className={buttonClasses()}
                 type="button"
                 disabled={actionsDisabled}
                 onClick={() => onOpenStructure(section?.id)}
@@ -334,7 +381,7 @@ export function TableEditor({
             )}
             {onOpenDiff && (
               <button
-                className="editor-button"
+                className={buttonClasses()}
                 type="button"
                 disabled={actionsDisabled}
                 onClick={onOpenDiff}
@@ -345,14 +392,15 @@ export function TableEditor({
           </div>
         )}
         {!section ? (
-          <p className="empty-message">No sections found.</p>
+          <p className="empty-message text-muted">No sections found.</p>
         ) : (
           <>
             {canEdit && selected.length > 1 && (
-              <div className="editor-bulk">
-                <label>
+              <div className="editor-bulk flex flex-wrap items-end gap-2 px-[0.3rem] pt-1 pb-2">
+                <label className="flex-[1_1_10rem]">
                   Set value for {selected.length} rows
                   <input
+                    className={`${tableFieldClasses} block w-full`}
                     placeholder={mixedValues ? "Mixed values" : undefined}
                     value={bulkValue}
                     onChange={(event) =>
@@ -362,7 +410,7 @@ export function TableEditor({
                   />
                 </label>
                 <button
-                  className="editor-button"
+                  className={buttonClasses()}
                   type="button"
                   disabled={!sameType}
                   onClick={() => onChange(selected, bulkValue)}
@@ -370,12 +418,17 @@ export function TableEditor({
                   Stage values
                 </button>
                 {!sameType && (
-                  <p className="empty-message">Select rows of the same type.</p>
+                  <p className="empty-message text-muted">
+                    Select rows of the same type.
+                  </p>
                 )}
               </div>
             )}
             {visibleRows.length === 0 ? (
-              <p className="empty-message" role={query ? "status" : undefined}>
+              <p
+                className="empty-message text-muted"
+                role={query ? "status" : undefined}
+              >
                 {query
                   ? "No matching rows."
                   : unified
@@ -394,8 +447,11 @@ export function TableEditor({
                 renderRow={renderRow}
               />
             ) : (
-              <table aria-label={label}>
-                <thead>
+              <table
+                className="w-full table-fixed border-collapse"
+                aria-label={label}
+              >
+                <thead className="sticky top-0 z-[1] bg-[var(--subtle-surface)]">
                   <tr>{header}</tr>
                 </thead>
                 <tbody>{visibleRows.map((entry) => renderRow(entry))}</tbody>
@@ -404,17 +460,17 @@ export function TableEditor({
           </>
         )}
         {hasHiddenDraft && (
-          <p className="empty-message" role="status">
+          <p className="empty-message text-muted" role="status">
             The row filter hides some staged edits.
           </p>
         )}
         {issues && issues.size > 0 && (
-          <p className="editor-error" role="status">
+          <p className={tableErrorClasses} role="status">
             {[...new Set(issues.values())].join(" ")}
           </p>
         )}
         {validationError && (
-          <p className="editor-error" role="status">
+          <p className={tableErrorClasses} role="status">
             {validationError}
           </p>
         )}
