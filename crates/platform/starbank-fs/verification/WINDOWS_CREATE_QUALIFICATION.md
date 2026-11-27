@@ -49,6 +49,12 @@ The existing opt-in NTFS test now includes a synthetic creation-time security pr
 
 Local Windows x64 MSVC compilation and all-target Clippy with warnings denied passed on the macOS host using Rust 1.100.0. Native Windows execution is pending. The existing hosted NTFS test selection includes this extension. This probe checks descriptor metadata; a distinct-user access denial, SACL inspection, post-publication sync, checkpoint termination and production outcome classification remain separate obligations. Windows bank writes remain disabled.
 
+### First hosted descriptor attempt
+
+Hosted run `46016246440` at `7d960c4` passed all 243 default Windows tests and the earlier rename/collision assertions, then the new security fixture returned `STATUS_INVALID_PARAMETER` (`0xc000000d`) from `NtCreateFile`. The original diagnostic did not identify which creation call failed, so private staging was not qualified. The token was elevated and its default owner differed from TokenUser; this run cannot prove ordinary-user behavior. [Windows job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46016246440/job/140564004999)
+
+The corrected fixture uses documented directory-compatible creation options and minimal directory access. Reparse/recall guards remain on regular stage/control files; directory creation is exclusive under the held synthetic temporary parent. Creation errors now include the fixture leaf and exact options. Native execution of the correction remains pending. This fixes an identified parameter-contract violation without claiming to have isolated the original kernel rejection. [NtCreateFile directory parameters](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile#parameters)
+
 ## Native acceptance
 
 | Fixture | Expected observation |

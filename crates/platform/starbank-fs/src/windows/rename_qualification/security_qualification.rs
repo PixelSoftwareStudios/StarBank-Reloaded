@@ -45,9 +45,9 @@ use windows_sys::{
 			TokenUser as USER_CLASS,
 		},
 		Storage::FileSystem::{
-			DELETE, FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY, FILE_ATTRIBUTE_ARCHIVE,
-			FILE_ATTRIBUTE_DIRECTORY, FILE_GENERIC_READ, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES,
-			FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE, READ_CONTROL, SYNCHRONIZE,
+			DELETE, FILE_ATTRIBUTE_ARCHIVE, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ,
+			FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
+			FILE_TRAVERSE, READ_CONTROL, SYNCHRONIZE,
 		},
 		System::{
 			IO::IO_STATUS_BLOCK,
@@ -223,14 +223,8 @@ pub(super) fn qualify_private_stage(root: &Path) -> Result<(), Box<dyn std::erro
 	let directory = create_relative(
 		&outer.parent,
 		OsStr::new(SECURITY_DIRECTORY),
-		FILE_LIST_DIRECTORY
-			| FILE_ADD_FILE
-			| FILE_ADD_SUBDIRECTORY
-			| FILE_TRAVERSE
-			| FILE_READ_ATTRIBUTES
-			| READ_CONTROL
-			| SYNCHRONIZE,
-		FILE_ATTRIBUTE_DIRECTORY,
+		FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE,
+		FILE_ATTRIBUTE_NORMAL,
 		FILE_DIRECTORY_FILE,
 		parent_descriptor.0,
 	)?;
@@ -430,14 +424,14 @@ fn sid_string(sid: PSID) -> io::Result<String> {
 
 fn create_relative(
 	parent: &File,
-	name: &OsStr,
+	leaf: &OsStr,
 	access: u32,
 	attributes: u32,
 	kind: u32,
 	descriptor: PSECURITY_DESCRIPTOR,
 ) -> io::Result<File> {
-	super::super::check_component(name).map_err(io::Error::other)?;
-	let mut name: Vec<u16> = name.encode_wide().collect();
+	super::super::check_component(leaf).map_err(io::Error::other)?;
+	let mut name: Vec<u16> = leaf.encode_wide().collect();
 	let length = u16::try_from(name.len() * size_of::<u16>()).map_err(io::Error::other)?;
 	let mut name = UNICODE_STRING {
 		Length: length,
@@ -452,11 +446,21 @@ fn create_relative(
 		SecurityDescriptor: descriptor.cast(),
 		SecurityQualityOfService: ptr::null_mut(),
 	};
+	let (share, flags) = if kind == FILE_DIRECTORY_FILE {
+		(FILE_SHARE_READ | FILE_SHARE_WRITE, kind)
+	} else {
+		(
+			FILE_SHARE_READ,
+			kind | FILE_OPEN_REPARSE_POINT | FILE_OPEN_NO_RECALL,
+		)
+	};
+	let options = flags | FILE_SYNCHRONOUS_IO_NONALERT;
 	let mut file: HANDLE = ptr::null_mut();
 	let mut completion = IO_STATUS_BLOCK::default();
 	// SAFETY: held parent, single checked leaf, live descriptor and initialized SDK buffers.
 	// FILE_CREATE never opens an existing object; synchronous completion owns exactly the
-	// returned file handle. No reparse traversal/recall and no backup privilege override.
+	// returned file handle. The directory fixture uses a fresh held temporary parent and
+	// directory-compatible options. Regular files retain the reparse and recall guards.
 	let status = unsafe {
 		NtCreateFile(
 			&mut file,
@@ -465,20 +469,16 @@ fn create_relative(
 			&mut completion,
 			ptr::null(),
 			attributes,
-			if kind == FILE_DIRECTORY_FILE {
-				FILE_SHARE_READ | FILE_SHARE_WRITE
-			} else {
-				FILE_SHARE_READ
-			},
+			share,
 			FILE_CREATE,
-			kind | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT | FILE_OPEN_NO_RECALL,
+			options,
 			ptr::null(),
 			0,
 		)
 	};
 	if status != STATUS_SUCCESS {
 		return Err(io::Error::other(format!(
-			"private fixture NtCreateFile NTSTATUS {status:#010x}"
+			"NtCreateFile for fixture {leaf:?} with options {options:#010x} returned NTSTATUS {status:#010x}"
 		)));
 	}
 	// SAFETY: successful exclusive NtCreateFile transfers the new owned handle to File.
