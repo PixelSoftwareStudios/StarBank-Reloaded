@@ -4,6 +4,7 @@ import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
+import { verifyBatchBackupReview } from "./batch-backup-review.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 
 const dist = fileURLToPath(
@@ -626,6 +627,11 @@ async function verifyToolsMenu(page) {
 }
 
 async function verifyBackupCopy(page, bridge, canOverwrite) {
+  const inventoryStatusCalls = bridge.callsFor("inventory_backup_status");
+  assert(inventoryStatusCalls.length > 0);
+  for (const call of inventoryStatusCalls) {
+    assert.deepEqual(call, { generation: inventory.generation });
+  }
   await button(page, "More save options").click();
   await page
     .getByRole("menuitem", {
@@ -657,9 +663,10 @@ async function verifyBackupCopy(page, bridge, canOverwrite) {
 
   assert(await button(page, "Undo").isEnabled());
   assert.equal(await goldField(page).inputValue(), "002");
-  assert.deepEqual(bridge.callsFor("inventory_backup_status"), [
-    { generation: inventory.generation },
-  ]);
+  assert.deepEqual(
+    bridge.callsFor("inventory_backup_status"),
+    inventoryStatusCalls,
+  );
   const lists = bridge.callsFor("list_active_backups");
   assert.equal(lists.length, 1);
   assert.deepEqual(bridge.callsFor("export_active_backup"), [
@@ -1273,7 +1280,10 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
       );
       return;
     }
-    if (canOverwrite) await verifyInventoryRecovery(page, bridge);
+    if (canOverwrite) {
+      await verifyInventoryRecovery(page, bridge);
+      await verifyBatchBackupReview(page);
+    }
     await button(
       page,
       /Synthetic Map.*1 bank without a recorded backup/,

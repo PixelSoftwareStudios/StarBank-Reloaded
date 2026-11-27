@@ -1,10 +1,12 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Dropdown, ToolsMenuTrigger } from "starbank-ui";
 import {
   focusOutlineClasses,
   menuContentClasses,
   menuItemClasses,
 } from "starbank-ui/controls";
+import { BatchBackupReviewDetails } from "./batch-backup-review";
+import type { BatchBackupReview, BatchBackupReviewTarget } from "./transport";
 
 export type BackupScope = { kind: "all" } | { kind: "map"; id: string };
 export type BackupPlacement = "managed" | "adjacent";
@@ -23,6 +25,7 @@ export type BatchBackupOutcome =
   | "inventory_changed";
 
 export interface BatchBackupReport {
+  runId: number | null;
   entries: readonly {
     bankId: string;
     name: string;
@@ -45,6 +48,7 @@ interface BatchBackupToolsProps {
   onReviewWriteRecovery?: () => void;
   externalSigningUnavailable?: string;
   onStart: (request: BatchBackupRequest) => Promise<BatchBackupReport | null>;
+  onReview: (target: BatchBackupReviewTarget) => Promise<BatchBackupReview>;
   onCancel: () => Promise<void>;
 }
 
@@ -93,8 +97,100 @@ function describeFailure(cause: unknown) {
   }
 }
 
-function Report({ report }: { report: BatchBackupReport }) {
+type ReviewState = { target: BatchBackupReviewTarget } & (
+  | { kind: "loading" }
+  | { kind: "ready"; details: BatchBackupReview }
+  | { kind: "failed"; message: string }
+);
+
+function Report({
+  report,
+  onReview,
+}: {
+  report: BatchBackupReport;
+  onReview: BatchBackupToolsProps["onReview"];
+}) {
   const [offset, setOffset] = useState(0);
+  const [review, setReview] = useState<ReviewState>();
+  const reviewRequest = useRef<BatchBackupReviewTarget | null>(null);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useRef<number | undefined>(undefined);
+  const reviewing = review !== undefined;
+
+  useEffect(() => {
+    if (reviewing) reviewHeading.current?.focus();
+  }, [reviewing]);
+
+  useLayoutEffect(
+    () => () => {
+      reviewRequest.current = null;
+    },
+    [],
+  );
+
+  async function openReview(rowIndex: number) {
+    if (
+      report.runId === null ||
+      reviewRequest.current ||
+      report.entries[rowIndex]?.outcome !== "needs_review"
+    )
+      return;
+    const target = { runId: report.runId, rowIndex };
+    reviewRequest.current = target;
+    setReview({ kind: "loading", target });
+    try {
+      const details = await onReview(target);
+      if (
+        details.runId !== target.runId ||
+        details.rowIndex !== target.rowIndex
+      ) {
+        throw new Error("The displayed backup review changed.");
+      }
+      if (reviewRequest.current === target)
+        setReview({ kind: "ready", target, details });
+    } catch (cause) {
+      if (reviewRequest.current === target) {
+        setReview({
+          kind: "failed",
+          target,
+          message:
+            cause === "invalid_review"
+              ? "That backup review is no longer available."
+              : "The backup review could not be read.",
+        });
+      }
+    }
+  }
+
+  if (review) {
+    return (
+      <>
+        <h3 className="font-semibold" ref={reviewHeading} tabIndex={-1}>
+          Backup review
+        </h3>
+        {review.kind === "loading" && (
+          <p role="status">Reading backup review…</p>
+        )}
+        {review.kind === "ready" && (
+          <BatchBackupReviewDetails review={review.details} />
+        )}
+        {review.kind === "failed" && <p role="alert">{review.message}</p>}
+        <div className={actionRowClasses}>
+          <button
+            className={batchButtonClasses}
+            type="button"
+            onClick={() => {
+              reviewRequest.current = null;
+              returnFocus.current = review.target.rowIndex;
+              setReview(undefined);
+            }}
+          >
+            Back
+          </button>
+        </div>
+      </>
+    );
+  }
   const end = Math.min(offset + REPORT_PAGE_SIZE, report.entries.length);
   const canceled = report.entries.some(
     ({ outcome }) => outcome === "cancelled",
@@ -125,13 +221,33 @@ function Report({ report }: { report: BatchBackupReport }) {
                 </tr>
               </thead>
               <tbody>
-                {report.entries.slice(offset, end).map((entry) => (
+                {report.entries.slice(offset, end).map((entry, index) => (
                   <tr key={entry.bankId}>
                     <th scope="row" className={reportCellClasses}>
                       {entry.name}
                     </th>
                     <td className={reportCellClasses}>
                       {OUTCOME_LABEL[entry.outcome] ?? "Unknown outcome"}
+                      {entry.outcome === "needs_review" &&
+                        report.runId !== null && (
+                          <button
+                            aria-label={`Review ${entry.name}`}
+                            className={`${batchButtonClasses} ms-2`}
+                            type="button"
+                            ref={(element) => {
+                              if (
+                                element &&
+                                returnFocus.current === offset + index
+                              ) {
+                                returnFocus.current = undefined;
+                                element.focus();
+                              }
+                            }}
+                            onClick={() => void openReview(offset + index)}
+                          >
+                            Review
+                          </button>
+                        )}
                       {entry.backupName && (
                         <small className="block text-muted">
                           {entry.backupName}
@@ -181,6 +297,7 @@ export function BatchBackupTools({
   onReviewWriteRecovery,
   externalSigningUnavailable,
   onStart,
+  onReview,
   onCancel,
 }: BatchBackupToolsProps) {
   const titleId = useId();
@@ -457,7 +574,9 @@ export function BatchBackupTools({
           </>
         )}
 
-        {state.kind === "report" && <Report report={state.report} />}
+        {state.kind === "report" && (
+          <Report report={state.report} onReview={onReview} />
+        )}
         {state.kind === "failed" && <p role="alert">{state.message}</p>}
         {(state.kind === "report" || state.kind === "failed") && (
           <div className={actionRowClasses}>

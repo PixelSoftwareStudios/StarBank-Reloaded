@@ -15,20 +15,22 @@ function boundedText(maximum: number) {
   );
 }
 
-const displayPath = v.strictObject({
+export const recordedPathSchema = v.strictObject({
   display: boundedText(MAX_DISPLAY_PATH_BYTES),
   truncated: v.boolean(),
   lossy: v.boolean(),
 });
 
+export const recordedReasonSchema = boundedText(MAX_REASON_BYTES);
+
 const recoveryLocation = v.variant("kind", [
-  v.strictObject({ kind: v.literal("recorded"), path: displayPath }),
+  v.strictObject({ kind: v.literal("recorded"), path: recordedPathSchema }),
   v.strictObject({ kind: v.literal("unknown") }),
 ]);
 
 const backupEvidence = v.variant("kind", [
-  v.strictObject({ kind: v.literal("verified"), path: displayPath }),
-  v.strictObject({ kind: v.literal("unverified"), path: displayPath }),
+  v.strictObject({ kind: v.literal("verified"), path: recordedPathSchema }),
+  v.strictObject({ kind: v.literal("unverified"), path: recordedPathSchema }),
   v.strictObject({ kind: v.literal("not_created") }),
 ]);
 
@@ -48,10 +50,10 @@ const recoveryReceipt = v.pipe(
       "verified_needs_reopen",
     ]),
     affectsActive: v.boolean(),
-    destination: displayPath,
+    destination: recordedPathSchema,
     recovery: recoveryLocation,
     backup: backupEvidence,
-    reason: boundedText(MAX_REASON_BYTES),
+    reason: recordedReasonSchema,
     reasonTruncated: v.boolean(),
     editorTarget: v.exactOptional(engineTargetSchema),
   }),
@@ -74,7 +76,7 @@ const recoveryReceipt = v.pipe(
 
 const recoveryError = v.strictObject({ [RECOVERY_ERROR]: recoveryReceipt });
 
-export type WriteRecoveryPath = v.InferOutput<typeof displayPath>;
+export type WriteRecoveryPath = v.InferOutput<typeof recordedPathSchema>;
 export type WriteRecoveryReceipt = v.InferOutput<typeof recoveryReceipt>;
 
 export type WriteRecoveryEvidence =

@@ -5,6 +5,7 @@ import {
 } from "starbank-ui/engine/signing-protocol";
 import { MAX_BACKUP_RETENTION } from "starbank-ui/settings-model";
 import * as v from "valibot";
+import { recordedPathSchema, recordedReasonSchema } from "#write-recovery";
 import type { BatchBackupRequest } from "./batch-backup-ui";
 
 const HEADER_BYTES = 5;
@@ -476,22 +477,30 @@ export async function confirmWindowClose(report: CloseReport) {
   }
 }
 
+const MAX_BATCH_BACKUP_ROWS = 4_096;
+const MAX_BATCH_RUN_ID = 0xffff_ffff;
+const batchRunId = v.pipe(count, v.minValue(1), v.maxValue(MAX_BATCH_RUN_ID));
+const batchBackupOutcome = v.picklist([
+  "created",
+  "source_unavailable",
+  "rejected",
+  "needs_review",
+  "cancelled",
+  "inventory_changed",
+]);
 const batchBackupReport = v.pipe(
-  v.object({
-    entries: v.array(
-      v.object({
-        bankId: v.string(),
-        name: v.string(),
-        outcome: v.picklist([
-          "created",
-          "source_unavailable",
-          "rejected",
-          "needs_review",
-          "cancelled",
-          "inventory_changed",
-        ]),
-        backupName: v.nullable(v.string()),
-      }),
+  v.strictObject({
+    runId: v.nullable(batchRunId),
+    entries: v.pipe(
+      v.array(
+        v.strictObject({
+          bankId: v.string(),
+          name: v.string(),
+          outcome: batchBackupOutcome,
+          backupName: v.nullable(v.string()),
+        }),
+      ),
+      v.maxLength(MAX_BATCH_BACKUP_ROWS),
     ),
     created: count,
     failed: count,
@@ -499,6 +508,7 @@ const batchBackupReport = v.pipe(
   }),
   v.check((report) => {
     const totals = { created: 0, failed: 0, skipped: 0 };
+    let needsReview = false;
     for (const { outcome } of report.entries) {
       switch (outcome) {
         case "created":
@@ -511,14 +521,45 @@ const batchBackupReport = v.pipe(
         default:
           totals.failed += 1;
       }
+      if (outcome === "needs_review") needsReview = true;
     }
     return (
+      needsReview === (report.runId !== null) &&
       report.created === totals.created &&
       report.failed === totals.failed &&
       report.skipped === totals.skipped
     );
   }),
 );
+
+const batchBackupReviewTarget = v.strictObject({
+  runId: batchRunId,
+  rowIndex: v.pipe(count, v.maxValue(MAX_BATCH_BACKUP_ROWS - 1)),
+});
+const batchBackupReview = v.pipe(
+  v.strictObject({
+    ...batchBackupReviewTarget.entries,
+    kind: v.picklist([
+      "snapshot_commit_uncertain",
+      "metadata_rejected",
+      "metadata_commit_uncertain",
+    ]),
+    backup: recordedPathSchema,
+    recovery: v.nullable(recordedPathSchema),
+    reason: recordedReasonSchema,
+    reasonTruncated: v.boolean(),
+  }),
+  v.check(
+    ({ kind, recovery }) =>
+      (kind === "metadata_rejected") === (recovery === null),
+  ),
+);
+
+export type BatchBackupReviewTarget = v.InferOutput<
+  typeof batchBackupReviewTarget
+>;
+export type BatchBackupReview = v.InferOutput<typeof batchBackupReview>;
+
 const backupRetentionReview = v.pipe(
   v.object({
     keepNewest: v.pipe(count, v.minValue(1), v.maxValue(MAX_BACKUP_RETENTION)),
@@ -550,6 +591,21 @@ export function createBatchBackup(request: BatchBackupRequest) {
     scope: request.scope,
     placement: request.placement,
   });
+}
+
+export async function reviewBatchBackup(target: BatchBackupReviewTarget) {
+  const request = v.safeParse(batchBackupReviewTarget, target);
+  if (!request.success) throw new Error("Invalid batch backup review target.");
+  const review = await invokeChecked(batchBackupReview, "review_batch_backup", {
+    target: request.output,
+  });
+  if (
+    review.runId !== request.output.runId ||
+    review.rowIndex !== request.output.rowIndex
+  ) {
+    throw new Error("StarBank received an invalid desktop response.");
+  }
+  return review;
 }
 
 export function readBackupRetentionReview(target: ActiveBankTarget) {

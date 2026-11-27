@@ -2,6 +2,9 @@
   "name": "starbank-desktop",
   "private": true,
   "type": "module",
+  "imports": {
+    "#write-recovery": "./src/write-recovery.ts"
+  },
   "scripts": {
     "build": "tauri build",
     "build:webview": "vite build",

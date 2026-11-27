@@ -66,6 +66,7 @@ import {
   restoreActiveBank,
   revealActiveBank,
   reviewActiveBackup,
+  reviewBatchBackup,
   saveActiveBank,
   saveBankAs,
 } from "./transport";
@@ -1135,6 +1136,7 @@ function DesktopApp() {
         breadcrumbAvailable
         tools={
           <BatchBackupTools
+            onReview={reviewBatchBackup}
             onReviewWriteRecovery={
               writeRecovery ? () => setWriteRecoveryVisible(true) : undefined
             }

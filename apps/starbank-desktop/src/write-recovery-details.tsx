@@ -32,7 +32,7 @@ function outcomeText(receipt: WriteRecoveryReceipt) {
     : "StarBank could not verify the write to the new destination. The source bank was left unchanged.";
 }
 
-function RecordedPath({
+export function RecordedPath({
   label,
   path,
 }: {

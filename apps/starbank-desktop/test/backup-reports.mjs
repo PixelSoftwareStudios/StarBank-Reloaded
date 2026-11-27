@@ -4,6 +4,7 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import {
   createBatchBackup,
   readBackupRetentionReview,
+  reviewBatchBackup,
 } from "../src/transport.ts";
 
 const invalidResponse = /invalid desktop response/;
@@ -25,6 +26,7 @@ const outcomes = [
   "inventory_changed",
 ];
 const report = {
+  runId: 17,
   entries: outcomes.map((outcome, index) => ({
     bankId: `synthetic-${index}`,
     name: `Synthetic-${index}.SC2Bank`,
@@ -116,6 +118,118 @@ test("batch reports cannot claim success or failure totals that disagree with en
     reply("create_batch_backup", request, value);
     await assert.rejects(createBatchBackup(request), invalidResponse);
   }
+});
+
+test("batch reports require a scoped run ID only for rows needing review", async () => {
+  const created = {
+    runId: null,
+    entries: [report.entries[0]],
+    created: 1,
+    failed: 0,
+    skipped: 0,
+  };
+  reply("create_batch_backup", request, created);
+  assert.deepEqual(await createBatchBackup(request), created);
+  for (const invalid of [
+    { ...created, runId: 17 },
+    {
+      ...created,
+      entries: Array(4_097).fill(created.entries[0]),
+      created: 4_097,
+    },
+    ...[null, undefined, 0, 1.5, "17", 2 ** 32].map((runId) => ({
+      ...report,
+      runId,
+    })),
+  ]) {
+    reply("create_batch_backup", request, invalid);
+    await assert.rejects(createBatchBackup(request), invalidResponse);
+  }
+});
+
+const reviewTarget = { runId: 0xffff_ffff, rowIndex: 4_095 };
+const backupPath = {
+  display: "/synthetic/Backups/Fixture.SC2Bank.bak",
+  truncated: false,
+  lossy: false,
+};
+const recoveryPath = {
+  display: "/synthetic/Backups/Fixture\uFFFD\r\n.recovery",
+  truncated: true,
+  lossy: true,
+};
+const review = {
+  ...reviewTarget,
+  kind: "snapshot_commit_uncertain",
+  backup: backupPath,
+  recovery: recoveryPath,
+  reason: "Synthetic verification failure.",
+  reasonTruncated: true,
+};
+
+test("batch review preserves exact record evidence at the validated row and run", async () => {
+  for (const value of [
+    review,
+    { ...review, kind: "metadata_commit_uncertain" },
+    { ...review, kind: "metadata_rejected", recovery: null },
+    {
+      ...review,
+      backup: { ...backupPath, display: "🌟".repeat(1_024) },
+      reason: "é".repeat(256),
+    },
+  ]) {
+    reply("review_batch_backup", { target: reviewTarget }, value);
+    assert.deepEqual(await reviewBatchBackup(reviewTarget), value);
+  }
+
+  const first = { runId: 1, rowIndex: 0 };
+  reply("review_batch_backup", { target: first }, { ...review, ...first });
+  assert.deepEqual(await reviewBatchBackup(first), { ...review, ...first });
+});
+
+test("batch review refuses malformed coordinates before invoking native code", async () => {
+  mockIPC(() => assert.fail("Invalid targets must remain local"));
+  for (const invalid of [
+    ...[undefined, null, 0, -1, 1.5, "1", 2 ** 32].map((runId) => ({
+      ...reviewTarget,
+      runId,
+    })),
+    ...[undefined, null, -1, 1.5, "0", 4_096].map((rowIndex) => ({
+      ...reviewTarget,
+      rowIndex,
+    })),
+    { ...reviewTarget, path: "/synthetic/not-an-authority" },
+  ]) {
+    await assert.rejects(
+      reviewBatchBackup(invalid),
+      /invalid batch backup review target/i,
+    );
+  }
+});
+
+test("batch review rejects wrong coordinates, forbidden kinds, and unsafe evidence", async () => {
+  for (const invalid of [
+    { ...review, runId: 1 },
+    { ...review, rowIndex: 0 },
+    { ...review, kind: "created" },
+    { ...review, kind: "metadata_rejected" },
+    { ...review, recovery: null },
+    { ...review, kind: "metadata_commit_uncertain", recovery: null },
+    { ...review, backup: { ...backupPath, display: "é".repeat(2_049) } },
+    { ...review, recovery: { ...recoveryPath, display: "🌟".repeat(1_025) } },
+    { ...review, recovery: { ...recoveryPath, truncated: "true" } },
+    { ...review, reason: "é".repeat(257) },
+    { ...review, reasonTruncated: null },
+    { ...review, retry: true },
+  ]) {
+    reply("review_batch_backup", { target: reviewTarget }, invalid);
+    await assert.rejects(reviewBatchBackup(reviewTarget), invalidResponse);
+  }
+  mockIPC(() => Promise.reject("invalid_review"));
+  await assert.rejects(
+    reviewBatchBackup(reviewTarget),
+    (error) => error === "invalid_review",
+  );
 });
 
 test("retention reports accept a truncated older-backup list and exact metadata", async () => {
