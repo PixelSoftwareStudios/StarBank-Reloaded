@@ -117,7 +117,7 @@ export function useDesktopSettings() {
     value: AppSettings[Key],
   ) {
     if (!snapshot) return;
-    void enqueue(() => invoke("change_setting", { change: { key, value } }));
+    return enqueue(() => invoke("change_setting", { change: { key, value } }));
   }
 
   function recover() {

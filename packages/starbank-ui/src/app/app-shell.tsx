@@ -84,11 +84,12 @@ export function AppShell({
   const [mapPaneWidth, setMapPaneWidth] = useState<number>(
     MAP_PANE_WIDTH.initial,
   );
-  const [previewWidth, setPreviewWidth] = useState<number>();
+  const [previewWidth, setPreviewWidth] = useState<{ width: number }>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const previousFocus = useRef<HTMLElement | null>(null);
   const settings = preferences?.settings;
-  const shownWidth = previewWidth ?? settings?.mapPaneWidth ?? mapPaneWidth;
+  const shownWidth =
+    previewWidth?.width ?? settings?.mapPaneWidth ?? mapPaneWidth;
   const showSettings = settingsOpen && preferences !== undefined;
 
   useEffect(() => {
@@ -102,6 +103,25 @@ export function AppShell({
     const focused = document.activeElement;
     previousFocus.current = focused instanceof HTMLElement ? focused : null;
     setSettingsOpen(true);
+  }
+
+  function resizeMapPane(width: number, commit: boolean) {
+    if (!preferences) {
+      setMapPaneWidth(width);
+      return;
+    }
+
+    const preview = { width };
+    setPreviewWidth(preview);
+    if (!commit) return;
+
+    function finish() {
+      setPreviewWidth((current) => (current === preview ? undefined : current));
+    }
+    void Promise.resolve(preferences.change("mapPaneWidth", width)).then(
+      finish,
+      finish,
+    );
   }
 
   const onOpenSettings = preferences
@@ -191,16 +211,7 @@ export function AppShell({
         disabled={preferences?.readOnly}
         controls={mapPaneId}
         percent={shownWidth}
-        onResize={(width, commit) => {
-          if (!preferences) {
-            setMapPaneWidth(width);
-          } else if (commit) {
-            preferences.change("mapPaneWidth", width);
-            setPreviewWidth(undefined);
-          } else {
-            setPreviewWidth(width);
-          }
-        }}
+        onResize={resizeMapPane}
       />
       <MapSidebar
         id={mapPaneId}

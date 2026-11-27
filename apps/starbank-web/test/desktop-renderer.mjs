@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
 import { verifyBatchBackupReview } from "./batch-backup-review.mjs";
 import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
+import { verifySidebarResize } from "./sidebar-resize.mjs";
 import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
 
@@ -175,6 +176,17 @@ function createBridge(engine, canOverwrite, copyCapability) {
   const wireRequests = [];
   let inventoryResponse = canOverwrite ? blockedInventory : inventory;
   let preferences = { ...settings };
+  const heldWidthWrites = [];
+
+  function settingsSnapshot() {
+    return {
+      value: {
+        settings: preferences,
+        legacyRootPending: false,
+        automaticBackupAvailable: canOverwrite,
+      },
+    };
+  }
 
   function dirtySnapshot(target) {
     const reply = JSON.parse(
@@ -314,21 +326,23 @@ function createBridge(engine, canOverwrite, copyCapability) {
       case "complete_window_close":
         return {};
       case "read_settings":
-        return {
-          value: {
-            settings: preferences,
-            legacyRootPending: false,
-            automaticBackupAvailable: canOverwrite,
-          },
-        };
+        return settingsSnapshot();
       case "change_setting":
+        if (args.change.key === "mapPaneWidth") {
+          const finish = (error) => {
+            if (error) return { error };
+            preferences = { ...preferences, mapPaneWidth: args.change.value };
+            return settingsSnapshot();
+          };
+          return heldWidthWrites.shift()?.then(finish) ?? finish();
+        }
         assert.equal(args.change.key, "mapIndexWorkers");
         assert(["auto", "1", "2", "3", "4"].includes(args.change.value));
         preferences = {
           ...preferences,
           mapIndexWorkers: args.change.value,
         };
-        return { value: null };
+        return settingsSnapshot();
       case "read_backup_preferences":
         return { value: { location: { mode: "default" }, keepNewest: null } };
       case "list_open_requests":
@@ -534,6 +548,14 @@ function createBridge(engine, canOverwrite, copyCapability) {
       heldStructureReply = { start: start.resolve, wait: reply.promise };
       return { started: start.promise, release: reply.resolve };
     },
+    holdNextWidthWrite() {
+      const { promise, resolve } = Promise.withResolvers();
+      heldWidthWrites.push(promise);
+      return resolve;
+    },
+    setStoredWidth(mapPaneWidth) {
+      preferences = { ...preferences, mapPaneWidth };
+    },
     cancelNextPicker() {
       cancelPicker = true;
     },
@@ -562,6 +584,8 @@ async function bindRenderer(page, bridge) {
     let callbackId = 0;
     const callbacks = new Map();
     window.fixtureNavigationReplies = 0;
+    window.fixtureWidthRequests = 0;
+    window.fixtureWidthReplies = 0;
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
     window.__TAURI_INTERNALS__ = {
       transformCallback(callback) {
@@ -587,10 +611,14 @@ async function bindRenderer(page, bridge) {
         }
         if (command === "confirm_window_close")
           window.fixtureRequestedCloseTicket = args.report.ticket;
+        const changingWidth =
+          command === "change_setting" && args.change.key === "mapPaneWidth";
+        if (changingWidth) window.fixtureWidthRequests += 1;
         const reply = await window.invokeDesktopFixture(
           command,
           binary ? Array.from(args) : args,
         );
+        if (changingWidth) window.fixtureWidthReplies += 1;
         if (command === "confirm_bank_navigation")
           window.fixtureNavigationReplies += 1;
         if (command === "can_create_bank_copy")
@@ -1602,6 +1630,16 @@ async function verifyRenderer(
       );
       return;
     }
+    if (openRecovery === "sidebar_resize") {
+      await verifySidebarResize(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer persisted rapid and pointer sidebar resizing through delayed settings writes.`,
+      );
+      return;
+    }
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
       const currentName = "Replacement-2.SC2Bank";
@@ -1662,6 +1700,7 @@ try {
   await verifyRenderer(browser, true, "verified_write");
   await verifyRenderer(browser, true, "close_probe");
   await verifyRenderer(browser, true, "structure_close");
+  await verifyRenderer(browser, false, "sidebar_resize");
   for (const capability of [
     { value: true },
     { value: false },

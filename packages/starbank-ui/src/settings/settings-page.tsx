@@ -21,7 +21,7 @@ export type SettingsKey = Exclude<keyof AppSettings, "version">;
 export type ChangeSetting = <Key extends SettingsKey>(
   key: Key,
   value: AppSettings[Key],
-) => void;
+) => void | Promise<void>;
 
 interface AccountOption {
   readonly id: string;
