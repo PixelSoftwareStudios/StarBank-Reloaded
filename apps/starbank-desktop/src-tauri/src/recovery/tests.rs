@@ -9,6 +9,9 @@ use super::*;
 
 mod copy;
 
+#[cfg(target_os = "macos")]
+mod verified;
+
 const ORIGINAL: &[u8] = br#"<Bank><Section name="Original"/></Bank>"#;
 const EDITED: &[u8] = br#"<Bank><Section name="Edited"/></Bank>"#;
 const OPEN: &str = r#"{"schema_version":1,"request_id":"open","command":{"kind":"open"}}"#;

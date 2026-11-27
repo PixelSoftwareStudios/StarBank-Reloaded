@@ -1,8 +1,11 @@
-use std::{fmt::Display, path::Path};
+use std::{
+	fmt::{Debug, Display},
+	path::Path,
+};
 
 use serde::Serialize;
 use starbank_backup::{BackupError, BackupId, RecordFailure};
-use starbank_fs::NativeBackupError;
+use starbank_fs::{CommitReceipt, NativeBackupError};
 
 use crate::{commands::CommandError, save::DesktopSession};
 
@@ -26,6 +29,7 @@ impl RecoveryOperation {
 	}
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct WriteContext<'path> {
 	pub(crate) operation: RecoveryOperation,
 	pub(crate) destination: &'path Path,
@@ -37,6 +41,7 @@ pub(crate) struct WriteContext<'path> {
 enum RecoveryOutcome {
 	CommitUncertain,
 	LiveUnchanged,
+	VerifiedNeedsReopen,
 }
 
 /// Display evidence from one attempted operation, never authority to open or overwrite a path.
@@ -51,6 +56,14 @@ pub(crate) struct RecoveryReceipt {
 	backup: BackupEvidence,
 	reason: String,
 	reason_truncated: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	editor_target: Option<RecoveryEditorTarget>,
+}
+
+#[derive(Debug, Serialize)]
+struct RecoveryEditorTarget {
+	document_id: String,
+	expected_revision: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -134,6 +147,43 @@ pub(crate) fn uncertain_result(
 	)))
 }
 
+/// Retains verified storage evidence when the subsequent editor update cannot be delivered.
+/// The engine state is preserved; only native file authority is withheld until trusted reopening.
+pub(crate) fn verified_result<T, E: Debug>(
+	session: &mut DesktopSession,
+	context: WriteContext<'_>,
+	committed: &CommitReceipt,
+	result: Result<T, E>,
+) -> Result<T, CommandError> {
+	result.map_err(|error| {
+		let editor_target =
+			session
+				.editor
+				.native_active_target()
+				.map(|active| RecoveryEditorTarget {
+					document_id: active.document_id,
+					expected_revision: active.revision.to_string(),
+				});
+		session.selected = None;
+		let backup =
+			context
+				.backup
+				.map_or(BackupEvidence::NotCreated, |id| BackupEvidence::Verified {
+					path: DisplayPath::new(id.path()),
+				});
+		let mut report = receipt(
+			context,
+			RecoveryOutcome::VerifiedNeedsReopen,
+			context.operation.affects_active(),
+			committed.recovery().map(|artifact| artifact.path()),
+			backup,
+			&format!("Editor update failed after the verified write: {error:?}"),
+		);
+		report.editor_target = editor_target;
+		CommandError::RecoveryRequired(Box::new(report))
+	})
+}
+
 /// Retains preparatory backup evidence while preserving unchanged live-file authority.
 pub(crate) fn backup_failure(
 	context: WriteContext<'_>,
@@ -206,6 +256,7 @@ fn receipt(
 		backup,
 		reason,
 		reason_truncated,
+		editor_target: None,
 	}
 }
 

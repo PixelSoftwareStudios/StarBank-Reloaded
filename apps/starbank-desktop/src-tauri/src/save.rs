@@ -4,7 +4,8 @@ use serde::Deserialize;
 use serde_json::json;
 use starbank_core::Revision;
 use starbank_editor::{
-	Engine, NativeSaveReceipt, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
+	Engine, NativeActiveTarget, NativeSaveReceipt, PROTOCOL_VERSION, WireReply,
+	max_attachment_bytes,
 };
 use starbank_fs::{
 	CommitIntent, CommitOutcome, CommitReceipt, Fingerprint, NativeBackupCatalog,
@@ -16,7 +17,7 @@ use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 use crate::backup;
 use crate::commands::{CommandError, DesktopEngine, OpenedBank, is_request};
 use crate::conflict::ConflictState;
-use crate::recovery::{RecoveryOperation, WriteContext, uncertain_write};
+use crate::recovery::{RecoveryOperation, WriteContext, uncertain_write, verified_result};
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name, destination_context};
 use crate::settings::{AutomaticBackup, SettingsStore};
 
@@ -100,25 +101,31 @@ impl DesktopSession {
 		reply
 	}
 
+	fn engine_for(&self, target: &ActiveTarget) -> Result<NativeActiveTarget, CommandError> {
+		let expected = target.expected()?;
+		self.editor
+			.native_active_target()
+			.filter(|active| {
+				active.document_id == target.document_id && active.revision == expected
+			})
+			.ok_or_else(|| {
+				CommandError::ActiveWriteRejected(
+					"The bank changed while this operation was pending.".into(),
+				)
+			})
+	}
+
 	pub(crate) fn selected_for(
 		&self,
 		target: &ActiveTarget,
 	) -> Result<(&SelectedBank, Revision), CommandError> {
-		let expected = target.expected()?;
-		let active = self.editor.native_active_target();
-		if !active.is_some_and(|active| {
-			active.document_id == target.document_id && active.revision == expected
-		}) {
-			return Err(CommandError::ActiveWriteRejected(
-				"The bank changed while this operation was pending.".into(),
-			));
-		}
+		let active = self.engine_for(target)?;
 		let selected = self
 			.selected
 			.as_ref()
 			.filter(|selected| selected.document_id == target.document_id)
 			.ok_or(CommandError::Unavailable)?;
-		Ok((selected, expected))
+		Ok((selected, active.revision))
 	}
 
 	pub(crate) fn snapshot(
@@ -353,13 +360,11 @@ fn publish(
 	let committed = verify_write(&mut session, effect.commit, context)?;
 	session.conflict.invalidate();
 	let id = target.document_id.clone();
-	let revision = session
+	let acknowledged = session
 		.editor
-		.acknowledge_verified_native_active_save(prepared.receipt)
-		.map_err(|_| {
-			session.selected = None;
-			CommandError::SavedNeedsReopen
-		})?;
+		.acknowledge_verified_native_active_save(prepared.receipt);
+	let revision = verified_result(&mut session, context, &committed, acknowledged)?;
+
 	session.backup_selection = None;
 	if !overwrite {
 		session.backups = None;
@@ -369,7 +374,8 @@ fn publish(
 		path: prepared.path.clone(),
 		fingerprint: Some(committed.fingerprint().clone()),
 	});
-	session.snapshot(&target.request_id, id, revision, &prepared.path)
+	let snapshot = session.snapshot(&target.request_id, id, revision, &prepared.path);
+	verified_result(&mut session, context, &committed, snapshot)
 }
 
 pub(crate) fn trusted_fingerprint(selected: &SelectedBank) -> Result<&Fingerprint, CommandError> {

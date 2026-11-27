@@ -52,6 +52,14 @@ impl DesktopSession {
 					active.document_id == permit.document_id && active.revision == permit.revision
 				})
 		});
+		if self.selected.is_none()
+			&& self.editor.native_active_target().is_some()
+			&& !discard_current
+		{
+			return Err(CommandError::ActiveWriteRejected(
+				"Confirm the current editor revision before opening another bank.".into(),
+			));
+		}
 		let (name, observed) =
 			selection::read_bank(path, Limits::default()).map_err(CommandError::File)?;
 		self.open_observed(

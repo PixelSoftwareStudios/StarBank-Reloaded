@@ -6,12 +6,51 @@ use crate::{
 	commands::{CommandError, DesktopEngine},
 };
 
-use super::ActiveTarget;
+use super::{ActiveTarget, DesktopSession};
 
 pub(super) struct DiscardPermit {
 	pub(super) request_id: String,
 	pub(super) document_id: String,
 	pub(super) revision: Revision,
+}
+
+struct NavigationState {
+	dirty: bool,
+	offer_save: bool,
+}
+
+fn navigation_state(
+	session: &DesktopSession,
+	target: &ActiveTarget,
+	can_save: bool,
+) -> Result<NavigationState, CommandError> {
+	let active = session.engine_for(target)?;
+	Ok(NavigationState {
+		dirty: active.dirty,
+		offer_save: can_save
+			&& session.selected_for(target).is_ok()
+			&& cfg!(any(target_os = "macos", target_os = "linux")),
+	})
+}
+
+fn finish_navigation(
+	session: &mut DesktopSession,
+	target: ActiveTarget,
+	choice: CloseChoice,
+	offer_save: bool,
+) -> Result<CloseChoice, CommandError> {
+	let active = session.engine_for(&target)?;
+	if choice == CloseChoice::Save && (!offer_save || session.selected_for(&target).is_err()) {
+		return Err(CommandError::Unavailable);
+	}
+	if choice == CloseChoice::Discard {
+		session.discard = Some(DiscardPermit {
+			request_id: target.request_id,
+			document_id: target.document_id,
+			revision: active.revision,
+		});
+	}
+	Ok(choice)
 }
 
 #[tauri::command]
@@ -22,12 +61,20 @@ pub(crate) async fn confirm_bank_navigation(
 	can_save: bool,
 ) -> Result<CloseChoice, CommandError> {
 	let _dialog = state.dialog()?;
-	{
-		let session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-		let _selection = session.selected_for(&target)?;
-	}
-	let offer_save = can_save && cfg!(any(target_os = "macos", target_os = "linux"));
-	let title = if offer_save {
+	let preview = {
+		let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
+		let preview = navigation_state(&session, &target, can_save)?;
+		if !preview.dirty {
+			return finish_navigation(
+				&mut session,
+				target,
+				CloseChoice::Discard,
+				preview.offer_save,
+			);
+		}
+		preview
+	};
+	let title = if preview.offer_save {
 		"Save changes before opening another bank?"
 	} else {
 		"Discard changes and open another bank?"
@@ -36,20 +83,12 @@ pub(crate) async fn confirm_bank_navigation(
 		&window,
 		title,
 		"The current bank has unsaved changes.",
-		offer_save,
+		preview.offer_save,
 	)
 	.await;
-	if choice == CloseChoice::Cancel {
-		return Ok(choice);
-	}
 	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-	let (_, expected) = session.selected_for(&target)?;
-	if choice == CloseChoice::Discard {
-		session.discard = Some(DiscardPermit {
-			request_id: target.request_id,
-			document_id: target.document_id,
-			revision: expected,
-		});
-	}
-	Ok(choice)
+	finish_navigation(&mut session, target, choice, preview.offer_save)
 }
+
+#[cfg(test)]
+mod tests;

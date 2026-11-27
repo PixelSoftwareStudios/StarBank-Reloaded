@@ -8,7 +8,7 @@ use starbank_signature::SignatureStatus;
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use super::{backup_selection, catalog, fresh_catalog};
-use crate::recovery::{RecoveryOperation, WriteContext, backup_failure};
+use crate::recovery::{RecoveryOperation, WriteContext, backup_failure, verified_result};
 use crate::{
 	backup_location::backup_folder,
 	commands::{CommandError, DesktopEngine, OpenedBank},
@@ -248,32 +248,28 @@ fn publish_restore(
 				failure,
 			)
 		})?;
-	let committed = verify_write(
-		&mut session,
-		effect.commit,
-		WriteContext {
-			operation: RecoveryOperation::Restore,
-			destination: &prepared.path,
-			backup: effect.backup.as_ref(),
-		},
-	)?;
-	let outcome = session
+	let context = WriteContext {
+		operation: RecoveryOperation::Restore,
+		destination: &prepared.path,
+		backup: effect.backup.as_ref(),
+	};
+	let committed = verify_write(&mut session, effect.commit, context)?;
+	let acknowledged = session
 		.editor
-		.acknowledge_verified_native_active_restore(prepared.editor)
-		.map_err(|_| {
-			session.selected = None;
-			CommandError::SavedNeedsReopen
-		})?;
+		.acknowledge_verified_native_active_restore(prepared.editor);
+	let outcome = verified_result(&mut session, context, &committed, acknowledged)?;
+
 	session.backups = None;
 	session.selected = Some(SelectedBank {
 		document_id: outcome.document_id.clone(),
 		path: prepared.path.clone(),
 		fingerprint: Some(committed.fingerprint().clone()),
 	});
-	session.snapshot(
+	let snapshot = session.snapshot(
 		&target.request_id,
 		outcome.document_id,
 		outcome.revision,
 		&prepared.path,
-	)
+	);
+	verified_result(&mut session, context, &committed, snapshot)
 }
