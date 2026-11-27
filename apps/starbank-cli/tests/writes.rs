@@ -1,6 +1,6 @@
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 
-use std::fs;
+use std::{collections::BTreeSet, ffi::OsString, fs, path::Path};
 
 use serde_json::json as object;
 use sha2::{Digest as _, Sha256};
@@ -13,8 +13,16 @@ mod patch;
 use cli::{Fixture, SOURCE, bank_command, command, json};
 use patch::{digest, edit_patch, inspect};
 
+fn file_names(directory: &Path) -> BTreeSet<OsString> {
+	fs::read_dir(directory)
+		.expect("enumerate fixture")
+		.map(|entry| entry.expect("read fixture directory entry").file_name())
+		.collect()
+}
+
 #[test]
 fn edit_prepares_and_commits_the_same_exact_copy_without_clobber() {
+	const OCCUPANT: &[u8] = b"independent destination bytes";
 	let fixture = Fixture::new();
 	let source = fixture.write("Source.sc2bank", SOURCE);
 	let destination = fixture.path.join("Destination.sc2bank");
@@ -32,21 +40,14 @@ fn edit_prepares_and_commits_the_same_exact_copy_without_clobber() {
 			.arg(&destination);
 		command
 	};
-	let before_count = fs::read_dir(&fixture.path)
-		.expect("enumerate fixture")
-		.count();
+	let before = file_names(&fixture.path);
 	let preview = args().arg("--dry-run").output().expect("dry-run");
 	let preview = json(&preview, 0);
 	assert_eq!(preview["result"]["outcome"], "prepared");
 	assert_eq!(preview["result"]["revision"], "1");
 	assert_eq!(preview["result"]["signature"], "unsigned");
 	assert!(!destination.exists());
-	assert_eq!(
-		fs::read_dir(&fixture.path)
-			.expect("enumerate fixture")
-			.count(),
-		before_count
-	);
+	assert_eq!(file_names(&fixture.path), before);
 
 	let written = args().output().expect("edit copy");
 	let written = json(&written, 0);
@@ -57,12 +58,16 @@ fn edit_prepares_and_commits_the_same_exact_copy_without_clobber() {
 		fs::read_to_string(&destination).expect("read copy"),
 		SOURCE.replace("00065", "9007199254740993")
 	);
+	fs::write(&destination, OCCUPANT).expect("put independent bytes at the destination");
+	let before_collision = file_names(&fixture.path);
 	let collision = args().output().expect("repeat edit into existing file");
 	assert_eq!(json(&collision, 5)["error"]["code"], "destination_exists");
 	assert_eq!(
-		fs::read_to_string(&destination).expect("read existing copy"),
-		SOURCE.replace("00065", "9007199254740993")
+		fs::read(&destination).expect("read independent destination bytes"),
+		OCCUPANT
 	);
+	assert_eq!(fs::read(&source).expect("read original"), SOURCE.as_bytes());
+	assert_eq!(file_names(&fixture.path), before_collision);
 }
 
 #[test]
@@ -121,12 +126,14 @@ fn sign_requires_an_explicit_target_for_effect_and_verifies_lossless_output() {
 		include_str!("../../../crates/domain/starbank-signature/tests/fixtures/case-ties.sc2bank");
 	let source = fixture.write("Source.sc2bank", original);
 	let destination = fixture.path.join("Signed.sc2bank");
+	let before = file_names(&fixture.path);
 
 	let no_target = bank_command("sign", &source)
 		.args(CONTEXT)
 		.output()
 		.expect("missing target");
 	assert_eq!(json(&no_target, 2)["error"]["code"], "invalid_arguments");
+	assert_eq!(file_names(&fixture.path), before);
 	let preview = bank_command("sign", &source)
 		.args(CONTEXT)
 		.arg("--dry-run")
@@ -138,12 +145,7 @@ fn sign_requires_an_explicit_target_for_effect_and_verifies_lossless_output() {
 		preview["result"]["diff"]["stored_signature"]["after"],
 		"400CCD1D17B653D68BE2FE645A694FB016C3105D"
 	);
-	assert_eq!(
-		fs::read_dir(&fixture.path)
-			.expect("enumerate fixture")
-			.count(),
-		1
-	);
+	assert_eq!(file_names(&fixture.path), before);
 
 	let output = bank_command("sign", &source)
 		.args(CONTEXT)
@@ -152,6 +154,7 @@ fn sign_requires_an_explicit_target_for_effect_and_verifies_lossless_output() {
 		.output()
 		.expect("write signature to copy");
 	let output = json(&output, 0);
+	assert_eq!(output["result"]["outcome"], "committed_verified");
 	assert_eq!(output["result"]["diff"], preview["result"]["diff"]);
 	assert_eq!(
 		fs::read_to_string(&source).expect("read original"),
@@ -164,13 +167,23 @@ fn sign_requires_an_explicit_target_for_effect_and_verifies_lossless_output() {
 		.expect("verify persisted signature");
 	assert_eq!(json(&verified, 0)["result"]["signature"]["status"], "valid");
 
+	let signed = fs::read(&destination).expect("read signed copy");
+	let before_refusal = file_names(&fixture.path);
 	let unconfirmed = bank_command("export", &destination)
 		.arg("--output")
 		.arg(fixture.path.join("Rejected.sc2bank"))
 		.output()
 		.expect("export without signing context");
 	assert_eq!(json(&unconfirmed, 3)["error"]["code"], "stale_signature");
-	assert!(!fixture.path.join("Rejected.sc2bank").exists());
+	assert_eq!(
+		fs::read(&destination).expect("read signed copy after refusal"),
+		signed
+	);
+	assert_eq!(
+		fs::read(&source).expect("read original after refusal"),
+		original.as_bytes()
+	);
+	assert_eq!(file_names(&fixture.path), before_refusal);
 }
 
 #[test]
