@@ -9,6 +9,10 @@ use crate::error::{Limit, MpqError};
 
 const MPQ_SIGNATURE: &[u8; 4] = b"MPQ\x1a";
 const USER_DATA_SIGNATURE: &[u8; 4] = b"MPQ\x1b";
+const USER_DATA_FIXED_BYTES: u64 = 16;
+const USER_DATA_SIZE_OFFSET: usize = 4;
+const USER_DATA_ARCHIVE_OFFSET: usize = 8;
+const USER_DATA_HEADER_SIZE_OFFSET: usize = 12;
 const VERSION_V1: u16 = 0;
 const VERSION_V2: u16 = 1;
 const VERSION_V4: u16 = 3;
@@ -37,9 +41,16 @@ const MAX_SECTOR_SHIFT: u16 = 7;
 pub(crate) const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_TABLE_ENTRIES: u32 = 64 * 1024;
 
+pub(crate) enum HeaderLocation {
+	FlatOnly,
+	AllowUserData,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Header {
 	version: u16,
+	source: Range<u64>,
+	// All table and payload positions are relative to the MPQ header.
 	pub(crate) hash_table: Range<u64>,
 	pub(crate) block_table: Range<u64>,
 	pub(crate) payload: Range<u64>,
@@ -47,7 +58,10 @@ pub(crate) struct Header {
 }
 
 impl Header {
-	pub(crate) fn read(reader: &mut (impl Read + Seek)) -> Result<Self, MpqError> {
+	pub(crate) fn read(
+		reader: &mut (impl Read + Seek),
+		location: HeaderLocation,
+	) -> Result<Self, MpqError> {
 		let file_len = reader.seek(SeekFrom::End(0))?;
 		if file_len > MAX_ARCHIVE_BYTES {
 			return Err(MpqError::LimitExceeded(Limit::ArchiveBytes));
@@ -58,14 +72,27 @@ impl Header {
 		}
 		reader.seek(SeekFrom::Start(0))?;
 		reader.read_exact(&mut raw[..V1_HEADER_BYTES])?;
-		if raw.starts_with(USER_DATA_SIGNATURE) {
-			return Err(MpqError::UnsupportedArchive("user data header"));
-		}
-		if !raw.starts_with(MPQ_SIGNATURE) {
-			return Err(MpqError::InvalidArchive(
-				"missing archive signature at offset zero",
-			));
-		}
+		let archive_base = if raw.starts_with(USER_DATA_SIGNATURE) {
+			if matches!(location, HeaderLocation::FlatOnly) {
+				return Err(MpqError::UnsupportedArchive("user data header"));
+			}
+			let declared = declared_archive_base(&raw, file_len)?;
+			reader.seek(SeekFrom::Start(declared))?;
+			reader.read_exact(&mut raw[..V1_HEADER_BYTES])?;
+			if !raw.starts_with(MPQ_SIGNATURE) {
+				return Err(MpqError::InvalidArchive(
+					"missing archive signature at declared user data offset",
+				));
+			}
+			declared
+		} else {
+			if !raw.starts_with(MPQ_SIGNATURE) {
+				return Err(MpqError::InvalidArchive(
+					"missing archive signature at offset zero",
+				));
+			}
+			0
+		};
 		let header_len = u32_at(&raw, HEADER_LEN_OFFSET);
 		let version = u16_at(&raw, VERSION_OFFSET);
 		let expected_len = match version {
@@ -74,7 +101,7 @@ impl Header {
 			VERSION_V4 => V4_HEADER_BYTES,
 			_ => return Err(MpqError::UnsupportedArchive("header version")),
 		};
-		if u64::from(header_len) > file_len {
+		if u64::from(header_len) > file_len - archive_base {
 			return Err(MpqError::InvalidArchive("truncated extended header"));
 		}
 		if header_len as usize != expected_len {
@@ -88,10 +115,11 @@ impl Header {
 			u64::from(u32_at(&raw, ARCHIVE_LEN_OFFSET))
 		};
 		let sector_shift = u16_at(&raw, SECTOR_SHIFT_OFFSET);
-		if archive_len > file_len
-			|| archive_len < u64::from(header_len)
-			|| sector_shift > MAX_SECTOR_SHIFT
-		{
+		let archive_end = archive_base
+			.checked_add(archive_len)
+			.filter(|&end| end <= file_len && archive_len >= u64::from(header_len))
+			.ok_or(MpqError::InvalidArchive("archive length or sector size"))?;
+		if sector_shift > MAX_SECTOR_SHIFT {
 			return Err(MpqError::InvalidArchive("archive length or sector size"));
 		}
 
@@ -162,6 +190,7 @@ impl Header {
 		}
 		Ok(Self {
 			version,
+			source: archive_base..archive_end,
 			hash_table,
 			block_table,
 			payload: content_start..content_end,
@@ -169,9 +198,33 @@ impl Header {
 		})
 	}
 
+	pub(crate) fn source_offset(&self, relative: u64) -> Result<u64, MpqError> {
+		self.source
+			.start
+			.checked_add(relative)
+			.filter(|&offset| offset <= self.source.end)
+			.ok_or(MpqError::InvalidArchive("archive-relative offset"))
+	}
+
 	pub(crate) fn is_v1(&self) -> bool {
 		self.version == VERSION_V1
 	}
+}
+
+fn declared_archive_base(raw: &[u8; V4_HEADER_BYTES], file_len: u64) -> Result<u64, MpqError> {
+	let data_size = u64::from(u32_at(raw, USER_DATA_SIZE_OFFSET));
+	let base = u64::from(u32_at(raw, USER_DATA_ARCHIVE_OFFSET));
+	// SC2 cache envelopes may report a zero user-data header size.
+	let header_size = u64::from(u32_at(raw, USER_DATA_HEADER_SIZE_OFFSET));
+	if header_size > data_size
+		|| data_size > base
+		|| !(USER_DATA_FIXED_BYTES..=file_len - V1_HEADER_BYTES as u64).contains(&base)
+	{
+		return Err(MpqError::InvalidArchive(
+			"user data header sizes or archive offset",
+		));
+	}
+	Ok(base)
 }
 
 fn extended_table_range(

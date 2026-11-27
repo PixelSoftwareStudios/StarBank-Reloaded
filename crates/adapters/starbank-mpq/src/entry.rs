@@ -75,7 +75,7 @@ impl MetadataEntry {
 			return Err(MpqError::LimitExceeded(Limit::EntrySectors));
 		}
 		let mut input = vec![0; packed];
-		reader.seek(SeekFrom::Start(start))?;
+		reader.seek(SeekFrom::Start(header.source_offset(start)?))?;
 		reader.read_exact(&mut input)?;
 		if !compressed || single && packed == expanded {
 			return Ok(input);

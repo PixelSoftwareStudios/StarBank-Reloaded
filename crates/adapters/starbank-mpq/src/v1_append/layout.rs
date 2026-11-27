@@ -2,7 +2,11 @@ use std::{io::Cursor, ops::Range};
 
 use stormlib_rs::{BlockTableEntry, HashTableEntry, MpqFileFlags, lookup_file_name};
 
-use crate::{V1AppendError, V1LayoutIssue, archive::ClassicTables, header::Header};
+use crate::{
+	V1AppendError, V1LayoutIssue,
+	archive::ClassicTables,
+	header::{Header, HeaderLocation},
+};
 
 const INTERNAL_NAMES: &[&str] = &[
 	"(listfile)",
@@ -25,7 +29,7 @@ pub(super) struct Layout {
 impl Layout {
 	pub(super) fn read(bytes: &[u8]) -> Result<Self, V1AppendError> {
 		let mut reader = Cursor::new(bytes);
-		let header = Header::read(&mut reader)?;
+		let header = Header::read(&mut reader, HeaderLocation::FlatOnly)?;
 		if !header.is_v1() {
 			return Err(V1LayoutIssue::Version.into());
 		}

@@ -12,7 +12,7 @@ use stormlib_rs::{
 use crate::{
 	entry::MetadataEntry,
 	error::MpqError,
-	header::{Header, le32},
+	header::{Header, HeaderLocation, le32},
 };
 
 const HASH_TABLE_NAME: &str = "(hash table)";
@@ -46,7 +46,7 @@ impl<R: Read + Seek> MetadataArchive<R> {
 	/// Returns an error for unreadable sources, inconsistent ranges, unsupported
 	/// layouts or limit violations. The reader is consumed even on failure.
 	pub fn open(mut reader: R) -> Result<Self, MpqError> {
-		let header = Header::read(&mut reader)?;
+		let header = Header::read(&mut reader, HeaderLocation::AllowUserData)?;
 		let tables = ClassicTables::read(&mut reader, &header)?;
 		Ok(Self {
 			reader,
@@ -84,7 +84,7 @@ pub(crate) struct ClassicTables {
 
 impl ClassicTables {
 	pub(crate) fn read(reader: &mut (impl Read + Seek), header: &Header) -> Result<Self, MpqError> {
-		let hash_bytes = read_table(reader, header.hash_table.clone(), HASH_TABLE_NAME)?;
+		let hash_bytes = read_table(reader, header, &header.hash_table, HASH_TABLE_NAME)?;
 		let hash_table = hash_bytes
 			.as_chunks::<{ HashTableEntry::SERIALIZED_LEN }>()
 			.0
@@ -99,7 +99,7 @@ impl ClassicTables {
 			})
 			.collect::<Vec<_>>();
 		drop(hash_bytes);
-		let block_bytes = read_table(reader, header.block_table.clone(), BLOCK_TABLE_NAME)?;
+		let block_bytes = read_table(reader, header, &header.block_table, BLOCK_TABLE_NAME)?;
 		let block_table = block_bytes
 			.as_chunks::<{ BlockTableEntry::SERIALIZED_LEN }>()
 			.0
@@ -127,11 +127,12 @@ impl ClassicTables {
 
 fn read_table(
 	reader: &mut (impl Read + Seek),
-	range: Range<u64>,
+	header: &Header,
+	range: &Range<u64>,
 	table_name: &str,
 ) -> Result<Vec<u8>, MpqError> {
 	let mut bytes = vec![0; (range.end - range.start) as usize];
-	reader.seek(SeekFrom::Start(range.start))?;
+	reader.seek(SeekFrom::Start(header.source_offset(range.start)?))?;
 	reader.read_exact(&mut bytes)?;
 	decrypt_mpq_block(&mut bytes, derive_file_key(table_name, 0, 0, false));
 	Ok(bytes)
