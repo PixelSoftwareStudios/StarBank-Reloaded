@@ -25,8 +25,10 @@ libc = "=0.2.191"
 [target.'cfg(windows)'.dependencies]
 cap-primitives = "=4.0.3"
 windows-sys = { version = "=0.61.2", features = [
+	"Wdk_Storage_FileSystem",
 	"Win32_Foundation",
 	"Win32_Storage_FileSystem",
+	"Win32_System_IO",
 	"Win32_System_WindowsProgramming",
 ] }
 

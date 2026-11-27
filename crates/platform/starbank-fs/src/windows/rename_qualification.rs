@@ -1,18 +1,27 @@
 //! Opt-in kernel probe on synthetic files. The product writer does not call this code.
 
 use std::ffi::OsStr;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::mem::{align_of, offset_of, size_of};
-use std::os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::AsRawHandle};
+use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+use std::path::Path;
 use std::ptr;
 
+use cap_primitives::fs::{OpenOptions, OpenOptionsExt as _};
 use sha2::{Digest as _, Sha256};
-use windows_sys::Win32::{
-	Foundation::{ERROR_ALREADY_EXISTS, ERROR_FILE_EXISTS, GENERIC_READ, GENERIC_WRITE, HANDLE},
-	Storage::FileSystem::{
-		DELETE, FILE_RENAME_INFO, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-		FileRenameInfo, GetVolumeInformationByHandleW, SetFileInformationByHandle,
+use windows_sys::{
+	Wdk::Storage::FileSystem::{
+		FILE_RENAME_INFORMATION, FILE_RENAME_INFORMATION_0, FileRenameInformation,
+		NtSetInformationFile,
+	},
+	Win32::{
+		Foundation::{
+			GENERIC_READ, GENERIC_WRITE, HANDLE, NTSTATUS, STATUS_OBJECT_NAME_COLLISION,
+			STATUS_SUCCESS,
+		},
+		Storage::FileSystem::{DELETE, FILE_SHARE_READ, GetVolumeInformationByHandleW},
+		System::IO::IO_STATUS_BLOCK,
 	},
 };
 
@@ -21,6 +30,8 @@ use super::{DirectoryScope, Identity, NO_REPARSE_OR_RECALL, Observation, read_sn
 const STAGED_NAME: &str = "PendingBank.sc2bank";
 const DESTINATION_NAME: &str = "PublishedBank.SC2Bank";
 const CASE_ALIAS: &str = "pUBLISHEDbANK.sc2bank";
+const CONTROL_SOURCE_DIR: &str = "RootControlSource";
+const CONTROL_TARGET_DIR: &str = "RootControlTarget";
 const STAGED: &[u8] = b"<Bank><!-- prepared fixture --></Bank>";
 const EXISTING: &[u8] = b"<Bank><!-- competing fixture --></Bank>";
 const MAX_BYTES: usize = 1024;
@@ -29,21 +40,104 @@ const FS_NAME_CAPACITY: u32 = 32;
 
 #[repr(C)]
 struct RenameBuffer {
-	flags: u32,
+	flags: FILE_RENAME_INFORMATION_0,
 	parent: HANDLE,
 	name_bytes: u32,
-	name: [u16; MAX_NAME_UNITS + 1],
+	name: [u16; MAX_NAME_UNITS],
 }
 
 // Compare the flexible-tail buffer with the SDK header at compile time. The name is inline at
 // the FileName offset, including on targets where the SDK header has trailing alignment padding.
 const _: () = {
-	assert!(align_of::<RenameBuffer>() == align_of::<FILE_RENAME_INFO>());
-	assert!(offset_of!(RenameBuffer, flags) == offset_of!(FILE_RENAME_INFO, Anonymous));
-	assert!(offset_of!(RenameBuffer, parent) == offset_of!(FILE_RENAME_INFO, RootDirectory));
-	assert!(offset_of!(RenameBuffer, name_bytes) == offset_of!(FILE_RENAME_INFO, FileNameLength));
-	assert!(offset_of!(RenameBuffer, name) == offset_of!(FILE_RENAME_INFO, FileName));
+	assert!(align_of::<RenameBuffer>() == align_of::<FILE_RENAME_INFORMATION>());
+	assert!(size_of::<RenameBuffer>() >= size_of::<FILE_RENAME_INFORMATION>());
+	assert!(offset_of!(RenameBuffer, flags) == offset_of!(FILE_RENAME_INFORMATION, Anonymous));
+	assert!(offset_of!(RenameBuffer, parent) == offset_of!(FILE_RENAME_INFORMATION, RootDirectory));
+	assert!(
+		offset_of!(RenameBuffer, name_bytes) == offset_of!(FILE_RENAME_INFORMATION, FileNameLength)
+	);
+	assert!(offset_of!(RenameBuffer, name) == offset_of!(FILE_RENAME_INFORMATION, FileName));
 };
+
+impl RenameBuffer {
+	fn new(parent: HANDLE, name: &OsStr) -> io::Result<Self> {
+		super::check_component(name).map_err(io::Error::other)?;
+		if name.is_empty() {
+			return Err(io::Error::new(
+				io::ErrorKind::InvalidInput,
+				"empty rename leaf",
+			));
+		}
+		let mut buffer = Self {
+			flags: FILE_RENAME_INFORMATION_0 { Flags: 0 },
+			parent,
+			name_bytes: 0,
+			name: [0; MAX_NAME_UNITS],
+		};
+		let mut name_units = 0;
+		for (index, unit) in name.encode_wide().enumerate() {
+			let slot = buffer.name.get_mut(index).ok_or_else(|| {
+				io::Error::new(
+					io::ErrorKind::InvalidInput,
+					"rename leaf exceeds NTFS name limit",
+				)
+			})?;
+			*slot = unit;
+			name_units += 1;
+		}
+		buffer.name_bytes =
+			u32::try_from(name_units * size_of::<u16>()).map_err(io::Error::other)?;
+		Ok(buffer)
+	}
+
+	fn byte_size(&self) -> io::Result<u32> {
+		let name_bytes = usize::try_from(self.name_bytes).map_err(io::Error::other)?;
+		let length = offset_of!(Self, name) + name_bytes;
+		u32::try_from(length.max(size_of::<FILE_RENAME_INFORMATION>())).map_err(io::Error::other)
+	}
+}
+
+struct PreparedStage<'parent> {
+	parent: &'parent DirectoryScope,
+	file: File,
+}
+
+impl<'parent> PreparedStage<'parent> {
+	fn create(parent: &'parent DirectoryScope) -> io::Result<Self> {
+		let mut options = OpenOptions::new();
+		options
+			.write(true)
+			.access_mode(GENERIC_READ | GENERIC_WRITE | DELETE)
+			.share_mode(FILE_SHARE_READ)
+			.custom_flags(NO_REPARSE_OR_RECALL)
+			.create_new(true);
+		let mut file = cap_primitives::fs::open(&parent.parent, Path::new(STAGED_NAME), &options)?;
+		file.write_all(STAGED)?;
+		file.sync_all()?;
+		Ok(Self { parent, file })
+	}
+
+	fn publish_status(&self, destination: &DirectoryScope, name: &OsStr) -> io::Result<NTSTATUS> {
+		assert_eq!(self.parent.identity.volume, destination.identity.volume);
+		let buffer = RenameBuffer::new(destination.parent.as_raw_handle(), name)?;
+		let length = buffer.byte_size()?;
+		let mut completion = IO_STATUS_BLOCK::default();
+		// SAFETY: the private stage is created without overlapped I/O. cap-primitives opens
+		// it with FILE_SYNCHRONOUS_IO_NONALERT and SYNCHRONIZE, so the request completes in
+		// the call. The live stage and directory handles, initialized writable status block
+		// and aligned counted UTF-16 buffer outlive the call. Zero flags disable replacement.
+		// For completed requests, the direct NTSTATUS is authoritative over the status block.
+		Ok(unsafe {
+			NtSetInformationFile(
+				self.file.as_raw_handle(),
+				&mut completion,
+				(&raw const buffer).cast(),
+				length,
+				FileRenameInformation,
+			)
+		})
+	}
+}
 
 #[test]
 #[ignore = "requires a native Windows host with its temporary directory on local NTFS"]
@@ -53,19 +147,12 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 	let scope = DirectoryScope::open_parent(&root)?;
 	require_ntfs(&scope.parent)?;
 	eprintln!("NTFS probe parent identity {:?}", scope.identity);
+	verify_explicit_destination_root(&root)?;
 
 	let staged = root.join(STAGED_NAME);
 	let destination = root.join(DESTINATION_NAME);
-	let mut file = OpenOptions::new()
-		.write(true)
-		.access_mode(GENERIC_READ | GENERIC_WRITE | DELETE)
-		.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
-		.custom_flags(NO_REPARSE_OR_RECALL)
-		.create_new(true)
-		.open(&staged)?;
-	file.write_all(STAGED)?;
-	file.sync_all()?;
-	let original_stage = Observation::read(&file)?;
+	let stage = PreparedStage::create(&scope)?;
+	let original_stage = Observation::read(&stage.file)?;
 	assert_eq!(original_stage.identity.volume, scope.identity.volume);
 
 	// Create each competitor after preparing and flushing the stage. The fixture directory
@@ -82,45 +169,92 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 		assert_ne!(occupant, original_stage.identity);
 		assert_eq!(occupant.volume, scope.identity.volume);
 
-		let collision = rename_create_only(&file, &scope, OsStr::new(DESTINATION_NAME))
-			.expect_err("exclusive rename must refuse the competing target");
-		let code = collision.raw_os_error();
+		let status = stage.publish_status(&scope, OsStr::new(DESTINATION_NAME))?;
 		eprintln!(
-			"Exclusive collision for {spelling} returned Win32 error {code:?}; occupant {occupant:?}"
+			"Exclusive collision for {spelling} returned NTSTATUS {status:#010x}; occupant {occupant:?}"
 		);
-		assert!(matches!(
-			code,
-			Some(value) if value == ERROR_ALREADY_EXISTS as i32 || value == ERROR_FILE_EXISTS as i32
-		));
+		assert_eq!(
+			status, STATUS_OBJECT_NAME_COLLISION,
+			"NTSTATUS {status:#010x}"
+		);
 		let after = read_snapshot(&competing, MAX_BYTES)?;
 		assert_eq!(after.fingerprint(), before.fingerprint());
 		assert_eq!(after.bytes(), EXISTING);
-		assert_eq!(Observation::read(&file)?.identity, original_stage.identity);
+		assert_eq!(
+			Observation::read(&stage.file)?.identity,
+			original_stage.identity
+		);
 		assert_eq!(fs::read(&staged)?, STAGED);
 		fs::remove_file(competing)?;
 	}
 
-	rename_create_only(&file, &scope, OsStr::new(DESTINATION_NAME))?;
-	assert_eq!(Identity::read(&file)?, original_stage.identity);
-	drop(file);
+	let status = stage.publish_status(&scope, OsStr::new(DESTINATION_NAME))?;
+	eprintln!("Exclusive publication returned NTSTATUS {status:#010x}");
+	assert_eq!(status, STATUS_SUCCESS, "NTSTATUS {status:#010x}");
+	assert_eq!(Identity::read(&stage.file)?, original_stage.identity);
+	drop(stage);
 
-	let resolved = DirectoryScope::open_parent(&root)?;
+	verify_published(&root, &scope, original_stage.identity)?;
+	assert_absent(&staged);
+	Ok(())
+}
+
+fn verify_explicit_destination_root(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+	let source = root.join(CONTROL_SOURCE_DIR);
+	let target = root.join(CONTROL_TARGET_DIR);
+	fs::create_dir(&source)?;
+	fs::create_dir(&target)?;
+	let source_scope = DirectoryScope::open_parent(&source)?;
+	let target_scope = DirectoryScope::open_parent(&target)?;
+	assert_eq!(source_scope.identity.volume, target_scope.identity.volume);
+	assert_ne!(source_scope.identity, target_scope.identity);
+	let source_leaf = source.join(DESTINATION_NAME);
+	assert_absent(&source_leaf);
+	assert_absent(&target.join(DESTINATION_NAME));
+
+	let stage = PreparedStage::create(&source_scope)?;
+	let original_stage = Observation::read(&stage.file)?;
+	assert_eq!(original_stage.identity.volume, source_scope.identity.volume);
+	let status = stage.publish_status(&target_scope, OsStr::new(DESTINATION_NAME))?;
+	eprintln!(
+		"Explicit destination root {:?}, distinct source root {:?}, NTSTATUS {status:#010x}",
+		target_scope.identity, source_scope.identity
+	);
+	assert_eq!(status, STATUS_SUCCESS, "NTSTATUS {status:#010x}");
+	assert_eq!(Identity::read(&stage.file)?, original_stage.identity);
+	drop(stage);
+
+	verify_published(&target, &target_scope, original_stage.identity)?;
+	assert_absent(&source.join(STAGED_NAME));
+	assert_absent(&source_leaf);
+	Ok(())
+}
+
+fn assert_absent(path: &Path) {
+	assert!(
+		fs::symlink_metadata(path).is_err_and(|error| error.kind() == io::ErrorKind::NotFound),
+		"expected absent fixture {path:?}"
+	);
+}
+
+fn verify_published(
+	parent: &Path,
+	scope: &DirectoryScope,
+	stage_identity: Identity,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let resolved = DirectoryScope::open_parent(parent)?;
 	assert_eq!(resolved.identity, scope.identity);
-	let published = read_snapshot(&destination, MAX_BYTES)?;
+	let published = read_snapshot(&parent.join(DESTINATION_NAME), MAX_BYTES)?;
 	assert_eq!(
 		published.fingerprint().windows.file.identity,
-		original_stage.identity
+		stage_identity
 	);
 	assert_eq!(published.fingerprint().windows.directory, scope.identity);
 	assert_eq!(published.bytes(), STAGED);
 	let digest: [u8; 32] = Sha256::digest(STAGED).into();
 	assert_eq!(published.fingerprint().sha256(), &digest);
-	assert!(
-		fs::symlink_metadata(&staged).is_err_and(|error| error.kind() == io::ErrorKind::NotFound)
-	);
 	eprintln!(
-		"Verified stage identity {:?} at the destination, size {}, SHA-256 {}",
-		original_stage.identity,
+		"Verified stage identity {stage_identity:?} at the destination, size {}, SHA-256 {}",
 		STAGED.len(),
 		hex::encode(digest)
 	);
@@ -158,39 +292,44 @@ fn require_ntfs(parent: &File) -> io::Result<()> {
 	Ok(())
 }
 
-fn rename_create_only(file: &File, scope: &DirectoryScope, name: &OsStr) -> io::Result<()> {
-	let mut buffer = RenameBuffer {
-		flags: 0,
-		parent: scope.parent.as_raw_handle(),
-		name_bytes: 0,
-		name: [0; MAX_NAME_UNITS + 1],
-	};
-	super::check_component(name).map_err(io::Error::other)?;
-	let name = name.encode_wide().collect::<Vec<_>>();
-	if name.is_empty() || name.len() > MAX_NAME_UNITS || name.contains(&0) {
-		return Err(io::Error::new(
-			io::ErrorKind::InvalidInput,
-			"invalid fixture name",
-		));
-	}
-	buffer.name[..name.len()].copy_from_slice(&name);
-	buffer.name_bytes = u32::try_from(name.len() * size_of::<u16>()).map_err(io::Error::other)?;
-	let encoded_size = offset_of!(RenameBuffer, name) + (name.len() + 1) * size_of::<u16>();
-	let buffer_size =
-		u32::try_from(encoded_size.max(size_of::<FILE_RENAME_INFO>())).map_err(io::Error::other)?;
-	// SAFETY: the file and parent handles and aligned inline UTF-16 buffer stay live during
-	// the call. The first union field is zero, selecting no replacement. The buffer includes
-	// an extra terminating zero while FileNameLength counts only the name.
-	let result = unsafe {
-		SetFileInformationByHandle(
-			file.as_raw_handle(),
-			FileRenameInfo,
-			(&raw const buffer).cast(),
-			buffer_size,
-		)
-	};
-	if result == 0 {
-		return Err(io::Error::last_os_error());
-	}
+#[test]
+fn rename_buffer_counts_utf16_bytes_without_a_terminator() -> Result<(), Box<dyn std::error::Error>>
+{
+	let short = RenameBuffer::new(ptr::null_mut(), OsStr::new("x"))?;
+	assert_eq!(short.name_bytes, 2);
+	assert_eq!(
+		usize::try_from(short.byte_size()?)?,
+		size_of::<FILE_RENAME_INFORMATION>()
+	);
+
+	let multibyte = "é🚀.SC2Bank";
+	let buffer = RenameBuffer::new(ptr::null_mut(), OsStr::new(multibyte))?;
+	assert_eq!(buffer.name_bytes, 22);
+	assert!(
+		buffer.name[..11]
+			.iter()
+			.copied()
+			.eq(multibyte.encode_utf16())
+	);
+	assert_eq!(
+		usize::try_from(buffer.byte_size()?)?,
+		offset_of!(RenameBuffer, name) + 22
+	);
+
+	let longest = "x".repeat(MAX_NAME_UNITS);
+	let buffer = RenameBuffer::new(ptr::null_mut(), OsStr::new(&longest))?;
+	assert_eq!(
+		usize::try_from(buffer.byte_size()?)?,
+		offset_of!(RenameBuffer, name) + size_of_val(&buffer.name)
+	);
 	Ok(())
+}
+
+#[test]
+fn rename_buffer_refuses_ambiguous_and_out_of_bounds_names() {
+	for leaf in ["", "..", "a/b", r"a\b", "a:b", "a\0b", "a.", "a "] {
+		assert!(RenameBuffer::new(ptr::null_mut(), OsStr::new(leaf)).is_err());
+	}
+	let too_long = "x".repeat(MAX_NAME_UNITS + 1);
+	assert!(RenameBuffer::new(ptr::null_mut(), OsStr::new(&too_long)).is_err());
 }
