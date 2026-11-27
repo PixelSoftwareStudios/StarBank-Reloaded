@@ -234,6 +234,10 @@ cargo build --locked -p starbank-cli --bin starbank
 target/debug/starbank --json map scan --root /path/to/selected-copy.s2ma
 ```
 
+All eleven hosted CI jobs subsequently passed at `2fc26d6`. The synthetic
+reader regressions ran in native CI; the private-copy comparisons above
+ran locally and their inputs were not uploaded. [Hosted run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46077188246)
+
 This is local read-only compatibility evidence for REQ-MPQ-01. Controlled
 map captures, broader layouts/codecs, original-component repair and SC2
 Editor reopen remain unqualified. No game or editor was launched and no
