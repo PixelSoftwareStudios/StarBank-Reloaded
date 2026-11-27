@@ -40,6 +40,7 @@ pub(super) enum Operation {
 	Undo,
 	Redo,
 	Reset,
+	RevertToSaved,
 	Prepare(ContextOptions),
 	Close(CloseOptions),
 }
@@ -148,6 +149,7 @@ enum CommandKind {
 	Undo,
 	Redo,
 	Reset,
+	RevertToSaved,
 	Prepare,
 	Close,
 }
@@ -275,6 +277,7 @@ fn payload_free_operation(kind: CommandKind) -> Result<Operation, ProtocolError>
 		CommandKind::Undo => Ok(Operation::Undo),
 		CommandKind::Redo => Ok(Operation::Redo),
 		CommandKind::Reset => Ok(Operation::Reset),
+		CommandKind::RevertToSaved => Ok(Operation::RevertToSaved),
 		_ => Err(ProtocolError::InvalidRequest),
 	}
 }

@@ -6,6 +6,7 @@ use starbank_signature::{SignatureStatus, SigningContext, verify_signature};
 
 use crate::{
 	EditorError, OccurrenceId,
+	checkpoint::Checkpoint,
 	history::{Direction, History},
 	identity::{Identities, Occurrence},
 	normalize_value,
@@ -34,7 +35,7 @@ pub struct Session {
 	pub(crate) token: Arc<()>,
 	pub(crate) save_order: SaveOrder,
 	pub(crate) opening_ids: Arc<Identities>,
-	saved: Arc<[u8]>,
+	pub(crate) saved: Checkpoint,
 	revision: Revision,
 	history: History,
 }
@@ -54,12 +55,13 @@ impl Session {
 		let mut id_cursor = 0;
 		let ids = Arc::new(Identities::allocate(&document, &mut id_cursor)?);
 		let opening: Arc<[u8]> = bytes.into();
+		let saved = Checkpoint::new(opening.clone(), &document, ids.clone())?;
 		Ok(Self {
 			document,
 			limits,
 			context,
 			id_cursor,
-			saved: opening.clone(),
+			saved,
 			opening,
 			token: Arc::new(()),
 			save_order: SaveOrder::default(),
@@ -82,7 +84,7 @@ impl Session {
 
 	/// Whether the checked XML differs from the verified saved checkpoint.
 	pub fn is_dirty(&self) -> bool {
-		self.document.source() != self.saved.as_ref()
+		self.document.source() != self.saved.bytes()
 	}
 
 	/// Whether the undo direction is available.
@@ -233,12 +235,21 @@ impl Session {
 	///
 	/// Rejects a stale or exhausted revision.
 	pub fn reset(&mut self, expected: Revision) -> Result<Revision, EditorError> {
+		self.restore_checkpoint(expected, self.opening.clone(), self.opening_ids.clone())
+	}
+
+	pub(crate) fn restore_checkpoint(
+		&mut self,
+		expected: Revision,
+		bytes: Arc<[u8]>,
+		ids: Arc<Identities>,
+	) -> Result<Revision, EditorError> {
 		self.require_revision(expected)?;
-		if self.document.source() == self.opening.as_ref() {
+		if self.document.source() == bytes.as_ref() {
 			return Ok(self.revision);
 		}
-		let document = parse(&self.opening, self.limits).map_err(EditorError::Parse)?;
-		self.commit(document, self.opening_ids.clone(), self.id_cursor)
+		let document = parse(&bytes, self.limits).map_err(EditorError::Parse)?;
+		self.commit(document, ids, self.id_cursor)
 	}
 
 	/// Reverses one transaction and advances the revision.
@@ -309,9 +320,5 @@ impl Session {
 		self.id_cursor = cursor;
 		self.revision = revision;
 		Ok(revision)
-	}
-
-	pub(crate) fn saved_checkpoint(&mut self, bytes: Arc<[u8]>) {
-		self.saved = bytes;
 	}
 }

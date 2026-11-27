@@ -102,6 +102,7 @@ export type EngineCommand =
   | { readonly kind: "undo" }
   | { readonly kind: "redo" }
   | { readonly kind: "reset" }
+  | { readonly kind: "revert_to_saved" }
   | { readonly kind: "close"; readonly payload?: { readonly discard: boolean } }
   | {
       readonly kind: "prepare";
@@ -149,11 +150,15 @@ const engineKey = v.object({
 const engineSection = v.object({
   id: v.string(),
   name: v.nullable(v.string()),
+  dirty: v.optional(v.boolean()),
   keys: v.array(engineKey),
 });
 
 const engineSnapshot = v.object({
   dirty: v.boolean(),
+  dirty_section_count: v.optional(
+    v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  ),
   can_undo: v.boolean(),
   can_redo: v.boolean(),
   signature_status: signatureStatus,

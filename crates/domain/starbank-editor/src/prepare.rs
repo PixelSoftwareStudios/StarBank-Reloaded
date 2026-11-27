@@ -7,7 +7,7 @@ use sc2bank::{BankDocument, parse, serialize};
 use starbank_core::Revision;
 use starbank_signature::{SignatureStatus, SigningContext, resign, verify_signature};
 
-use crate::{EditorError, Session};
+use crate::{EditorError, Session, checkpoint::Checkpoint};
 
 /// Signature policy for preparing exact output bytes.
 #[derive(Clone, Copy, Debug)]
@@ -25,7 +25,7 @@ pub enum ExportSigning<'context> {
 /// Validated output and the session revision from which it was prepared.
 #[derive(Debug)]
 pub struct PreparedExport {
-	bytes: Arc<[u8]>,
+	checkpoint: Checkpoint,
 	revision: Revision,
 	sequence: u64,
 	signature: SignatureStatus,
@@ -37,7 +37,7 @@ pub struct PreparedExport {
 impl PreparedExport {
 	/// The exact bytes to copy, export or commit.
 	pub fn bytes(&self) -> &[u8] {
-		&self.bytes
+		self.checkpoint.bytes()
 	}
 
 	/// The revision captured during preparation.
@@ -85,26 +85,25 @@ impl Session {
 			ExportSigning::PreserveFor(context) => context,
 			ExportSigning::Sign(context) => Some(context),
 		};
-		let (bytes, signature, signed_document) = match policy {
+		let (checkpoint, signature, signed_document) = match policy {
 			ExportSigning::Preserve | ExportSigning::PreserveFor(_) => {
 				let bytes =
 					serialize(&self.document, &[], self.limits).map_err(EditorError::Serialize)?;
 				let checked = parse(&bytes, self.limits).map_err(EditorError::Parse)?;
 				let status = verify_signature(&checked, context);
-				(bytes.into(), status, None)
+				let checkpoint = Checkpoint::new(bytes.into(), &checked, self.ids.clone())?;
+				(checkpoint, status, None)
 			}
 			ExportSigning::Sign(context) => {
 				let checked =
 					resign(&self.document, context, self.limits).map_err(EditorError::Signing)?;
-				(
-					checked.source().into(),
-					SignatureStatus::Valid,
-					Some(checked),
-				)
+				let checkpoint =
+					Checkpoint::new(checked.source().into(), &checked, self.ids.clone())?;
+				(checkpoint, SignatureStatus::Valid, Some(checked))
 			}
 		};
 		Ok(PreparedExport {
-			bytes,
+			checkpoint,
 			revision: expected,
 			sequence: self.save_order.issue()?,
 			signature,
@@ -138,7 +137,7 @@ impl Session {
 			self.revision()
 		};
 		self.context = prepared.context;
-		self.saved_checkpoint(prepared.bytes);
+		self.saved = prepared.checkpoint;
 		self.save_order.acknowledged = Some(prepared.sequence);
 		Ok(revision)
 	}

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod checkpoint;
 mod diff;
 mod error;
 mod history;
@@ -14,6 +15,7 @@ mod raw;
 mod session;
 mod structure;
 
+pub use checkpoint::DirtySections;
 pub use diff::{
 	DiffOccurrence, DiffValue, OccurrenceChange, OccurrenceDiff, OccurrenceKind, OpeningDiff,
 };

@@ -159,6 +159,52 @@ fn stale_receipt_cannot_start_a_write_but_verified_earlier_bytes_remain_the_chec
 }
 
 #[test]
+fn the_revert_wire_command_restores_the_verified_checkpoint_and_dirty_projection() {
+	let mut bank = Bank::open();
+	bank.change(EDITED);
+	let (snapshot, _) = bank.command("snapshot", None);
+	let saved_id = snapshot["result"]["payload"]["sections"][0]["id"].clone();
+	assert_eq!(snapshot["result"]["payload"]["dirty_section_count"], 1);
+	assert_eq!(snapshot["result"]["payload"]["sections"][0]["dirty"], true);
+	let receipt = bank.prepare(ExportSigning::Preserve);
+	bank.revision = bank
+		.engine
+		.acknowledge_verified_native_active_save(receipt)
+		.unwrap();
+
+	bank.change(LATER);
+	let latest = bank.revision;
+	bank.revision = Revision::INITIAL;
+	let (stale, _) = bank.command("revert_to_saved", None);
+	assert_eq!(stale["result"]["payload"]["code"], "stale_revision");
+	bank.revision = latest;
+	let (attached, _) = bank.command("revert_to_saved", Some(b"unexpected"));
+	assert_eq!(
+		attached["result"]["payload"]["code"],
+		"unexpected_attachment"
+	);
+	assert_eq!(bank.raw(), LATER);
+
+	let (restored, _) = bank.command("revert_to_saved", None);
+	bank.revision = revision(&restored);
+	assert_eq!(Some(bank.revision), latest.checked_next());
+	let payload = &restored["result"]["payload"];
+	assert_eq!(payload["dirty"], false);
+	assert_eq!(payload["dirty_section_count"], 0);
+	assert_eq!(payload["sections"][0]["id"], saved_id);
+	assert_eq!(payload["sections"][0]["dirty"], false);
+	assert_eq!(bank.raw(), EDITED);
+	assert_eq!(bank.command("opening_raw", None).1.unwrap(), ORIGINAL);
+	let (reset, _) = bank.command("reset", None);
+	bank.revision = revision(&reset);
+	let payload = &reset["result"]["payload"];
+	assert_eq!(payload["dirty"], true);
+	assert_eq!(payload["dirty_section_count"], 1);
+	assert_eq!(payload["sections"], json!([]));
+	assert_eq!(bank.raw(), ORIGINAL);
+}
+
+#[test]
 fn replaced_and_foreign_sessions_reject_receipts_even_when_public_ids_match() {
 	let mut first = Bank::open();
 	let mut second = Bank::open();

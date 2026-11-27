@@ -2,7 +2,7 @@ use serde::Serialize;
 use starbank_signature::SignatureStatus;
 
 use super::error::ProtocolError;
-use crate::{Session, is_value_editable};
+use crate::{DirtySections, Session, is_value_editable};
 
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -31,6 +31,7 @@ impl From<SignatureStatus> for WireSignatureStatus {
 #[derive(Serialize)]
 pub(super) struct Snapshot<'a> {
 	dirty: bool,
+	dirty_section_count: usize,
 	can_undo: bool,
 	can_redo: bool,
 	signature_status: WireSignatureStatus,
@@ -41,6 +42,7 @@ pub(super) struct Snapshot<'a> {
 struct Section<'a> {
 	id: String,
 	name: Option<&'a str>,
+	dirty: bool,
 	keys: Vec<Key<'a>>,
 }
 
@@ -62,14 +64,18 @@ struct Value<'a> {
 
 impl<'a> Snapshot<'a> {
 	pub(super) fn from_session(session: &'a Session) -> Result<Self, ProtocolError> {
+		let dirty_sections = session
+			.dirty_sections()
+			.map_err(|_| ProtocolError::Internal)?;
 		let sections = session
 			.document()
 			.sections()
 			.iter()
-			.map(|section| Section::from_section(session, section))
+			.map(|section| Section::from_section(session, section, &dirty_sections))
 			.collect::<Result<Vec<_>, _>>()?;
 		Ok(Self {
 			dirty: session.is_dirty(),
+			dirty_section_count: dirty_sections.count(),
 			can_undo: session.can_undo(),
 			can_redo: session.can_redo(),
 			signature_status: session.signature_status().into(),
@@ -82,13 +88,15 @@ impl<'a> Section<'a> {
 	fn from_section(
 		session: &Session,
 		section: &'a sc2bank::Section,
+		dirty_sections: &DirtySections,
 	) -> Result<Self, ProtocolError> {
+		let id = session
+			.id_of_section(section.id())
+			.ok_or(ProtocolError::Internal)?;
 		Ok(Self {
-			id: session
-				.id_of_section(section.id())
-				.ok_or(ProtocolError::Internal)?
-				.to_string(),
+			id: id.to_string(),
 			name: section.name(),
+			dirty: dirty_sections.contains(id),
 			keys: section
 				.keys()
 				.iter()

@@ -320,6 +320,7 @@ fn execute(
 		Operation::Undo => session.undo(expected),
 		Operation::Redo => session.redo(expected),
 		Operation::Reset => session.reset(expected),
+		Operation::RevertToSaved => session.revert_to_saved(expected),
 		Operation::Prepare(options) => return prepare(session, expected, options),
 		Operation::ReplaceRaw
 		| Operation::ReplaceRawText
