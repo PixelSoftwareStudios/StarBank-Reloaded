@@ -8,11 +8,11 @@ starbank validate FILE [--json]
 starbank diff BEFORE AFTER [--json]
 starbank sign FILE [--author HANDLE --player HANDLE --bank-name NAME] [--dry-run] [--output PATH | --in-place]
 starbank edit FILE --patch PATCH [--dry-run] [--output PATH | --in-place]
-starbank export FILE --output PATH
+starbank export FILE --output PATH [--dry-run]
 starbank discover [--root PATH] [--json]
 starbank backup list FILE [--verify]
 starbank backup create FILE
-starbank backup restore FILE BACKUP --expected-current-sha256 SHA [--dry-run]
+starbank backup restore FILE BACKUP --expected-current-sha256 SHA [--expected-backup-sha256 SHA] [--dry-run]
 starbank map inspect FILE [--json]
 starbank map scan --root PATH [--root PATH] [--json]
 ```

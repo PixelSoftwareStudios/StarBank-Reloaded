@@ -58,40 +58,151 @@ fn validate_reports_typed_status_and_anonymized_diagnostics() {
 
 #[test]
 #[cfg(any(target_os = "macos", target_os = "linux", windows))]
-fn validate_matches_known_signature_only_with_the_exact_context() {
-	let fixture = Fixture::new();
-	let data = include_str!(
+fn signed_fixture_and_write_previews_match_across_native_encodings() {
+	use sc2bank::XmlEncoding;
+
+	const BANK_XML: &str = include_str!(
 		"../../../crates/domain/starbank-signature/tests/fixtures/canonical-ascii.sc2bank"
 	);
-	let expected = "9689A338F3C1C57C9090E476B6A5F60336C17DAC";
-	let signed = data.replace(
-		"</Bank>",
-		&format!("<Signature value='{expected}'/></Bank>"),
-	);
-	let path = fixture.write("Outside.sc2bank", signed);
-	let output = bank_command("validate", &path)
-		.output()
-		.expect("run validate without explicit context");
-	assert_eq!(
-		json(&output, 0)["result"]["signature"]["status"],
-		"missing_context"
-	);
+	const CONTEXT: [&str; 6] = [
+		"--author",
+		"1-S2-1-0",
+		"--player",
+		"1-S2-1-0",
+		"--bank-name",
+		"Fixture",
+	];
+	const SIGNATURE: &str = "9689A338F3C1C57C9090E476B6A5F60336C17DAC";
+	// Golden SHA-256 values were computed from the independently encoded fixture bytes.
+	for (encoding, declaration, unsigned_sha256, signed_sha256) in [
+		(
+			XmlEncoding::Utf8,
+			"UTF-8",
+			"7ba65c405e67fae253fadd3a9fe8e39f83527344e4b1e76c4a2ece12de799c4c",
+			"efe10915dacf3a6be91325c4d0587e0d57c7e1a765787cff971c91b9f74992b1",
+		),
+		(
+			XmlEncoding::Utf16Le,
+			"UTF-16",
+			"c9d6a438008c7f855abb64ada0d64481ec5a884da2632372c2ad5eb5205e1b24",
+			"9cc1778924a2f470c024765faf31cc289f100c60425262e4c1b9f2fc174038ae",
+		),
+		(
+			XmlEncoding::Utf16Be,
+			"UTF-16BE",
+			"8e0f3374ede8376940f320e09d867eb9c8472473090cea84694b797307c74dab",
+			"df70d4cb12f26dc615ab2d14ced1dfee25066a6bd61ac221a6ab1e5e33b75bad",
+		),
+	] {
+		let fixture = Fixture::new();
+		let unsigned_xml =
+			format!("<?xml version=\"1.0\" encoding=\"{declaration}\"?>\r\n{BANK_XML}");
+		let signed_xml = unsigned_xml.replace(
+			"</Bank>",
+			&format!("<Signature value=\"{SIGNATURE}\"/></Bank>"),
+		);
+		let unsigned = encode_cli_fixture(encoding, &unsigned_xml);
+		let signed = encode_cli_fixture(encoding, &signed_xml);
+		let unsigned_path = fixture.write("Unsigned.sc2bank", &unsigned);
+		let signed_path = fixture.write("Outside.sc2bank", &signed);
+		let sign_target = fixture.path.join("SignDestination.sc2bank");
+		let export_target = fixture.path.join("ExportDestination.sc2bank");
 
-	let output = bank_command("validate", &path)
-		.args([
-			"--author",
-			"1-S2-1-0",
-			"--player",
-			"1-S2-1-0",
-			"--bank-name",
-			"Fixture",
-			"--require-signature",
-		])
-		.output()
-		.expect("run validate with given context");
-	let body = json(&output, 0);
-	assert_eq!(body["result"]["signature"]["status"], "valid");
-	assert_eq!(body["result"]["signature"]["digest"], expected);
+		let output = bank_command("inspect", &signed_path)
+			.output()
+			.expect("inspect signed fixture");
+		let inspection = json(&output, 0);
+		assert_eq!(inspection["command"], "inspect");
+		let result = &inspection["result"];
+		assert_eq!(result["sha256"], signed_sha256);
+		assert_eq!(result["signature"]["status"], "missing_context");
+		let keys = &result["contents"][1]["keys"];
+		assert_eq!(keys[1]["name"], "Same");
+		assert_eq!(keys[2]["name"], "Same");
+		assert_eq!(keys[1]["values"][0]["value"], "A & B");
+		assert_eq!(keys[1]["values"][1]["value"], "1.50");
+		assert_eq!(keys[2]["values"][0]["value"], "9007199254740993");
+
+		let output = bank_command("validate", &signed_path)
+			.output()
+			.expect("validate without explicit context");
+		assert_eq!(
+			json(&output, 0)["result"]["signature"]["status"],
+			"missing_context"
+		);
+
+		let output = bank_command("validate", &signed_path)
+			.args(CONTEXT)
+			.arg("--require-signature")
+			.output()
+			.expect("validate with exact signing context");
+		let validation = json(&output, 0);
+		assert_eq!(validation["command"], "validate");
+		assert_eq!(validation["result"]["signature"]["status"], "valid");
+		assert_eq!(validation["result"]["signature"]["digest"], SIGNATURE);
+
+		let sign = bank_command("sign", &unsigned_path)
+			.args(CONTEXT)
+			.args(["--dry-run", "--output"])
+			.arg(&sign_target)
+			.output()
+			.expect("preview signature");
+		let export = bank_command("export", &signed_path)
+			.args(CONTEXT)
+			.args(["--dry-run", "--no-resign", "--output"])
+			.arg(&export_target)
+			.output()
+			.expect("preview export");
+		for (command, output, before_sha256) in [
+			("sign", sign, unsigned_sha256),
+			("export", export, signed_sha256),
+		] {
+			let preview = json(&output, 0);
+			assert_eq!(preview["command"], command);
+			let result = &preview["result"];
+			assert_eq!(result["outcome"], "prepared");
+			assert_eq!(result["signature"], "valid");
+			assert_eq!(result["diff"]["before_sha256"], before_sha256);
+			assert_eq!(result["diff"]["after_sha256"], signed_sha256);
+			assert_eq!(result["diff"]["stored_signature"]["after"], SIGNATURE);
+			assert_eq!(
+				result["diff"]["source_changed"],
+				before_sha256 != signed_sha256
+			);
+			assert!(result["backup"].is_null());
+			assert!(result["recovery"].is_null());
+		}
+
+		assert!(!sign_target.exists());
+		assert!(!export_target.exists());
+		assert_eq!(
+			fs::read_dir(&fixture.path)
+				.expect("read fixture directory")
+				.count(),
+			2
+		);
+		assert_eq!(
+			fs::read(&signed_path).expect("read original signed bank"),
+			signed
+		);
+		assert_eq!(
+			fs::read(&unsigned_path).expect("read original unsigned bank"),
+			unsigned
+		);
+	}
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+fn encode_cli_fixture(encoding: sc2bank::XmlEncoding, xml: &str) -> Vec<u8> {
+	use sc2bank::XmlEncoding;
+
+	const UTF16_BOM: u16 = 0xfeff;
+	let units = std::iter::once(UTF16_BOM).chain(xml.encode_utf16());
+	match encoding {
+		XmlEncoding::Utf8 => xml.as_bytes().to_vec(),
+		XmlEncoding::Utf16Le => units.flat_map(u16::to_le_bytes).collect(),
+		XmlEncoding::Utf16Be => units.flat_map(u16::to_be_bytes).collect(),
+	}
 }
 
 #[test]

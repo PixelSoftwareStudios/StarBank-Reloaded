@@ -151,7 +151,8 @@ Depends on: 05,07,08.
 - [x] Implement typed local bank commands, versioned JSON, exact patch selectors, dry-run, guarded effects, backup and restore, and the CLI skill.
 - [x] Implement read-only map inspection and qualify the local CLI on macOS and Linux. [CLI guide](../apps/starbank-cli/README.md)
 - [x] Compare native protocol, release WASM, and CLI output on the same three synthetic encodings, including exact signing and dry-run behavior. [Adapter parity](verification/ADAPTER_PARITY.md)
-- [ ] Verify native Windows runtime and complete cross-adapter conformance on authorized game data.
+- [ ] Verify Windows CLI reads and no-write preparation on synthetic UTF-8, UTF-16LE and UTF-16BE banks.
+- [ ] Complete cross-adapter conformance on authorized game data.
 - [ ] Implement and verify: REQ-CLI-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
