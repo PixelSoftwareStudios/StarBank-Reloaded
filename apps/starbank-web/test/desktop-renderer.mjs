@@ -1453,8 +1453,10 @@ async function verifyCreateOnlyRenderer(page, bridge, canCreateCopy) {
 
   assert.equal(await button(page, "Save").count(), 0);
   assert.equal(await button(page, "Save As…").count(), Number(canCreateCopy));
-  await button(page, "More save options").click();
+  const saveOptions = button(page, "More save options");
+  await saveOptions.click();
   const menu = page.getByRole("menu");
+  await menu.waitFor();
   assert.equal(
     await menu
       .getByRole("menuitem", {
@@ -1471,6 +1473,7 @@ async function verifyCreateOnlyRenderer(page, bridge, canCreateCopy) {
   );
   await page.keyboard.press("Escape");
   await menu.waitFor({ state: "hidden" });
+  await saveOptions.and(page.locator(":focus")).waitFor();
 
   await button(page, "Tools").press("Enter");
   const toolsMenu = page.getByRole("menu");
