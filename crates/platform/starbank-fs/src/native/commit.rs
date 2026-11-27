@@ -129,10 +129,6 @@ fn try_commit(
 	if let Some(original) = &original {
 		original.ensure_prepared(&destination, &stage, &staged, max_bytes)?;
 	}
-	if stage.ensure_bound()? != staged {
-		return Err(StorageError::Conflict);
-	}
-
 	let flags = match intent {
 		CommitIntent::CreateNew => RenameFlags::NOREPLACE,
 		CommitIntent::ReplaceExpected(_) => RenameFlags::EXCHANGE,
@@ -140,8 +136,13 @@ fn try_commit(
 	#[cfg(target_os = "macos")]
 	let flags = darwin::publication_flags(flags);
 	checkpoint(CommitPhase::Staged)?;
+	if stage.ensure_bound()? != staged {
+		return Err(StorageError::Conflict);
+	}
 	if let Some(authority) = authority {
 		authority.validate()?;
+	} else {
+		destination.ensure_bound()?;
 	}
 	let publish = fs::renameat_with(
 		&destination.dir,

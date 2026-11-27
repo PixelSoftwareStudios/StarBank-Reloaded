@@ -101,6 +101,70 @@ fn failure_after_stage_sync_leaves_original_and_removes_owned_stage() -> io::Res
 }
 
 #[test]
+fn ordinary_overwrite_rechecks_the_parent_binding_before_publication() -> io::Result<()> {
+	let fixture = Fixture::new()?;
+	let chosen = fixture.root.join("Selected");
+	let moved = fixture.root.join("Original");
+	fs::create_dir(&chosen)?;
+	let target = chosen.join(FIXTURE_NAME);
+	fs::write(&target, ORIGINAL)?;
+	let before = read_snapshot(&target, LIMIT).expect("read original fixture");
+	let rejected = try_commit(
+		&target,
+		PREPARED,
+		CommitIntent::ReplaceExpected(before.fingerprint()),
+		LIMIT,
+		None,
+		|phase| {
+			if phase == CommitPhase::Staged {
+				fs::rename(&chosen, &moved)
+					.and_then(|()| fs::create_dir(&chosen))
+					.and_then(|()| fs::write(&target, EXTERNAL))
+					.map_err(|error| StorageError::io("replace fixture directory", error))?;
+			}
+			Ok(())
+		},
+	)
+	.expect_err("a moved destination must be rejected before writing the bank");
+	assert!(matches!(rejected, StorageError::Conflict));
+	assert_eq!(fs::read(&target)?, EXTERNAL);
+	assert_eq!(fs::read(moved.join(FIXTURE_NAME))?, ORIGINAL);
+	assert_eq!(fs::read_dir(moved)?.count(), 1);
+	Ok(())
+}
+
+#[test]
+fn ordinary_overwrite_rechecks_the_pending_file_before_publication() -> io::Result<()> {
+	let fixture = Fixture::new()?;
+	let before = read_snapshot(&fixture.target, LIMIT).expect("read original fixture");
+	let rejected = try_commit(
+		&fixture.target,
+		PREPARED,
+		CommitIntent::ReplaceExpected(before.fingerprint()),
+		LIMIT,
+		None,
+		|phase| {
+			if phase == CommitPhase::Staged {
+				let pending = fixture
+					.pending_paths()
+					.map_err(|error| StorageError::io("find fixture stage", error))?;
+				assert_eq!(pending.len(), 1);
+				fs::write(&pending[0], b"changed pending bytes")
+					.map_err(|error| StorageError::io("change fixture stage", error))?;
+			}
+			Ok(())
+		},
+	)
+	.expect_err("a changed stage must be rejected before writing the bank");
+	assert!(matches!(rejected, StorageError::Conflict));
+	let after = read_snapshot(&fixture.target, LIMIT).expect("read rejected fixture");
+	assert_eq!(before.fingerprint(), after.fingerprint());
+	assert_eq!(after.bytes(), ORIGINAL);
+	assert!(fixture.pending_paths()?.is_empty());
+	Ok(())
+}
+
+#[test]
 fn cancel_before_directory_sync_or_readback_preserves_recovery() -> io::Result<()> {
 	for at in [CommitPhase::Published, CommitPhase::DirectorySynced] {
 		let fixture = Fixture::new()?;
