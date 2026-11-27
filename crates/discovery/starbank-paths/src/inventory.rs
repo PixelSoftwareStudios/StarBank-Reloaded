@@ -11,6 +11,7 @@ use crate::{
 	LimitKind, PathError, PathSelection, PlayerScope, SigningContextHint,
 	context::{BACKUP_EXTENSION, BANK_EXTENSION, has_extension},
 	parse_signing_context,
+	selection::scope_from_path,
 };
 
 const DEFAULT_MAX_DEPTH: usize = 64;
@@ -52,7 +53,7 @@ impl Default for ScanLimits {
 pub struct BankLocation {
 	/// Native absolute path for display or subsequent explicit file open.
 	pub path: PathBuf,
-	/// Account and player associated with this path's bank root.
+	/// Account and player observed in this bank's path.
 	pub scope: PlayerScope,
 	/// Context available from the path structure, when unambiguous.
 	pub signing_hint: Option<SigningContextHint>,
@@ -96,9 +97,9 @@ pub fn inventory_banks(
 			if !metadata.is_file() {
 				return Err(PathError::EntryChanged(path));
 			}
-			state.add_file(&root.directory, name, &metadata, path, root.scope())?;
+			state.add_file(&root.directory, name, &metadata, path)?;
 		} else {
-			state.walk(&root.directory, root.path(), root.scope(), 0)?;
+			state.walk(&root.directory, root.path(), 0)?;
 		}
 	}
 	let mut banks = state
@@ -131,13 +132,7 @@ struct InventoryState {
 }
 
 impl InventoryState {
-	fn walk(
-		&mut self,
-		directory: &Dir,
-		parent: &Path,
-		scope: &PlayerScope,
-		depth: usize,
-	) -> Result<(), PathError> {
+	fn walk(&mut self, directory: &Dir, parent: &Path, depth: usize) -> Result<(), PathError> {
 		let entries = directory
 			.entries()
 			.map_err(|source| PathError::io(parent, source))?;
@@ -151,9 +146,9 @@ impl InventoryState {
 			if metadata.is_dir() {
 				self.budget.check_depth(&path, depth + 1)?;
 				let child = open_child(directory, &name, &metadata, &path)?;
-				self.walk(&child, &path, scope, depth + 1)?;
+				self.walk(&child, &path, depth + 1)?;
 			} else if metadata.is_file() {
-				self.add_file(directory, &name, &metadata, path, scope)?;
+				self.add_file(directory, &name, &metadata, path)?;
 			}
 		}
 		Ok(())
@@ -165,14 +160,15 @@ impl InventoryState {
 		name: &OsStr,
 		metadata: &Metadata,
 		path: PathBuf,
-		scope: &PlayerScope,
 	) -> Result<(), PathError> {
 		if has_extension(&path, BANK_EXTENSION) {
 			let identity = file_identity(directory, name, metadata, &path)?;
 			self.banks.entry(identity).or_default().push(BankLocation {
 				signing_hint: parse_signing_context(&path),
+				scope: path
+					.parent()
+					.map_or_else(PlayerScope::default, scope_from_path),
 				path,
-				scope: scope.clone(),
 			});
 		} else if has_extension(&path, BACKUP_EXTENSION)
 			&& path

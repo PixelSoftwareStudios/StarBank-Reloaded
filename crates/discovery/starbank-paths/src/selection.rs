@@ -289,34 +289,37 @@ fn named(path: &Path, name: &str) -> bool {
 		.is_some_and(|part| part.eq_ignore_ascii_case(name))
 }
 
-fn scope_from_path(path: &Path) -> PlayerScope {
-	let banks = path.ancestors().find(|ancestor| named(ancestor, BANKS));
-	let Some(parent) = banks.and_then(Path::parent) else {
-		return PlayerScope::default();
-	};
-	let Some(grandparent) = parent.parent() else {
-		return PlayerScope::default();
-	};
-	if named(grandparent, ACCOUNTS) {
-		PlayerScope {
-			account: parent
-				.file_name()
-				.filter(|name| valid_numeric_account(name))
-				.map(OsStr::to_owned),
-			player: None,
-		}
+pub(crate) fn scope_from_path(path: &Path) -> PlayerScope {
+	let mut candidates = path.ancestors().filter_map(scope_at_banks_directory);
+	let scope = candidates.next().unwrap_or_default();
+	if candidates.next().is_some() {
+		PlayerScope::default()
+	} else {
+		scope
+	}
+}
+
+fn scope_at_banks_directory(path: &Path) -> Option<PlayerScope> {
+	if !named(path, BANKS) {
+		return None;
+	}
+	let parent = path.parent()?;
+	let grandparent = parent.parent()?;
+	let (account, player) = if named(grandparent, ACCOUNTS) {
+		(parent, None)
 	} else if grandparent
 		.parent()
 		.is_some_and(|ancestor| named(ancestor, ACCOUNTS))
 	{
-		PlayerScope {
-			account: grandparent
-				.file_name()
-				.filter(|name| valid_numeric_account(name))
-				.map(OsStr::to_owned),
-			player: parent.file_name().and_then(valid_handle).map(str::to_owned),
-		}
+		(grandparent, parent.file_name().and_then(valid_handle))
 	} else {
-		PlayerScope::default()
-	}
+		return None;
+	};
+	let account = account
+		.file_name()
+		.filter(|name| valid_numeric_account(name));
+	(account.is_some() || player.is_some()).then(|| PlayerScope {
+		account: account.map(OsStr::to_owned),
+		player: player.map(str::to_owned),
+	})
 }

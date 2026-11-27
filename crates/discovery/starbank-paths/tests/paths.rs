@@ -100,6 +100,68 @@ fn inventory_keeps_all_bank_scopes_and_distinct_name_collisions()
 }
 
 #[test]
+fn manual_collections_preserve_per_bank_scope_through_nested_accounts_and_folders()
+-> Result<(), Box<dyn std::error::Error>> {
+	let temp = tempfile::tempdir()?;
+	let wrapper = temp.path().canonicalize()?.join("Imported collections");
+	let first = write_fixture(
+		&wrapper,
+		"First/Accounts/123/1-S2-1-987/Banks/1-S2-1-123/Nested/Banks/Shared.SC2Bank",
+	)?;
+	let second = write_fixture(
+		&wrapper,
+		"Second/Accounts/456/1-S2-1-987/Banks/1-S2-1-456/Shared.SC2Bank",
+	)?;
+	let loose = write_fixture(&wrapper, "Loose/Shared.SC2Bank")?;
+	let ambiguous = write_fixture(
+		&wrapper,
+		"Third/Accounts/789/1-S2-1-231/Banks/1-S2-1-567/Accounts/456/1-S2-1-987/Banks/1-S2-1-456/Shared.SC2Bank",
+	)?;
+	let limits = ScanLimits::default();
+	let selection = is_valid_bank_path(&wrapper, limits)?;
+	assert_eq!(selection.kind(), SelectionKind::Collection);
+	let inventory = inventory_banks(&selection, limits)?;
+	assert_eq!(inventory.banks.len(), 4);
+	let location = |path: &Path| {
+		inventory
+			.banks
+			.iter()
+			.flat_map(|bank| &bank.locations)
+			.find(|bank| bank.path == path)
+	};
+	for (path, account, author) in [
+		(&first, "123", "1-S2-1-123"),
+		(&second, "456", "1-S2-1-456"),
+	] {
+		let bank = location(path).ok_or("manual bank location")?;
+		assert_eq!(bank.scope.account.as_deref(), Some(account.as_ref()));
+		assert_eq!(bank.scope.player.as_deref(), Some("1-S2-1-987"));
+		let hint = bank.signing_hint.as_ref().ok_or("canonical signing hint")?;
+		assert_eq!(hint.author, author);
+		assert_eq!(hint.player, "1-S2-1-987");
+	}
+	let first_location = location(&first).ok_or("first bank")?;
+	let scoped_dir = first.parent().ok_or("nested Banks directory")?;
+	let author_dir = wrapper.join("First/Accounts/123/1-S2-1-987/Banks/1-S2-1-123");
+	for selected in [scoped_dir, author_dir.as_path(), first.as_path()] {
+		let selection = is_valid_bank_path(selected, limits)?;
+		assert_eq!(selection.bank_roots()[0].scope(), &first_location.scope);
+		let single = inventory_banks(&selection, limits)?;
+		assert_eq!(single.banks.len(), 1);
+		assert_eq!(
+			single.banks[0].locations,
+			std::slice::from_ref(first_location)
+		);
+	}
+	for path in [loose, ambiguous] {
+		let bank = location(&path).ok_or("unknown bank location")?;
+		assert!(bank.scope.account.is_none() && bank.scope.player.is_none());
+		assert!(bank.signing_hint.is_none());
+	}
+	Ok(())
+}
+
+#[test]
 fn accepts_explicit_folders_and_files_without_assuming_signing_context()
 -> Result<(), Box<dyn std::error::Error>> {
 	let temp = tempfile::tempdir()?;
