@@ -70,8 +70,9 @@ impl Session {
 	/// Reports pending changes to section subtrees relative to the saved checkpoint.
 	///
 	/// Whole-document dirtiness also includes formatting and metadata outside sections.
-	/// Byte-identical sections with new IDs after a raw edit are matched by their
-	/// complete source bytes. This comparison does not reassign occurrence IDs.
+	/// When a raw edit invalidates identities, byte-identical sections with new IDs
+	/// are matched by complete source bytes. Structured edits within the same
+	/// projection keep added and deleted occurrences distinct.
 	///
 	/// # Errors
 	///
@@ -102,7 +103,7 @@ impl Session {
 		}
 
 		dirty.deleted = saved.sections.len() - matched_saved;
-		if dirty.deleted > 0 && !new_sections.is_empty() {
+		if !self.ids.same_raw_origin(&saved.ids) && dirty.deleted > 0 && !new_sections.is_empty() {
 			let mut unmatched_source = BTreeMap::new();
 			for (&id, range) in &saved.sections {
 				if self.ids.resolve(id).is_none() {

@@ -66,15 +66,21 @@ impl Occurrence {
 	}
 }
 
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub(crate) struct Identities {
+	raw_origin: u64,
 	by_source: Vec<(u32, OccurrenceId)>,
 	by_session: Vec<(OccurrenceId, Occurrence)>,
 }
 
 impl Identities {
 	pub(crate) fn allocate(document: &BankDocument, cursor: &mut u64) -> Result<Self, EditorError> {
-		let mut identities = Self::default();
+		// Raw replacement starts at the last issued ID. Projections with allocated
+		// occurrences on opposite sides of a raw replacement have different origins.
+		let mut identities = Self {
+			raw_origin: *cursor,
+			..Self::default()
+		};
 		for section in document.sections() {
 			identities.insert(Occurrence::Section(section.id()), cursor)?;
 			for key in section.keys() {
@@ -96,7 +102,10 @@ impl Identities {
 		addition: Option<StructuralNodeId>,
 		cursor: &mut u64,
 	) -> Result<(Self, Option<OccurrenceId>), EditorError> {
-		let mut identities = Self::default();
+		let mut identities = Self {
+			raw_origin: self.raw_origin,
+			..Self::default()
+		};
 		for &(id, occurrence) in &self.by_session {
 			if let Some(current) = occurrence.remap(changes) {
 				identities.store(id, current);
@@ -143,7 +152,8 @@ impl Identities {
 		self.by_session.push((id, occurrence));
 	}
 
-	pub(crate) fn from_assignments(
+	pub(crate) fn with_assignments(
+		&self,
 		mut assignments: Vec<(OccurrenceId, Occurrence)>,
 	) -> Result<Self, EditorError> {
 		assignments.sort_unstable_by_key(|&(id, _)| id);
@@ -159,9 +169,18 @@ impl Identities {
 			return Err(EditorError::InconsistentProjection);
 		}
 		Ok(Self {
+			raw_origin: self.raw_origin,
 			by_source,
 			by_session: assignments,
 		})
+	}
+
+	pub(crate) fn same_raw_origin(&self, other: &Self) -> bool {
+		self.raw_origin == other.raw_origin
+	}
+
+	pub(crate) fn same_bindings(&self, other: &Self) -> bool {
+		self.by_session == other.by_session
 	}
 
 	pub(crate) fn id(&self, occurrence: Occurrence) -> Option<OccurrenceId> {

@@ -205,7 +205,7 @@ impl Session {
 		let candidate = parse(&bytes, self.limits).map_err(EditorError::Parse)?;
 		let identities =
 			self.revert_identities(&candidate, &opening, &target.range, &original.range)?;
-		if bytes == source && identities == *self.ids {
+		if bytes == source && identities.same_bindings(&self.ids) {
 			return Ok(self.revision());
 		}
 		self.commit(candidate, Arc::new(identities), self.id_cursor)
@@ -245,7 +245,7 @@ impl Session {
 		if !positions.is_empty() {
 			return Err(EditorError::InconsistentProjection);
 		}
-		Identities::from_assignments(assignments)
+		self.ids.with_assignments(assignments)
 	}
 }
 

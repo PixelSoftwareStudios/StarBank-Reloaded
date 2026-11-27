@@ -103,6 +103,88 @@ fn dirty_sections_follow_the_saved_occurrences_through_structure_and_history() {
 }
 
 #[test]
+fn a_deleted_and_recreated_duplicate_has_separate_dirty_identities() {
+	let source = br#"<Bank><Section name="Same"/><Section name="Same"/><Section name="Tail"><Key name="K"><A int="1"/><B int="2"/></Key></Section></Bank>"#;
+	let mut session = Session::open(source, Limits::default(), None).unwrap();
+	let [same, deleted, tail]: [_; 3] = section_ids(&session).try_into().unwrap();
+	let tail_values = session.document().sections()[2].keys()[0]
+		.values()
+		.iter()
+		.map(|value| session.id_of_value(value.id()).unwrap())
+		.collect::<Vec<_>>();
+	let edited = session
+		.set_values(
+			Revision::INITIAL,
+			&[ValueChange {
+				id: tail_values[0],
+				value: "001",
+			}],
+		)
+		.unwrap();
+	let receipt = session.prepare(edited, ExportSigning::Preserve).unwrap();
+	let saved = receipt.bytes().to_vec();
+	assert_ne!(saved, source);
+	assert_eq!(
+		session.acknowledge_verified_active_save(receipt).unwrap(),
+		edited
+	);
+	let removed = session
+		.apply_structure(edited, StructureChange::RemoveSection { id: deleted })
+		.unwrap();
+	let inserted = session
+		.apply_structure(
+			removed.revision,
+			StructureChange::AddSection { name: "Same" },
+		)
+		.unwrap();
+	let new = inserted.added.unwrap();
+	assert_ne!(deleted, new);
+	assert_eq!(section_ids(&session), [same, tail, new]);
+	assert_eq!(
+		session.document().sections()[1].keys()[0]
+			.values()
+			.iter()
+			.map(|value| session.id_of_value(value.id()).unwrap())
+			.collect::<Vec<_>>(),
+		tail_values
+	);
+	assert!(session.is_dirty());
+	let dirty = session.dirty_sections().unwrap();
+	assert_eq!(
+		dirty.count(),
+		2,
+		"the same source spelling does not merge known identities"
+	);
+	assert!(dirty.contains(new));
+	assert!(!dirty.contains(same));
+	assert!(!dirty.contains(tail));
+
+	let reverted = session.revert_to_saved(inserted.revision).unwrap();
+	assert_eq!(session.document().source(), saved);
+	assert_eq!(section_ids(&session), [same, deleted, tail]);
+	assert_eq!(session.dirty_sections().unwrap().count(), 0);
+	assert!(session.undo(reverted).unwrap() > reverted);
+	assert_eq!(section_ids(&session), [same, tail, new]);
+	assert_eq!(session.dirty_sections().unwrap().count(), 2);
+}
+
+#[test]
+fn restoring_identical_empty_xml_remains_a_noop() {
+	let source = b"<Bank/>";
+	let mut session = Session::open(source, Limits::default(), None).unwrap();
+	let other = session
+		.replace_raw(Revision::INITIAL, DUPLICATE_SECTIONS)
+		.unwrap();
+	let empty = session.replace_raw(other, source).unwrap();
+	assert_eq!(session.revert_to_saved(empty).unwrap(), empty);
+	assert_eq!(session.reset(empty).unwrap(), empty);
+	assert_eq!(session.document().source(), source);
+	assert_eq!(session.dirty_sections().unwrap().count(), 0);
+	assert!(session.undo(empty).unwrap() > empty);
+	assert_eq!(session.document().source(), DUPLICATE_SECTIONS);
+}
+
+#[test]
 fn raw_document_only_changes_leave_byte_identical_duplicate_sections_clean() {
 	let text = "<Bank><Section name='Same'/><Section name='Same'/></Bank>";
 	let mut session = Session::open(text.as_bytes(), Limits::default(), None).unwrap();
