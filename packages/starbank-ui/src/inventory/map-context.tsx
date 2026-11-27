@@ -1,4 +1,8 @@
-import type { BankBrowserModel, BankListItem } from "./inventory-browser";
+import {
+  type BankBrowserModel,
+  type BankListItem,
+  filterBanks,
+} from "./inventory-browser";
 import type { MapInventory, MapListItem } from "./map-sidebar";
 
 const ARCHIVE_DATE = new Intl.DateTimeFormat(undefined, {
@@ -46,6 +50,7 @@ export interface MapContext {
 export function resolveMapContext(
   inventory: MapInventory,
   hasDocument: boolean,
+  account: string,
 ): MapContext | undefined {
   if (inventory.status !== "ready") return undefined;
   const browser = inventory.bankBrowser;
@@ -63,11 +68,16 @@ export function resolveMapContext(
   }
   const map = inventory.maps.find(({ id }) => id === mapId);
   if (!map) return undefined;
+  const choices = browser
+    ? filterBanks(browser.banks, { kind: "map", mapId: map.id }, account)
+    : [];
   return {
     map,
     activeBank,
     choices:
-      browser?.banks.filter(({ mapIds }) => mapIds.includes(map.id)) ?? [],
+      activeBank && !choices.includes(activeBank)
+        ? [activeBank, ...choices]
+        : choices,
     onOpenBank: browser?.onOpenBank,
     disabled: browser?.disabled,
     uncertainMatch: candidateIds.length > 1,

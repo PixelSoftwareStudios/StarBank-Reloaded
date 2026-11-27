@@ -149,6 +149,7 @@ export function AppShell({
               mapContext={resolveMapContext(
                 inventory,
                 Boolean(editor.document),
+                accountScope.selected,
               )}
             />
           ) : (

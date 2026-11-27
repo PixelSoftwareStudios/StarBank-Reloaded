@@ -4,7 +4,7 @@ import {
   type BankBackupPresence,
   type MapInventory,
 } from "starbank-ui";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type BankListItem,
   bankScopeChoices,
@@ -267,6 +267,73 @@ describe("bank scopes and archive dates", () => {
     expect(
       filterBanks(scopedBanks, { kind: "map", mapId: "alpha" }, "scope:one"),
     ).toEqual([scopedBanks[0]]);
+  });
+
+  it("scopes header alternatives while preserving the open bank and its map", async () => {
+    const candidates = [
+      scopedBanks[0],
+      { ...scopedBanks[0], id: "other-copy-one" },
+      { ...scopedBanks[1], mapIds: ["alpha"] },
+    ];
+    const inventoryModule = await import(
+      "../../../packages/starbank-ui/src/inventory/inventory-browser"
+    );
+    const useScope = vi.spyOn(inventoryModule, "useBankAccountScope");
+
+    function show(selected: string) {
+      useScope.mockReturnValue({
+        choices: bankScopeChoices(candidates),
+        selected,
+        select: () => {},
+      });
+      return renderToStaticMarkup(
+        <AppShell
+          name="StarBank Reloaded"
+          editor={{
+            document: {
+              id: "open-bank",
+              revision: "0",
+              name: "Same.SC2Bank",
+              dirty: false,
+              xml: "<Bank/>",
+              sections: [],
+            },
+          }}
+          inventory={{
+            status: "ready",
+            maps,
+            selectedMapId: "beta",
+            onSelectMap: () => {},
+            bankBrowser: {
+              banks: candidates,
+              selectedBankId: "copy-one",
+              onOpenBank: () => {},
+            },
+          }}
+        />,
+      );
+    }
+
+    function chooser(markup: string) {
+      return markup.match(
+        /<select[^>]*aria-label="Bank file for this map"[^>]*>.*?<\/select>/,
+      )?.[0];
+    }
+
+    try {
+      const scoped = show("scope:two");
+      expect(scoped).toContain(">Alpha</h1>");
+      expect(chooser(scoped)).toContain('value="copy-one" selected=""');
+      expect(chooser(scoped)).toContain('value="copy-two"');
+      expect(chooser(scoped)).not.toContain('value="other-copy-one"');
+
+      const allAccounts = chooser(show(""));
+      expect(allAccounts).toContain('value="copy-one" selected=""');
+      expect(allAccounts).toContain('value="other-copy-one"');
+      expect(allAccounts).toContain('value="copy-two"');
+    } finally {
+      useScope.mockRestore();
+    }
   });
 
   it("drops a missing opaque account key without confusing a matching display label", () => {
