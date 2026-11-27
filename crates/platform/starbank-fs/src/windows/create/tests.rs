@@ -33,7 +33,7 @@ fn local_ntfs_create_candidate_transactions() -> Result<(), Box<dyn std::error::
 	Ok(())
 }
 
-pub(super) fn fixture(fixture_root: &Path) -> io::Result<(tempfile::TempDir, std::path::PathBuf)> {
+fn fixture(fixture_root: &Path) -> io::Result<(tempfile::TempDir, std::path::PathBuf)> {
 	use super::super::{
 		DIRECTORY_ACCESS, DirectoryScope,
 		stage_security::{EffectiveToken, RelativeKind, SecurityDescriptor, create_relative},

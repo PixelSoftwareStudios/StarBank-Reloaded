@@ -4,7 +4,7 @@ use super::super::super::{
 	DirectoryScope, Observation, read_snapshot,
 	rename_qualification::{prepare_reduced_fixture, with_reduced_token},
 };
-use super::super::{CommitPhase, Scope, tests::fixture, try_create_scoped};
+use super::super::{CommitPhase, Scope, try_create_scoped};
 use super::{CleanupFailure, PrivateStageSecurity, Stage, State, dispose};
 use crate::{CommitOutcome, FileSnapshot, StorageError};
 use std::{
@@ -54,7 +54,7 @@ fn bounded_ntfs_disk_full_rejects_before_publication() -> Result<(), Box<dyn Err
 	let prepared = prepare_reduced_fixture(&owned)?;
 	// Keep recovery evidence on the disposable image until the fixture detaches.
 	let _ = owned.keep();
-	with_reduced_token(move || exercise_disk_full(&mount, &prepared))?;
+	with_reduced_token(move || exercise_disk_full(&mount, &prepared, &owned_scope))?;
 	Ok(())
 }
 
@@ -172,17 +172,23 @@ fn verify_volume(scope: &DirectoryScope, volume: &str, label: &str) -> Result<()
 	Ok(())
 }
 
-fn exercise_disk_full(mount: &Mount, prepared: &Path) -> Result<(), Box<dyn Error>> {
+fn exercise_disk_full(
+	mount: &Mount,
+	prepared: &Path,
+	owned_scope: &DirectoryScope,
+) -> Result<(), Box<dyn Error>> {
 	assert_mount_is_bound(mount)?;
-	let (owned, root) = fixture(prepared)?;
-	let _ = owned.keep();
-	let target = root.join(TARGET_NAME);
-	let original = root.join(ORIGINAL_NAME);
+	let target = prepared.join(TARGET_NAME);
+	let original = prepared.join(ORIGINAL_NAME);
+	// prepare_reduced_fixture has already read back the actual user-only DACL on this directory.
+	eprintln!("NTFS disk-full fixture: opening the ACL-verified directory under the reduced actor");
 	let scope = Scope::open(&target)?;
-	assert_eq!(scope.directory.identity.volume, mount.scope.identity.volume);
+	assert_eq!(scope.directory.identity, owned_scope.identity);
+	eprintln!("NTFS disk-full fixture: verified writable scope, opening the baseline scope");
 	assert!(mount.free_bytes()? > PAYLOAD_BYTES as u64);
 	let original_scope = Scope::open(&original)?;
 	assert_eq!(original_scope.directory.identity, scope.directory.identity);
+	eprintln!("NTFS disk-full fixture: verified baseline scope, creating the baseline");
 	let result = try_create_scoped(&original_scope, ORIGINAL, ORIGINAL.len(), |_| Ok(()))?;
 	let CommitOutcome::CommittedVerified(original_receipt) = result else {
 		panic!("create the synthetic baseline before filling: {result:?}");
@@ -190,6 +196,7 @@ fn exercise_disk_full(mount: &Mount, prepared: &Path) -> Result<(), Box<dyn Erro
 	let baseline = read_snapshot(&original, ORIGINAL.len())?;
 	assert_eq!(baseline.fingerprint(), original_receipt.fingerprint());
 	assert_eq!(baseline.bytes(), ORIGINAL);
+	eprintln!("NTFS disk-full fixture: verified baseline, creating the capacity filler");
 	let security = PrivateStageSecurity::current()?;
 	let filler = Stage::create(&security, &scope.directory, &target)?;
 	let filler_name = filler.name().to_owned();
