@@ -7,6 +7,7 @@ import {
   simulateUnavailableBank,
   verifyLocalImports,
 } from "./local-bank-library.mjs";
+import { verifySaveMenu } from "./save-menu.mjs";
 import { verifyWindowedTable } from "./windowed-table.mjs";
 
 const playwright = await import(
@@ -512,8 +513,7 @@ async function verify(name) {
     );
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: "More save options" }).click();
-    await page.getByRole("menuitem", { name: "Copy bank XML" }).click();
+    await verifySaveMenu(page);
     dialog = page.getByRole("dialog", { name: "Copy bank XML" });
     const clipboard = await dialog.getByLabel("Prepared bank XML").inputValue();
     assert.equal(

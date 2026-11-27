@@ -209,6 +209,7 @@ export {
   prepareTableDraft,
 } from "starbank-editor";
 export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
+export { ToolsMenuTrigger } from "./editor-actions";
 export type { BankBackupPresence } from "./inventory-browser";
 export {
   filterMaps,

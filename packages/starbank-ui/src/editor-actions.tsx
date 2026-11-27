@@ -1,12 +1,14 @@
 import { Dropdown } from "@heroui/react/dropdown";
-import { Settings } from "lucide-react";
-import { type DragEvent, useRef } from "react";
+import { Separator } from "@heroui/react/separator";
+import { Settings, Wrench } from "lucide-react";
+import { type DragEvent, Fragment, type Ref, useRef } from "react";
 import type {
   BankEditorController,
   EditorAction,
   EditorActionResult,
   EditorTarget,
 } from "starbank-editor";
+import { EditorHelpButton, EditorTooltip } from "./editor-tooltip";
 import {
   REDO_SHORTCUT,
   SAVE_SHORTCUT,
@@ -18,6 +20,34 @@ export type RunEditorAction = (
   action: () => Promise<EditorActionResult>,
   onSuccess?: () => void,
 ) => void;
+
+export function ToolsMenuTrigger({
+  ref,
+  descriptionId,
+  disabled,
+}: {
+  ref?: Ref<HTMLButtonElement>;
+  descriptionId?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <EditorTooltip
+      help="Open bank and map tools"
+      placement="bottom"
+      disabled={disabled}
+    >
+      <Dropdown.Trigger
+        ref={ref}
+        className="editor-button"
+        aria-label="Tools"
+        aria-describedby={descriptionId}
+        isDisabled={disabled}
+      >
+        <Wrench aria-hidden="true" className="settings-icon" />
+      </Dropdown.Trigger>
+    </EditorTooltip>
+  );
+}
 
 export function fileDropHandlers(
   onOpenFile: BankEditorController["onOpenFile"],
@@ -77,10 +107,10 @@ export function OpenBankButton({
           }}
         />
       )}
-      <button
+      <EditorHelpButton
         className="editor-button"
-        title="Open a local bank file"
-        type="button"
+        help="Choose a local bank file"
+        placement="bottom"
         disabled={disabled}
         onClick={() => {
           if (onOpen) run(onOpen);
@@ -88,14 +118,19 @@ export function OpenBankButton({
         }}
       >
         Open Bank…
-      </button>
+      </EditorHelpButton>
     </>
   );
 }
 
+const menuGroups = ["save", "clipboard", "bank"] as const;
+
 interface Action {
+  id: string;
+  group: (typeof menuGroups)[number];
   label: string;
-  action: EditorAction | undefined;
+  help: string;
+  action?: EditorAction;
 }
 
 export function EditorActions({
@@ -121,56 +156,100 @@ export function EditorActions({
     run,
   });
   const actions: Action[] = [
-    { label: "Save", action: controller.onSave },
-    { label: "Save As…", action: controller.onSaveAs },
-    { label: "Save w/ Backup", action: controller.onSaveWithBackup },
     {
+      id: "save",
+      group: "save",
+      label: "Save",
+      help: "Save changes to the open bank",
+      action: onSave,
+    },
+    {
+      id: "save-as",
+      group: "save",
+      label: "Save As…",
+      help: "Choose a new filename or location",
+      action: onSaveAs,
+    },
+    {
+      id: "save-with-backup",
+      group: "save",
+      label: "Save w/ Backup",
+      help: "Save changes and keep a backup of the previous file",
+      action: controller.onSaveWithBackup,
+    },
+    {
+      id: "backup-history",
+      group: "bank",
       label: controller.canRestoreBackup ? "Restore Backup…" : "Bank Backups…",
+      help: "View backups for the open bank",
       action: controller.onBackupHistory,
     },
-    { label: "Re-sign Bank", action: controller.onResign },
-    { label: "Export copy…", action: controller.onExport },
-    { label: "Copy bank XML", action: controller.onCopy },
+    {
+      id: "resign",
+      group: "bank",
+      label: "Re-sign Bank",
+      help: "Recalculate the open bank’s signature",
+      action: controller.onResign,
+    },
+    {
+      id: "export",
+      group: "bank",
+      label: "Export copy…",
+      help: "Export the bank without replacing the open file",
+      action: onExport,
+    },
+    {
+      id: "clipboard",
+      group: "clipboard",
+      label: "Copy bank XML to clipboard",
+      help: "Copy the prepared XML of the open bank",
+      action: controller.onCopy,
+    },
   ];
-  const available = actions.flatMap(({ label, action }) =>
-    action ? [{ label, action }] : [],
+  const available = actions.flatMap(({ action, ...item }) =>
+    action ? [{ ...item, action }] : [],
   );
-  const [primary, ...remaining] = available;
-  const secondary = controller.onSave
-    ? [{ label: "Save (Overwrite)", action: controller.onSave }, ...remaining]
-    : remaining;
+  const [primary, ...secondary] = available;
+  const groupedMenu = menuGroups
+    .map((group) => ({
+      group,
+      items: [
+        ...(group === "save" && onSave
+          ? [{ id: "overwrite", label: "Save (Overwrite)", action: onSave }]
+          : []),
+        ...secondary.filter((item) => item.group === group),
+      ],
+    }))
+    .filter(({ items }) => items.length > 0);
 
   return (
     <div className="editor-file-actions" ref={root}>
       {onUndo && (
-        <button
+        <EditorHelpButton
           className="editor-button"
-          type="button"
-          title="Undo last bank change"
+          help="Undo the last bank change"
           aria-keyshortcuts={UNDO_SHORTCUT}
           disabled={disabled}
           onClick={() => run(() => onUndo(target))}
         >
           Undo
-        </button>
+        </EditorHelpButton>
       )}
       {onRedo && (
-        <button
+        <EditorHelpButton
           className="editor-button"
-          type="button"
-          title="Redo last reverted bank change"
+          help="Redo the last reverted bank change"
           aria-keyshortcuts={REDO_SHORTCUT}
           disabled={disabled}
           onClick={() => run(() => onRedo(target))}
         >
           Redo
-        </button>
+        </EditorHelpButton>
       )}
       {onReset && (
-        <button
+        <EditorHelpButton
           className="editor-button editor-reset"
-          type="button"
-          title="Restore the originally opened bank values"
+          help="Restore the originally opened bank values"
           disabled={disabled}
           onClick={() => {
             if (
@@ -182,14 +261,13 @@ export function EditorActions({
           }}
         >
           Reset
-        </button>
+        </EditorHelpButton>
       )}
       {primary && (
         <div className="editor-save-split">
-          <button
+          <EditorHelpButton
             className="editor-button editor-primary"
-            type="button"
-            title={primary.label}
+            help={primary.help}
             aria-keyshortcuts={
               primary.action === save ? SAVE_SHORTCUT : undefined
             }
@@ -197,31 +275,41 @@ export function EditorActions({
             onClick={() => run(() => primary.action(target))}
           >
             {primary.label}
-          </button>
-          {secondary.length > 0 && (
+          </EditorHelpButton>
+          {groupedMenu.length > 0 && (
             <Dropdown>
-              <Dropdown.Trigger
-                className="editor-button editor-primary editor-save-menu"
-                aria-label="More save options"
-                isDisabled={disabled}
+              <EditorTooltip
+                help="Choose how to save or copy the open bank"
+                disabled={disabled}
               >
-                <span aria-hidden="true">▾</span>
-              </Dropdown.Trigger>
+                <Dropdown.Trigger
+                  className="editor-button editor-primary editor-save-menu"
+                  aria-label="More save options"
+                  isDisabled={disabled}
+                >
+                  <span aria-hidden="true">▾</span>
+                </Dropdown.Trigger>
+              </EditorTooltip>
               <Dropdown.Popover
                 placement="top end"
                 className="editor-action-popover"
               >
-                <Dropdown.Menu
-                  aria-label="Save options"
-                  onAction={(key) => {
-                    const action = secondary.find(({ label }) => label === key);
-                    if (action) run(() => action.action(target));
-                  }}
-                >
-                  {secondary.map(({ label }) => (
-                    <Dropdown.Item id={label} key={label}>
-                      {label}
-                    </Dropdown.Item>
+                <Dropdown.Menu aria-label="Save options">
+                  {groupedMenu.map(({ group, items }, index) => (
+                    <Fragment key={group}>
+                      {index > 0 && (
+                        <Separator className="editor-menu-divider" />
+                      )}
+                      {items.map(({ id, label, action }) => (
+                        <Dropdown.Item
+                          id={id}
+                          key={id}
+                          onAction={() => run(() => action(target))}
+                        >
+                          {label}
+                        </Dropdown.Item>
+                      ))}
+                    </Fragment>
                   ))}
                 </Dropdown.Menu>
               </Dropdown.Popover>
@@ -235,14 +323,14 @@ export function EditorActions({
 
 export function SettingsButton({ open }: { open?: () => void }) {
   return open ? (
-    <button
+    <EditorHelpButton
       className="editor-button"
-      type="button"
       aria-label="Settings"
-      title="Settings"
+      help="Open editor settings"
+      placement="bottom"
       onClick={open}
     >
       <Settings aria-hidden="true" className="settings-icon" />
-    </button>
+    </EditorHelpButton>
   ) : null;
 }

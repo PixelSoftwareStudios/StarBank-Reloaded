@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Dropdown } from "starbank-ui";
+import { Dropdown, ToolsMenuTrigger } from "starbank-ui";
 import "./batch-backup-ui.css";
 
 export type BackupScope = { kind: "all" } | { kind: "map"; id: string };
@@ -257,19 +257,13 @@ export function BatchBackupTools({
 
   return (
     <>
-      <span
-        className="batch-backup-tools"
-        title={blockedMessage ?? "Bank tools"}
-      >
+      <span className="batch-backup-tools">
         <Dropdown>
-          <Dropdown.Trigger
+          <ToolsMenuTrigger
             ref={trigger}
-            className="editor-button batch-backup-trigger"
-            aria-describedby={blockedMessage ? availabilityId : undefined}
-            isDisabled={dialogOpen}
-          >
-            Tools
-          </Dropdown.Trigger>
+            descriptionId={blockedMessage ? availabilityId : undefined}
+            disabled={dialogOpen}
+          />
           <Dropdown.Popover
             placement="bottom end"
             className="editor-action-popover batch-backup-menu"

@@ -19,7 +19,7 @@
   block-size: 100%;
   min-width: 0;
   gap: 0.5rem;
-  padding: 0.875rem 0.875rem 1rem;
+  padding: 0.875rem 0.875rem calc(0.875rem + 2px);
   font-size: 0.875rem;
   --editor-danger: #9e2635;
   --editor-primary-bg: #2466a6;
@@ -379,6 +379,18 @@
   background: var(--map-pane-bg);
   color: var(--shell-fg);
   border-color: var(--shell-divider);
+}
+
+.editor-tooltip {
+  color: var(--shell-fg);
+  background: var(--map-pane-bg);
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.editor-menu-divider {
+  margin-block: 0.25rem;
+  background: var(--shell-divider);
 }
 
 .editor-action-popover .menu-item:where([data-hovered], [data-focused]) {
