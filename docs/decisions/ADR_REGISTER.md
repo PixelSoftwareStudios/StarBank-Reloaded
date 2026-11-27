@@ -14,7 +14,7 @@ Accepted = explicit direction or established standard. Proposed = recommendation
 | 008 | Pending | Qualify a native replacement adapter for each supported filesystem. The atomic-write-file 0.3.1 spike lost ACLs and extended attributes. [Evidence](../verification/BOOTSTRAP.md) |
 | 009 | Proposed | Keep opening snapshot across saves; separate last-saved revert. Default Save As switches active document; export copy option. Auto backup first overwrite per session default + explicit timestamp backup. Owner can adjust in Settings. |
 | 010 | Accepted | Rust 1.100.0 verified on macOS arm64 and for wasm32. Apply EES-1 and EVS-1 to new code. [Evidence](../verification/BOOTSTRAP.md) |
-| 011 | Pending | MIT preferred for new code. File-level provenance, permissions and release-license approval remain open. Keep the upstream source dump local pending review. |
+| 011 | Pending | MIT preferred for new code. File-level provenance, permissions and release-license approval remain open. |
 | 012 | Proposed | Agent CLI structured JSON/dry-run, no separate daemon; static hosting Cloudflare Pages candidate. |
 | 013 | Proposed | Declarative profiles only, no arbitrary code execution; match confidence and dependent atomic updates. |
 | 014 | Proposed | Preserve Tools map repair only for authorized offline copy, no runtime/memory tools. Explicit limitations if backend cannot repair safely. |

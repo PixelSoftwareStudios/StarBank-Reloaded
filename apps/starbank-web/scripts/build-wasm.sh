@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 bindgen_version=0.2.129
 if ! command -v wasm-bindgen >/dev/null 2>&1 ||

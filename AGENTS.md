@@ -2,11 +2,11 @@
 
 ## Mission and authority
 
-Implement a dependable, lightweight SC2 bank editor with StarBank v2.0 parity plus Reloaded features, Rust + Tauri + React + WASM. Read `START_HERE.md`, `PLAN.md`, `ARCHITECTURE.md`, `TASKS.md` and the relevant requirements/design/standards before editing. Current owner decisions override historic Go designs. Treat `original/` and upstream C# as references, not runtime dependencies or a mandate to copy source. Do not claim unimplemented features or tests passed.
+Implement a dependable, lightweight SC2 bank editor with StarBank v2.0 parity plus Reloaded features, Rust + Tauri + React + WASM. Read the [roadmap](docs/roadmap.md), [architecture](docs/architecture.md), [work packages](docs/work-packages.md), and the relevant requirements and standards before editing. Current owner decisions override historic Go designs. Keep the Go prototype in `original/` as an archive and develop the new editor from format requirements and authorized fixtures. Do not claim unimplemented features or tests passed.
 
 ## Mandatory first task
 
-Follow `MIGRATION.md`: inspect the actual existing repository; preserve Go/Fyne code, assets, module manifests, tests, license, old docs and dev configs under `original/` with Git history retained. Preserve hidden files that belong to the project, not secrets, personal data or build output. Never move `.git`, destroy untracked files, rewrite history, or commit a source snapshot that was guessed from chat. Report gaps between the prototype and actual code. Do not scaffold the new root until the move is verified. The supplied source snapshot is already archived in this pack. Reconcile it with the live checkout before implementation; never replace newer local work blindly.
+Follow [the migration record](docs/reference/MIGRATION.md): inspect the actual existing repository; preserve Go/Fyne code, assets, module manifests, tests, license, old docs and dev configs under `original/` with Git history retained. Preserve hidden files that belong to the project, not secrets, personal data or build output. Never move `.git`, destroy untracked files, rewrite history, or commit a source snapshot that was guessed from chat. Report gaps between the prototype and actual code. Do not scaffold the new root until the move is verified. The supplied source snapshot is already archived in this pack. Reconcile it with the live checkout before implementation; never replace newer local work blindly.
 
 The live move was verified in `4119421`. See `docs/reference/GO_INVENTORY.md`; keep the archived bytes intact.
 
@@ -22,7 +22,7 @@ The live move was verified in `4119421`. See `docs/reference/GO_INVENTORY.md`; k
 - Local-first; no remote bank processing, telemetry, login, embedded HTTP server or network requirement for editing. Scope Tauri capabilities narrowly. Never run game scripts or attach to game processes. Map repair only for authorized local copies; no evasion or runtime tampering.
 - No unnecessary dependencies. HeroUI, Tailwind 4, React, TypeScript, Vite, Valibot (not Zod), Lucide, CodeMirror 6; no shadcn by default. Evaluate HeroUI table before adding TanStack Table. React Number Format or compatible input wrapper must preserve exact numeric lexemes. Avoid Next.js/SSR. Match the approved compact layout, not a generic dashboard.
 - **Change scope:** never make unrelated layout, labels, menu, data or behavior changes. Keep approved UI and behavior while fixing one issue. Do not replace native-style in-window dropdowns with unrelated custom controls. No `// NOTE:` insertion. Use actual current library APIs and check deprecations/warnings. Explain any necessary incidental change explicitly.
-- Read upstream source at a pinned commit and reference file/lines before asserting original behavior. Never infer from presence of a wrapper or README. Verify dependency existence, licenses, versions, supported targets, APIs and limitations in primary documentation/source. Unknown is unknown; do not invent library symbols or benchmarks. Do not label this work clean-room without evidence.
+- Use reproducible behavior and independently documented format evidence for compatibility claims. Verify dependency existence, licenses, versions, supported targets, APIs and limitations in primary documentation/source. Unknown is unknown; do not invent library symbols or benchmarks. Do not label this work clean-room without evidence.
 
 ## Implementation and evidence workflow
 

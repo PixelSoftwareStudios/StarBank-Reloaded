@@ -7,7 +7,7 @@
     "dev": "pnpm run wasm && vite",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "wasm": "sh ../../tools/build-web-wasm.sh",
+    "wasm": "sh scripts/build-wasm.sh",
     "test:browser": "node test/browser.mjs",
     "test:desktop-renderer": "node test/desktop-renderer.mjs"
   },

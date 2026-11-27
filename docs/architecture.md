@@ -61,7 +61,6 @@ starbank-reloaded/
 │   ├── bindings/starbank-wasm/      # wasm-bindgen only, pure engine facade
 │   └── engineering/starbank-testkit/ # shared fixtures/generators, dev-only
 ├── docs/                            # requirements/design/verification/ADRs
-├── tools/                           # pack/CI checks and fixture tools
 └── .github/workflows/               # native and WASM CI/release
 ```
 

@@ -12,7 +12,7 @@ An isolated AddressSanitizer and libFuzzer smoke ran 114,685 inputs in 31 second
 
 `starbank-signature` validates explicit author, player and bank-name context, computes the SHA-1 digest using stable UTF-16 ordinal ordering, and checks a stored signature without mutating the bank. It distinguishes unsigned, malformed, missing-context, unsupported, valid and invalid states. Eight Rust tests passed on macOS arm64. The WASM library built on Rust 1.100.0. [Tests](../../crates/domain/starbank-signature/tests/signatures.rs)
 
-An isolated harness linked original C# source at `1f95ab3425753b12d6387d327870dc6d408c49ac`. Four synthetic vectors matched the pinned signer on .NET 10.0.12 on macOS, including ordering, stable ties, decoded XML whitespace and supplementary Unicode. Three vectors also matched after upstream XML write and reread. The harness reported two upstream SHA-1 API deprecation warnings. The expanded pinned oracle passed 15 synthetic probes. The later encoding comparison matched digests for UTF-8, UTF-16LE and UTF-16BE using generic UTF-16 declarations and the corresponding explicit labels. Reloaded keeps the native byte order and BOM on disk. Windows .NET Framework execution and SC2 game-generated conformance remain open. [Oracle source and reproduction](../../crates/domain/starbank-signature/verification/upstream-oracle/README.md)
+Synthetic digest and round-trip checks cover ordering, UTF-16 and signature state. SC2 game-generated conformance remains open. [Signature tests](../../crates/domain/starbank-signature/tests/signatures.rs)
 
 ## WP-08 native discovery
 

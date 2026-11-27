@@ -17,14 +17,14 @@ StarBank Reloaded is a modern replacement for BlueRaja's StarBank editor for Sta
 
 | Slice | Required deliverables |
 |---|---|
-| A — preservation & feasibility | Archive Go; inventory capabilities and licenses; pin upstream v2.0; real fixture corpus; MPQ read/write/WASM and filesystem safety spikes; approve crate contracts |
+| A — preservation & feasibility | Archive Go; inventory capabilities and licenses; real fixture corpus; MPQ read/write/WASM and filesystem safety spikes; approve crate contracts |
 | B — core | Lossless XML model, parse/write, validation, exact signing/verification, context inference/manual entry, number normalization, transactional editing, safe file operations, backup/restore, CLI |
 | C — discovery | Windows/macOS resolver, Linux explicit auto-detect stub with manual support; all accounts, author folders, nested/hidden banks, map cache scanning, persistent metadata, ambiguity resolution, incremental bounded indexing |
 | D — desktop & web UI | Three synchronized views, full map navigation/filters, profile system, raw editor, save split button, re-sign action, backup status, settings, drag/drop, copy, accessibility, responsive layout and all tooltips |
-| E — original parity | External bank signing, local authorized map repair/export, cached and unknown map handling, account selection, per-map/all backups and reversible restore, source-based compatibility audit |
+| E — original parity | External bank signing, local authorized map repair/export, cached and unknown map handling, account selection, per-map/all backups and reversible restore, behavioral compatibility checks |
 | F — distribution & polish | Signed/package builds and file associations, static web deploy, real OS/browser tests, performance baselines, docs, agent skill/CLI contracts, settings persistence, no user data in test artifacts |
 
-No release labelled feature parity until all upstream features in `docs/reference/UPSTREAM.md` are verified or explicitly listed as unsupported. Web can release separately as a fully functional local-bank editor with clearly stated filesystem/MPQ restrictions; do not hold parsing/editing hostage to a native archive dependency. Linux auto-detection (Proton/Wine/Lutris) is deferred deliberately, not silently omitted.
+No release labelled feature parity until all relevant features in [the requirements](REQUIREMENTS.md) are verified or explicitly listed as unsupported. Web can release separately as a fully functional local-bank editor with clearly stated filesystem/MPQ restrictions; do not hold parsing/editing hostage to a native archive dependency. Linux auto-detection (Proton/Wine/Lutris) is deferred deliberately, not silently omitted.
 
 ## Mandatory product features
 
@@ -45,4 +45,4 @@ Deferred: Linux auto-detection, optional WASM MPQ support if proven, user-author
 
 ## Licensing
 
-The owner prefers MIT for new work. The upstream tree includes GPL-covered ObjectListView files, and the pinned StarBank app tree lacks a verified license grant. File-level provenance for possible Go translations, asset rights and the dependency audit are open. The release license requires owner approval. See [the upstream audit](docs/reference/UPSTREAM.md) and [ADR 011](docs/decisions/ADR_REGISTER.md).
+The owner prefers MIT for new work. Asset rights and third-party obligations remain open. The release license requires owner approval. See [ADR 011](decisions/ADR_REGISTER.md).

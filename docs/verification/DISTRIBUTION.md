@@ -34,4 +34,4 @@ The resulting `starbank-reloaded_0.1.0_arm64.deb` was 9,309,134 bytes with SHA-2
 - A disposable container with networking disabled installed it with `dpkg -i`. It resolved the declared runtime libraries and opened the branded 850×500 welcome window in Xvfb as an unprivileged user.
 - `dpkg --purge starbank-reloaded` removed the app and launcher. Checksums of the synthetic bank, its backup and existing MIME defaults remained identical. The package contains no installation scripts and declares no MIME handler.
 
-Signed release artifacts, the Windows installer and Explorer flow, native Windows runtime, and final rights and license approval remain open. [Provenance audit](../reference/PROVENANCE_AUDIT.md)
+Signed release artifacts, the Windows installer and Explorer flow, native Windows runtime, and final rights and license approval remain open.

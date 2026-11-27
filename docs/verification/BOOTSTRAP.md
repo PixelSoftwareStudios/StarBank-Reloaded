@@ -34,4 +34,4 @@ Keep destination creation and expected-target replacement distinct. A replace pr
 
 ## Corpus and provenance
 
-The archived Go suite has XML and SHA-1 examples without SC2 capture provenance. New synthetic format and signing vectors can qualify specific invariants. Authorized real fixtures need a source and permission record, capture environment, expected behavior and a SHA-256 digest. Keep private inputs and their signing context in an isolated local corpus. The [pinned upstream audit](../reference/UPSTREAM.md) records the source reviewed and the remaining licensing questions.
+The archived Go suite has XML and SHA-1 examples without SC2 capture provenance. New synthetic format and signing vectors can qualify specific invariants. Authorized real fixtures need a source and permission record, capture environment, expected behavior and a SHA-256 digest. Keep private inputs and their signing context in an isolated local corpus.

@@ -24,9 +24,9 @@ versions and matching wasm-bindgen.
 ```sh
 cargo build --locked --target-dir target -p starbank-cli --bin starbank
 cargo build --locked --target-dir target -p starbank-editor --example parity_protocol
-sh tools/build-web-wasm.sh
+pnpm --filter starbank-web run wasm
 
-node tools/private-sc2-corpus.mjs /path/to/private/manifest.json \
+node docs/verification/scripts/private-sc2-corpus.mjs /path/to/private/manifest.json \
   target/debug/examples/parity_protocol target/debug/starbank \
   apps/starbank-web/src/generated/starbank_wasm.js \
   apps/starbank-web/src/generated/starbank_wasm_bg.wasm
@@ -131,6 +131,5 @@ outputs after capture. In-game acceptance for REQ-SIG-03 also needs a
 separately authorized game-side verification.
 
 [Format fixtures](../../crates/formats/sc2bank/tests/fixtures/README.md) ·
-[Pinned signing oracle](../../crates/domain/starbank-signature/verification/upstream-oracle/README.md) ·
 [Map fixtures](../../crates/discovery/starbank-map-index/tests/fixtures/README.md) ·
 [MPQ extraction and copy evidence](../../crates/adapters/starbank-mpq/verification/MAP_EXPORT.md)

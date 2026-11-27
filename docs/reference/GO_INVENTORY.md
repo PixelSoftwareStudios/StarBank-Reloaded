@@ -2,8 +2,6 @@
 
 The live checkout at `59979256b046d092c8e776495cc77070e37aa0d2` was archived in `4119421`. Its 37 tracked files and four untracked project files were moved into `original/`. The manifest records their SHA-256 hashes. The local `.gitignore` had one added exclusion for `docs/temp`; the live bytes were retained. Every other archived file matched the uploaded snapshot, including the uncommitted map-cache work and historical plans.
 
-The supplied pack omitted the upstream dump from its `original/docs/` even though the manifest listed it. The file in the live `docs/temp/` matched the recorded checksum. It was moved into `original/docs/` and remains ignored by Git. Mac app bundles, temporary binaries and logs, Finder metadata and pack extraction files stay outside the archive. The Git database remains at the root.
-
 ## Archived capabilities
 
 | Source in `original/` | Observed capability | Work remaining |
@@ -22,18 +20,17 @@ The supplied pack omitted the upstream dump from its `original/docs/` even thoug
 | `internal/ui/app.go`, `state.go`, `sidebar.go`, `header.go` | Startup discovery, map filters/search, settings folder chooser, real editor open/save callbacks, fixed mock header metadata/bank dropdown; window 850×500 | All metadata and bank selection bound to real data, async startup, safe switching; proper reveal, exact empty-state copy; top-right tools are stubs |
 | `internal/ui/views/{simple,table,raw}.go` | Three layout prototypes | All three use static mock content, no synchronized model edits. Raw change only calls edit handler, does not call LoadXML. Table entries do not update model. Simple fields placeholders. Implement live editor rather than translating mock |
 | `internal/ui/widgets/{breadcrumb,savebar}.go`, `utils/helpers.go` | Scroll breadcrumb, Save split/menu/copy, tooltip layer | Responsive CSS, hidden scrollbars, all buttons accessible, proper menu positioning/close; avoid historic Fyne workarounds |
-| `docs/{PLAN,ARCHITECTURE,TASKS}.md`, local upstream C# dump | Three legacy plans and a pre-v2.0 source reference | Current requirements supersede the plans. Pinned v2.0 sources are tracked in [UPSTREAM.md](UPSTREAM.md). |
+| `docs/{PLAN,ARCHITECTURE,TASKS}.md` | Three legacy plans | The current requirements supersede the plans. |
 
 The lossless format and signature gaps map to REQ-FMT-01 through REQ-FMT-04 and REQ-SIG-01 through REQ-SIG-03. Discovery maps to REQ-PATH-01 and REQ-PATH-02. Editor behavior maps to REQ-EDIT-01 through REQ-EDIT-07 and REQ-PROF-01 through REQ-PROF-02. Persistence maps to REQ-SAVE-01 through REQ-SAVE-02 and REQ-BACKUP-01 through REQ-BACKUP-02. The archive has no CI workflow or end-to-end GUI tests. The existing Go tests exercise parsing, basic round-trip and signing, with no SC2-generated compatibility evidence.
 
 ## Provenance
 
-`original/LICENSE` retains the prototype's MIT copyright notice. The historical upstream source dump, possible source translations, asset rights and third-party obligations still need review for REQ-MIG-02. The release license requires owner approval. The upstream dump remains local pending that review.
+`original/LICENSE` retains the prototype's MIT copyright notice. Asset rights and third-party obligations remain open under REQ-MIG-02. The release license requires owner approval.
 
 ## Verification status
 
 - Before the move, `GOWORK=off GOTOOLCHAIN=local GOPROXY=off go test -count=1 ./...` passed on Go 1.27.0 for macOS arm64.
 - From `original/`, `GOWORK=off GOTOOLCHAIN=local GOPROXY=off go test -mod=readonly -count=1 ./...` passed. `go build -mod=readonly -o <temp-path> ./cmd/starbank` compiled the GUI with the same environment. The linker reported a duplicate `-lobjc` warning.
-- The staged archive matched all 41 pre-move hashes. A disposable copy of the supplied pack, with the recovered ignored dump, passed its original validator for 42 snapshot entries. The imported validator checks the live archive and verifies the ignored dump when present.
-- A clean checkout with `core.autocrlf=true` initially converted 40 archived files. The repository's path-scoped Git attributes preserve the archive bytes, and the validator passes with that checkout setting and the local dump absent.
+- A clean checkout with `core.autocrlf=true` initially converted 40 archived files. The repository's path-scoped Git attributes preserve the archive bytes, and the validator passes with that checkout setting.
 - The declared minimum Go 1.25.1, GUI runtime behavior and Windows builds remain unverified. For archived development, start in `original/` before running `air` or a platform recipe in its `justfile`.

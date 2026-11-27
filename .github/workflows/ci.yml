@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - run: rustup show
       - run: cargo fmt --all -- --check
-      - run: python3 tools/validate_pack.py
+      - run: python3 docs/verification/scripts/validate.py
       - run: cargo run --locked -p starbank-source-check
 
   native:

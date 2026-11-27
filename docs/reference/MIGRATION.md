@@ -1,6 +1,6 @@
 # Migration of the Go prototype
 
-The live Go project was archived under `original/` in commit `4119421`. The included architecture pack was compared against the actual checkout before the move. See the [Go inventory](docs/reference/GO_INVENTORY.md) for the source differences, verification and open provenance work.
+The live Go project was archived under `original/` in commit `4119421`. The included architecture pack was compared against the actual checkout before the move. See the [Go inventory](GO_INVENTORY.md) for the source differences, verification and open provenance work.
 
 ## WP-01 (first commit)
 

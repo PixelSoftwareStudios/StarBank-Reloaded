@@ -9,7 +9,7 @@ Use the pinned Rust toolchain with the wasm32 target, wasm-bindgen 0.2.129, and 
 ```sh
 cargo build --locked --target-dir target -p starbank-cli --bin starbank
 cargo build --locked --target-dir target -p starbank-editor --example parity_protocol
-sh tools/build-web-wasm.sh
+pnpm --filter starbank-web run wasm
 node apps/starbank-web/test/adapter-parity.mjs
 ```
 
