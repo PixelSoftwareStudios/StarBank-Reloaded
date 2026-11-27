@@ -2,6 +2,10 @@
 
 Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
 
+## Headless Linux native WebView qualification
+
+Run `46081832654` at `29d6f36` passed nine jobs and failed the new native WebView check on both Linux desktop runners. The real application started under Xvfb, established Wry automation sessions, and reached the packaged welcome screen and two-file startup queue. The test then timed out waiting for its first Table observation. Its selector used the browser's `Gold · Value value` label; the native adapter deliberately omits the generic `Value` child name and labels that input `Gold value`. The fixture now uses the native label and records bounded synthetic UI state on failure. No application labels or behavior changed. The remaining native edit/navigation assertions await the corrected hosted run. [Initial run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46081832654) · [Fixture](../../apps/starbank-desktop/verification/linux-native-webview.mjs)
+
 ## Hosted completion fixes at `6b26129`
 
 All eleven jobs in run `46064339302` passed. For REQ-PROF-02/EDIT-02, integer-backed profile checkboxes now check both configured endpoints against the existing profile integer grammar before matching; invalid mappings preserve bytes, revision and history, while valid numeric, flag and string mappings retain exact lexemes. REQ-CLI-01 discovery errors distinguish validation/limits, I/O and observed input changes with redacted JSON. For REQ-MAP-02/03, metadata headings come from standalone lexical comments and cache version 2 reparses stale metadata from the old parser. Local owning-crate Clippy and 136 tests passed; hosted native regressions passed on all four runners. [Hosted run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46064339302)

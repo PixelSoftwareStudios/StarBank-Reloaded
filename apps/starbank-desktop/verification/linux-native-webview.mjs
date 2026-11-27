@@ -12,6 +12,8 @@ const startupTimeout = 25_000;
 const uiTimeout = 10_000;
 const cleanupTimeout = 2_000;
 const pollInterval = 100;
+const failureItemLimit = 8;
+const failureTextLimit = 1_000;
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 const selectAllKeys = "\uE009a\uE000";
 
@@ -133,8 +135,37 @@ async function waitForDriver(driver) {
   );
 }
 
+async function reportFailureState(origin, session) {
+  try {
+    const state = await request(
+      origin,
+      `${session}/execute/sync`,
+      "POST",
+      {
+        script: `const [itemLimit, textLimit] = arguments;
+        return {
+          url: location.href.slice(0, textLimit),
+          headings: Array.from(document.querySelectorAll("h1")).slice(0, itemLimit)
+            .map((node) => node.textContent.slice(0, textLimit)),
+          statuses: Array.from(document.querySelectorAll('[role="status"]')).slice(0, itemLimit)
+            .map((node) => node.textContent.slice(0, textLimit)),
+          fields: Array.from(document.querySelectorAll('table input[type="text"]')).slice(0, itemLimit)
+            .map((node) => ({label: node.getAttribute("aria-label"), value: node.value.slice(0, textLimit),
+              readOnly: node.readOnly, invalid: node.getAttribute("aria-invalid")})),
+          queue: document.querySelector('aside[aria-label="File open requests"]')?.textContent.slice(0, textLimit)
+        };`,
+        args: [failureItemLimit, failureTextLimit],
+      },
+      cleanupTimeout,
+    );
+    console.error("Synthetic native UI failure state:", JSON.stringify(state));
+  } catch {
+    console.error("Synthetic native UI failure state was unavailable.");
+  }
+}
+
 const queue = 'aside[aria-label="File open requests"]';
-const gold = 'table input[aria-label="Gold · Value value"]';
+const gold = 'table input[aria-label="Gold value"]';
 const xml = '[aria-label="Bank XML"]';
 
 async function verifyEditor(command, first, second) {
@@ -323,6 +354,7 @@ async function run(application) {
       assert.deepEqual(await readFile(join(scratch, name)), bytes);
   } catch (error) {
     verificationError = error;
+    if (driver && session) await reportFailureState(driver.origin, session);
   }
   const cleanupErrors = [];
   for (const cleanup of [
