@@ -8,7 +8,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "wasm": "sh ../../tools/build-web-wasm.sh",
-    "test:browser": "node test/browser.mjs"
+    "test:browser": "node test/browser.mjs",
+    "test:desktop-renderer": "node test/desktop-renderer.mjs"
   },
   "dependencies": {
     "starbank-engine-client": "workspace:*",

@@ -109,6 +109,10 @@ jobs:
         run: node apps/starbank-web/test/adapter-parity.mjs
       - name: Install pinned Playwright browsers and dependencies
         run: pnpm --filter starbank-web exec playwright install --with-deps chromium firefox webkit
+      - name: Test the production desktop renderer with synthetic IPC
+        run: |
+          pnpm --filter starbank-desktop run build:webview
+          pnpm --filter starbank-web test:desktop-renderer
       - name: Test the production web app offline
         run: pnpm --filter starbank-web test:browser
       - name: Test the breadcrumb layout and keyboard navigation
