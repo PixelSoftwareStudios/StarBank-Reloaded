@@ -120,6 +120,8 @@ fn physical_identity(metadata: &Metadata) -> Option<(u64, u64)> {
 
 #[cfg(not(unix))]
 fn physical_identity(_metadata: &Metadata) -> Option<(u64, u64)> {
+	// Windows cache checks use size and modification time as their available
+	// fingerprint. A replacement preserving both can match the cached record.
 	None
 }
 

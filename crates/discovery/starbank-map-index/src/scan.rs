@@ -137,7 +137,7 @@ pub enum IndexIssueKind {
 	Io(io::Error),
 	/// An archive was larger than the configured file cap.
 	ArchiveTooLarge,
-	/// An archive changed or was replaced while being read.
+	/// A discovered archive changed before inspection completed.
 	ArchiveChanged,
 	/// The archive backend could not read a requested member.
 	Archive(MpqError),
@@ -424,6 +424,7 @@ fn process_one(
 	cache: &Cache,
 ) -> Result<(ArchiveMetadata, bool), IndexIssueKind> {
 	if let Some(metadata) = cache.get(&work.path, &work.fingerprint) {
+		check_current_archive(work)?;
 		return Ok((
 			ArchiveMetadata {
 				metadata: metadata.clone(),
@@ -439,17 +440,22 @@ fn process_one(
 	}
 	let metadata = read_archive(&mut file)?;
 	let checked = file.metadata().map_err(IndexIssueKind::Io)?;
+	check_current_archive(work)?;
+	if Fingerprint::of(&checked) != work.fingerprint {
+		return Err(IndexIssueKind::ArchiveChanged);
+	}
+	Ok((metadata, false))
+}
+
+fn check_current_archive(work: &ArchiveWork) -> Result<(), IndexIssueKind> {
 	let current = work
 		.scope
 		.symlink_metadata(&work.relative)
 		.map_err(IndexIssueKind::Io)?;
-	if !current.is_file()
-		|| Fingerprint::of(&checked) != work.fingerprint
-		|| Fingerprint::of(&current) != work.fingerprint
-	{
+	if !current.is_file() || Fingerprint::of(&current) != work.fingerprint {
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
-	Ok((metadata, false))
+	Ok(())
 }
 
 fn metadata_size(path: &Path, metadata: &MapMetadata) -> usize {
