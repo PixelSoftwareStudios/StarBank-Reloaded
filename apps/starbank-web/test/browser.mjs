@@ -5,6 +5,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyDiffContext } from "./diff-context.mjs";
 import { verifyTableDraftSwitch } from "./draft-switch.mjs";
+import { verifyDropImport } from "./drop-import.mjs";
 import {
   simulateUnavailableBank,
   verifyLocalImports,
@@ -570,6 +571,7 @@ async function verify(name) {
       name === "firefox"
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
+    await verifyDropImport(context, server.url, viewport);
     await verifySnapshotRefresh(browser, server.url, bankPicker, viewport);
     await verifyDiffContext(browser, server.url, bankPicker);
     await verifyNumericCaret(browser, server.url, bankPicker);

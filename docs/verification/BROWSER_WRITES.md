@@ -9,3 +9,9 @@ Web Save As and opening-backup export use a local download and leave the dirty c
 ## Opening backup implementation evidence
 
 On macOS arm64, the isolated dfe70d8 integration with the format and editor UTF-16 overlays passed the full offline browser workflow in Chromium 159.0.8154.6, Firefox 159.0, and WebKit 26.5. The test verified exact source bytes for an edited UTF-8 CRLF bank and a BOM-marked UTF-16LE bank after Table and Raw edits. It also verified UTF-16LE edited recovery after an injected worker failure. The opening backup preserved the dirty state and retained the original byte sequence even when the re-sign option was selected. WebKit used the matching Playwright 1.61.1 fallback locally. App typecheck, the Vite/WASM build, scoped Biome, and all 39 app tests passed.
+
+## File-drop acceptance
+
+On 2026-11-27, the production renderer with the real WASM engine passed file-drop checks in headless Chromium 159.0.8154.6, Firefox 159.0 and WebKit 26.5. Browser-native File and DataTransfer objects entered the actual dragover/drop handlers through synthetic DOM events. A BOM-marked UTF-16LE/CRLF bank opened and downloaded with its exact original bytes and filename. Multiple-file drops and drops over an unapplied Table draft issued no Open command. Cancelling dirty-bank replacement retained the current bank; confirming a malformed replacement also preserved its dirty values. A confirmed valid replacement opened the new bank. Worker instrumentation only counted outgoing Open requests and forwarded them unchanged. These checks cover the event contract, not a physical operating-system drag gesture. [Drop cases](../../apps/starbank-web/test/drop-import.mjs)
+
+The final focused drop cases passed in all three engines. Scoped Biome and the Vite build passed. Local WebKit used the matching Playwright 1.61.1 fallback; hosted execution of this addition remains pending.
