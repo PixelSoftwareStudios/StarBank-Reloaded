@@ -42,6 +42,19 @@ cargo check -p starbank-fs --offline --locked --target wasm32-unknown-unknown
 
 WASM cross-checks the adapter that reports unsupported. Linux implements checked snapshots and exclusive creation using `renameat2(RENAME_NOREPLACE)` through rustix. The workspace suite and Linux desktop tests ran on Debian 12 arm64 with Rust 1.100.0. A separate native ext4 probe demonstrated verified exchange of visible metadata and found a gap in verifying existing attributes that Linux hides from an unprivileged caller. [Linux execution evidence](../../../../docs/verification/IMPLEMENTATION.md) · [Native replacement qualification](NATIVE_REPLACEMENT_QUALIFICATION.md)
 
+## Linux staging space exhaustion
+
+At `c8d0b0f`, the native Linux arm64 adapter exercised Create New as UID 65534 with no capabilities. The run used Linux 6.12.76-linuxkit, Rust 1.100.0 and a disposable 64 KiB tmpfs in the cached Debian 12 Rust image at `sha256:bb875b0f8ce726053e259034848c471840e96bfe591fd52556178ae9a05e6126`. The container had no network or host filesystem bind mounts. Repository source and its unchanged locked dependency subset came in on stdin.
+
+The control write accepted 61,440 of 65,537 bytes and then returned `ENOSPC` (28). Create New reported the same native errno from the staging write and rejected publication. The existing bank kept its fingerprint and bytes, the requested destination remained absent, and the partial stage and its storage allocation were released. A subsequent verified Create New confirmed that the directory lease and recovered capacity were available. [Linux write semantics](https://man7.org/linux/man-pages/man2/write.2.html) [Linux tmpfs limits](https://docs.kernel.org/filesystems/tmpfs.html)
+
+To run the opt-in test on Linux, use a dedicated empty tmpfs capped at 1 MiB or less with at least two data blocks available to the test user. The test verifies these conditions before creating fixtures. The 2 GiB build tmpfs was refused at that gate. All 16 ordinary Linux storage tests and the opt-in regression passed. This is separate evidence from the APFS file-size-limit test. Linux replacement, Windows writes and other filesystems retain their existing qualification status. [Regression test](../tests/linux_enospc.rs)
+
+```sh
+STARBANK_ENOSPC_TMPFS=/fixture cargo test -p starbank-fs --test linux_enospc \
+  --locked --offline -- --ignored --nocapture
+```
+
 ## Outcomes and remaining gates
 
 The adapter walks directory components without following symlinks and uses directory-relative operations. It takes a nonblocking advisory lease on the destination directory before reading or preparing an overwrite. A fingerprint binds the observed name and parent identity to the file identity, change stamp and SHA-256. Existing-file replacement currently requires local APFS and a supported, writable single-link regular file. macOS overwrites verify the staged owner, group, permissions, ACL and xattrs against the original. File flags and special permission bits are refused. The native publication updates file identity, so timestamps and change tracking are observably distinct after replacement.
