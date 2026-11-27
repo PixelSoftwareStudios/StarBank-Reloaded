@@ -3468,6 +3468,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "starbank-mpq-fuzz"
+version = "0.1.0"
+dependencies = [
+ "libfuzzer-sys",
+ "starbank-mpq",
+ "stormlib-rs",
+]
+
+[[package]]
 name = "starbank-paths"
 version = "0.1.0"
 dependencies = [
