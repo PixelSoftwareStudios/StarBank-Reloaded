@@ -50,7 +50,7 @@ describe("bank editor", () => {
         name="StarBank Web"
         editor={{
           document,
-          onEditValues: async () => ({ ok: true }),
+          onEditValues: async (target) => ({ ok: true, target }),
           onSaveAs: async () => ({ ok: true }),
           onCopy: async () => ({ ok: true }),
         }}
@@ -79,7 +79,7 @@ describe("bank editor", () => {
             ...document,
             sections: [{ id: "player", name: "Player", rows }],
           },
-          onEditValues: async () => ({ ok: true }),
+          onEditValues: async (target) => ({ ok: true, target }),
         }}
       />,
     );

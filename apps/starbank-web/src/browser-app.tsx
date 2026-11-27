@@ -46,6 +46,7 @@ export function StarBankWeb() {
   const session = useRef<BrowserBankSession>(null);
   const actionInProgress = useRef(false);
   const validationInProgress = useRef<Promise<unknown>>(null);
+  const currentDocument = useRef<BrowserBankDocument>(null);
   const [document, setDocument] = useState<BrowserBankDocument>();
   const [openedFile, setOpenedFile] = useState<File>();
   const [busy, setBusy] = useState(false);
@@ -53,7 +54,11 @@ export function StarBankWeb() {
   const [status, setStatus] = useState("Loading the bank engine…");
   const [maxBankBytes, setMaxBankBytes] = useState<number>();
   const [hasDraft, setHasDraft] = useState(false);
-  const [showExport, setShowExport] = useState(false);
+  const [exportTarget, setExportTarget] = useState<EditorTarget>();
+  const showExport =
+    exportTarget?.id === document?.id &&
+    exportTarget?.revision === document?.revision &&
+    exportTarget !== undefined;
   const [copyPreview, setCopyPreview] = useState<string>();
   const [pendingOpen, setPendingOpen] = useState<{
     save: boolean;
@@ -108,10 +113,16 @@ export function StarBankWeb() {
   }
 
   function activeDocument(target: EditorTarget): BrowserBankDocument {
+    const document = currentDocument.current;
     if (document?.id !== target.id || document.revision !== target.revision) {
       throw new Error("The bank changed before the action could start.");
     }
     return document;
+  }
+
+  function publishDocument(next: BrowserBankDocument) {
+    currentDocument.current = next;
+    setDocument(next);
   }
 
   async function runBankAction<Result>(
@@ -148,7 +159,7 @@ export function StarBankWeb() {
         if (!proceed)
           return { ok: false, message: "The current bank is still open." };
       }
-      setDocument(await bankSession().open(file, discardCurrent));
+      publishDocument(await bankSession().open(file, discardCurrent));
       setOpenedFile(file);
       setProfile(undefined);
       return { ok: true };
@@ -232,7 +243,7 @@ export function StarBankWeb() {
     onReset: navigate("reset"),
     onSaveAs: async (target) => {
       activeDocument(target);
-      setShowExport(true);
+      setExportTarget(target);
       return { ok: true };
     },
     onCopy: (target) =>
@@ -252,20 +263,21 @@ export function StarBankWeb() {
   };
 
   async function publish(next: BrowserBankDocument) {
+    let message: string | undefined;
     if (profile !== undefined && profile.status !== "unloaded") {
       try {
         setProfile(await bankSession().profile(next));
       } catch {
         setProfile(undefined);
-        setDocument(next);
-        return {
-          ok: true,
-          message: "Bank updated. Reload the profile to refresh Simple View.",
-        } as const;
+        message = "Bank updated. Reload the profile to refresh Simple View.";
       }
     }
-    setDocument(next);
-    return { ok: true } as const;
+    publishDocument(next);
+    return {
+      ok: true,
+      target: { id: next.id, revision: next.revision },
+      message,
+    } as const;
   }
 
   function apply(target: EditorTarget, command: BankEditCommand) {
@@ -290,8 +302,12 @@ export function StarBankWeb() {
     };
   }
 
-  async function exportCopy(name: string, context?: EngineSigningContext) {
-    if (!document) throw new Error("Open a bank to prepare a download.");
+  async function exportCopy(
+    target: EditorTarget,
+    name: string,
+    context?: EngineSigningContext,
+  ) {
+    const document = activeDocument(target);
     try {
       const { bytes, signatureStatus } = await bankSession().prepare(
         document,
@@ -355,12 +371,12 @@ export function StarBankWeb() {
           name={document.name}
           initialSign={preferences.settings.autoResignOnSave}
           prepare={(name, context) =>
-            runBankAction(() => exportCopy(name, context))
+            runBankAction(() => exportCopy(exportTarget, name, context))
           }
           prepareBackup={() =>
-            runBankAction(() => exportOpeningBackup(document))
+            runBankAction(() => exportOpeningBackup(exportTarget))
           }
-          dismiss={() => setShowExport(false)}
+          dismiss={() => setExportTarget(undefined)}
         />
       )}
       {pendingOpen &&
@@ -369,7 +385,7 @@ export function StarBankWeb() {
           <ExportDialog
             name={document.name.replace(/\.xml$/i, ".SC2Bank")}
             initialSign={preferences.settings.autoResignOnSave}
-            prepare={exportCopy}
+            prepare={(name, context) => exportCopy(document, name, context)}
             continueAfterDownload={() => finishSwitch(true)}
             dismiss={() => finishSwitch(false)}
           />

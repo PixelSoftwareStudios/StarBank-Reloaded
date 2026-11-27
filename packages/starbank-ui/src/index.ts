@@ -7,6 +7,7 @@ export type {
   BankEditorDocument,
   EditorAction,
   EditorActionResult,
+  EditorMutationResult,
   EditorRow,
   EditorSection,
   EditorTarget,

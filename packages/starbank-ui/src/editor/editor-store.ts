@@ -14,13 +14,15 @@ interface EditorUiState {
   draft?: EditorDraft;
   profileDraft?: EditorProfileDraft;
   view?: EditorView;
+  getDraft: () => EditorDraft | undefined;
   setDraft: (update: DraftUpdater<EditorDraft>) => void;
   setProfileDraft: (update: DraftUpdater<EditorProfileDraft>) => void;
   setView: (view: EditorView) => void;
 }
 
 function createEditorState() {
-  return createStore<EditorUiState>()((set) => ({
+  return createStore<EditorUiState>()((set, get) => ({
+    getDraft: () => get().draft,
     setDraft: (update) =>
       set(({ draft }) => ({
         draft: typeof update === "function" ? update(draft) : update,

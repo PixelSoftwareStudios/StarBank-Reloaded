@@ -53,6 +53,10 @@ export type EditorActionResult =
   | { ok: true; message?: string }
   | { ok: false; message: string };
 
+export type EditorMutationResult =
+  | { ok: true; target: EditorTarget; message?: string }
+  | Extract<EditorActionResult, { ok: false }>;
+
 export type EditorDiffResult =
   | { ok: true; diff: EngineDiff; message?: string }
   | { ok: false; message: string };
@@ -77,11 +81,11 @@ export interface BankEditorController {
   onEditValues?: (
     target: EditorTarget,
     edits: readonly EditorValueEdit[],
-  ) => Promise<EditorActionResult>;
+  ) => Promise<EditorMutationResult>;
   onReplaceXml?: (
     target: EditorTarget,
     xml: string,
-  ) => Promise<EditorActionResult>;
+  ) => Promise<EditorMutationResult>;
   onDraftChange?: (hasDraft: boolean) => void;
   onStructure?: (
     target: EditorTarget,

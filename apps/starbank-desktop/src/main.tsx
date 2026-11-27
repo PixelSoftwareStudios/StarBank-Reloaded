@@ -5,6 +5,7 @@ import type {
   BankEditorController,
   BankEditorDocument,
   EditorActionResult,
+  EditorMutationResult,
   EditorRow,
   EditorTarget,
   SettingsPlatformInfo,
@@ -82,6 +83,7 @@ interface DesktopDocument {
 type OpenBankSource = (control: string) => Promise<FileDialogReply | null>;
 
 function DesktopApp() {
+  const currentDocument = useRef<DesktopDocument>(null);
   const [document, setDocument] = useState<DesktopDocument>();
   const [profile, setProfile] = useState<EngineProfile>();
   const [hasDraft, setHasDraft] = useState(false);
@@ -162,9 +164,9 @@ function DesktopApp() {
     }
   }
 
-  async function action(
-    run: () => Promise<EditorActionResult>,
-  ): Promise<EditorActionResult> {
+  async function action<Result extends EditorActionResult>(
+    run: () => Promise<Result>,
+  ): Promise<Result | Extract<EditorActionResult, { ok: false }>> {
     try {
       return await exclusive(run);
     } catch (error) {
@@ -208,10 +210,15 @@ function DesktopApp() {
     const target = { id: reply.document_id, revision: reply.revision };
     const snapshot = reply.result.payload;
     const raw = await dispatch(target, { kind: "raw_text" });
-    if (raw.reply.result.kind !== "raw_text" || raw.bytes === undefined) {
+    if (
+      raw.reply.result.kind !== "raw_text" ||
+      raw.reply.document_id !== target.id ||
+      raw.reply.revision !== target.revision ||
+      raw.bytes === undefined
+    ) {
       throw new Error("The bank engine did not return XML.");
     }
-    setDocument({
+    const next = {
       projection: {
         ...target,
         name,
@@ -228,7 +235,9 @@ function DesktopApp() {
       },
       canUndo: snapshot.can_undo,
       canRedo: snapshot.can_redo,
-    });
+    };
+    currentDocument.current = next;
+    setDocument(next);
     if (document?.projection.id !== target.id) {
       setProfile(undefined);
     } else if (profile && profile.status !== "unloaded") {
@@ -238,6 +247,7 @@ function DesktopApp() {
         setProfile(undefined);
       }
     }
+    return target;
   }
 
   async function updateProfile(
@@ -266,14 +276,25 @@ function DesktopApp() {
     command: EngineCommand,
     bytes?: Uint8Array,
   ) {
-    return action(async () => {
-      if (!document || document.projection.id !== target.id) {
-        return { ok: false, message: "Open a bank before editing it." };
-      }
+    return action<EditorMutationResult>(async () => {
+      const { projection } = activeDocument(target);
       const { reply } = await dispatch(target, command, bytes);
-      await adopt(document.projection.name, reply);
-      return { ok: true };
+      if (reply.document_id !== target.id)
+        throw new Error("The bank engine returned a different document.");
+      const next = await adopt(projection.name, reply);
+      return { ok: true, target: next };
     });
+  }
+
+  function activeDocument(target: EditorTarget): DesktopDocument {
+    const document = currentDocument.current;
+    if (
+      document?.projection.id !== target.id ||
+      document.projection.revision !== target.revision
+    ) {
+      throw new Error("The bank changed before the action could start.");
+    }
+    return document;
   }
 
   function activeTarget(target: EditorTarget): ActiveBankTarget {
@@ -354,7 +375,10 @@ function DesktopApp() {
       : inventory;
 
   function save(target: EditorTarget, mode: "overwrite" | "backup" | "new") {
-    return action(() => saveCurrent(target, mode));
+    return action(() => {
+      activeDocument(target);
+      return saveCurrent(target, mode);
+    });
   }
 
   async function saveCurrent(
@@ -604,7 +628,9 @@ function DesktopApp() {
           document: document?.projection,
           target,
           activeTarget,
-          adopt,
+          adopt: async (name, reply) => {
+            await adopt(name, reply);
+          },
           setPrompt: setSigningPrompt,
           errorMessage: messageFor,
         }),
@@ -612,9 +638,7 @@ function DesktopApp() {
     onExport: exportAvailable
       ? (target) =>
           action(async () => {
-            if (!document || document.projection.id !== target.id) {
-              throw new Error("Open a bank before exporting it.");
-            }
+            const { projection } = activeDocument(target);
             const id = requestId();
             const control = engineRequest(
               id,
@@ -626,7 +650,7 @@ function DesktopApp() {
             );
             const exported = await exportBankCopy(
               JSON.stringify(control),
-              document.projection.name,
+              projection.name,
             );
             if (!exported) return { ok: true };
             const { result } = decodeEngineReply(exported.control, id);
@@ -641,10 +665,16 @@ function DesktopApp() {
     onCopy: navigator.clipboard
       ? (target) =>
           action(async () => {
+            activeDocument(target);
             const { reply, bytes } = await dispatch(target, {
               kind: "prepare",
             });
-            if (reply.result.kind !== "prepared" || bytes === undefined) {
+            if (
+              reply.result.kind !== "prepared" ||
+              reply.document_id !== target.id ||
+              reply.revision !== target.revision ||
+              bytes === undefined
+            ) {
               throw new Error("The bank engine did not prepare XML.");
             }
             const status = reply.result.payload.signature_status;

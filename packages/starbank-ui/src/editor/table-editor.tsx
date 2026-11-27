@@ -330,7 +330,7 @@ export function TableEditor({
           {row.type || "Unknown"}
         </td>
         <td className={cellClasses}>
-          {windowed || editable || values?.has(row.id) ? (
+          {windowed || editable || editing === row.id || values?.has(row.id) ? (
             <input
               type="text"
               className={`${tableFieldClasses} w-full${index === undefined ? "" : " h-[calc(var(--editor-windowed-row-height)_-_0.375rem)]"}`}

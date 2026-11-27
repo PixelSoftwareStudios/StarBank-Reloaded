@@ -43,6 +43,7 @@ export function useEditorShortcuts(
   root: RefObject<HTMLElement | null>,
   {
     disabled,
+    saveDisabled,
     target,
     save,
     undo,
@@ -50,6 +51,7 @@ export function useEditorShortcuts(
     run,
   }: {
     disabled: boolean;
+    saveDisabled: boolean;
     target: EditorTarget;
     save?: EditorAction;
     undo?: EditorAction;
@@ -70,7 +72,8 @@ export function useEditorShortcuts(
     if (!action) return;
     const selected = action;
     event.preventDefault();
-    if (!event.repeat && !disabled) run(() => selected(target));
+    const blocked = key === "s" ? saveDisabled : disabled;
+    if (!event.repeat && !blocked) run(() => selected(target));
   });
 }
 

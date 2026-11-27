@@ -135,6 +135,7 @@ interface Action {
   group: (typeof menuGroups)[number];
   label: string;
   help: string;
+  output?: true;
   action?: EditorAction;
 }
 
@@ -142,11 +143,15 @@ export function EditorActions({
   controller,
   target,
   disabled,
+  outputDisabled,
+  saveDraft,
   run,
 }: {
   controller: BankEditorController;
   target: EditorTarget;
   disabled: boolean;
+  outputDisabled: boolean;
+  saveDraft: (action: EditorAction) => Promise<EditorActionResult>;
   run: RunEditorAction;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -155,8 +160,9 @@ export function EditorActions({
   const save = onSave ?? onSaveAs ?? onExport;
   useEditorShortcuts(root, {
     disabled,
+    saveDisabled: outputDisabled,
     target,
-    save,
+    save: save && (() => saveDraft(save)),
     undo: onUndo,
     redo: onRedo,
     run,
@@ -167,6 +173,7 @@ export function EditorActions({
       group: "save",
       label: "Save",
       help: "Save changes to the open bank",
+      output: true,
       action: onSave,
     },
     {
@@ -174,6 +181,7 @@ export function EditorActions({
       group: "save",
       label: "Save As…",
       help: "Choose a new filename or location",
+      output: true,
       action: onSaveAs,
     },
     {
@@ -181,6 +189,7 @@ export function EditorActions({
       group: "save",
       label: "Save w/ Backup",
       help: "Save changes and keep a backup of the previous file",
+      output: true,
       action: controller.onSaveWithBackup,
     },
     {
@@ -202,6 +211,7 @@ export function EditorActions({
       group: "bank",
       label: "Export copy…",
       help: "Export the bank without replacing the open file",
+      output: true,
       action: onExport,
     },
     {
@@ -209,6 +219,7 @@ export function EditorActions({
       group: "clipboard",
       label: "Copy bank XML to clipboard",
       help: "Copy the prepared XML of the open bank",
+      output: true,
       action: controller.onCopy,
     },
     {
@@ -242,12 +253,22 @@ export function EditorActions({
       group,
       items: [
         ...(group === "save" && onSave
-          ? [{ id: "overwrite", label: "Save (Overwrite)", action: onSave }]
+          ? [
+              {
+                id: "overwrite",
+                label: "Save (Overwrite)",
+                output: true,
+                action: onSave,
+              },
+            ]
           : []),
         ...secondary.filter((item) => item.group === group),
       ],
     }))
     .filter(({ items }) => items.length > 0);
+  const menuDisabled = groupedMenu.every(({ items }) =>
+    items.every(({ output }) => (output ? outputDisabled : disabled)),
+  );
 
   return (
     <div
@@ -301,8 +322,14 @@ export function EditorActions({
             aria-keyshortcuts={
               primary.action === save ? SAVE_SHORTCUT : undefined
             }
-            disabled={disabled}
-            onClick={() => run(() => primary.action(target))}
+            disabled={primary.output ? outputDisabled : disabled}
+            onClick={() =>
+              run(() =>
+                primary.output
+                  ? saveDraft(primary.action)
+                  : primary.action(target),
+              )
+            }
           >
             {primary.label}
           </EditorHelpButton>
@@ -310,12 +337,12 @@ export function EditorActions({
             <Dropdown.Root modal={false}>
               <EditorTooltip
                 help="Choose how to save or copy the open bank"
-                disabled={disabled}
+                disabled={menuDisabled}
               >
                 <Dropdown.Trigger
                   className={`${buttonClasses("primary")} editor-save-menu h-auto min-w-7 rounded-s-none [border-inline-start-color:color-mix(in_srgb,currentColor_32%,transparent)]`}
                   aria-label="More save options"
-                  disabled={disabled}
+                  disabled={menuDisabled}
                 >
                   <ChevronDown
                     aria-hidden="true"
@@ -336,11 +363,16 @@ export function EditorActions({
                       {index > 0 && (
                         <Dropdown.Separator className={menuDividerClasses} />
                       )}
-                      {items.map(({ id, label, action }) => (
+                      {items.map(({ id, label, output, action }) => (
                         <Dropdown.Item
                           key={id}
                           className={menuItemClasses}
-                          onSelect={() => run(() => action(target))}
+                          disabled={output ? outputDisabled : disabled}
+                          onSelect={() =>
+                            run(() =>
+                              output ? saveDraft(action) : action(target),
+                            )
+                          }
                         >
                           {label}
                         </Dropdown.Item>

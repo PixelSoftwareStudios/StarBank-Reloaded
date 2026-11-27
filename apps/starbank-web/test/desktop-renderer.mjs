@@ -102,15 +102,17 @@ function dispatch(engine, control, bytes) {
   }
 }
 
-function dispatchFrame(engine, packet) {
+function dispatchFrame(engine, packet, beforeDispatch) {
   const frame = Buffer.from(packet);
   const controlEnd = frameHeaderBytes + frame.readUInt32LE(controlLengthOffset);
   assert(controlEnd <= frame.length);
   const attached = frame[0] === 1;
   assert(attached || (frame[0] === 0 && controlEnd === frame.length));
+  const request = frame.subarray(frameHeaderBytes, controlEnd).toString();
+  beforeDispatch?.(JSON.parse(request));
   const reply = dispatch(
     engine,
-    frame.subarray(frameHeaderBytes, controlEnd).toString(),
+    request,
     attached ? frame.subarray(controlEnd) : undefined,
   );
 
@@ -132,6 +134,7 @@ function createBridge(engine, canOverwrite) {
   let openCount = 0;
   let saved = false;
   let malformedBackupList = false;
+  let supersedeNextEdit = false;
   let inventoryResponse = canOverwrite ? blockedInventory : inventory;
   let preferences = { ...settings };
 
@@ -153,9 +156,28 @@ function createBridge(engine, canOverwrite) {
     return reply;
   }
 
+  function advanceRevisionBeforeEdit(request) {
+    if (request.command.kind !== "set_values") return;
+    supersedeNextEdit = false;
+    const { control } = dispatch(
+      engine,
+      JSON.stringify({ ...request, command: { kind: "reset" } }),
+    );
+    const reset = JSON.parse(control);
+    assert.equal(reset.result.kind, "snapshot");
+    assert.notEqual(reset.revision, request.expected_revision);
+  }
+
   function invoke(command, args) {
-    if (command === "dispatch_bank")
-      return { value: dispatchFrame(engine, args) };
+    if (command === "dispatch_bank") {
+      return {
+        value: dispatchFrame(
+          engine,
+          args,
+          supersedeNextEdit ? advanceRevisionBeforeEdit : undefined,
+        ),
+      };
+    }
     calls.push({ command, args });
     switch (command) {
       case "read_settings":
@@ -294,6 +316,9 @@ function createBridge(engine, canOverwrite) {
     choose(choice, outcome) {
       navigation = { choice, outcome };
     },
+    supersedeNextEdit() {
+      supersedeNextEdit = true;
+    },
     corruptBackupList() {
       malformedBackupList = true;
     },
@@ -364,6 +389,7 @@ async function verifyRevert(page) {
   );
 
   for (const approve of [false, true]) {
+    await more.click({ trial: true });
     await more.press("ArrowDown");
     const decision = page.waitForEvent("dialog").then(async (dialog) => {
       assert.equal(dialog.type(), "confirm");
@@ -614,6 +640,50 @@ async function verifyMalformedBackupList(page, bridge) {
   );
 }
 
+async function verifyDraftSave(page, bridge, canOverwrite) {
+  const saveCommand = canOverwrite ? "save_active_bank" : "save_bank_as";
+  const before = bridge.callsFor(saveCommand).length;
+  bridge.choose("save", "success");
+  await goldField(page).fill("9,007,199,254,740,993");
+  await page.evaluate(() => {
+    const editor = document.activeElement;
+    for (let index = 0; index < 2; index += 1) {
+      editor.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "s",
+          ctrlKey: true,
+          bubbles: true,
+        }),
+      );
+    }
+  });
+  await page
+    .getByRole("status")
+    .filter({ hasText: /Saved .*\.SC2Bank\./ })
+    .waitFor();
+  assert.equal(bridge.callsFor(saveCommand).length, before + 1);
+  const raw = page.getByRole("textbox", { name: "Bank XML" });
+  await page.getByRole("tab", { name: "Raw View" }).click();
+  await raw.filter({ hasText: 'int="9007199254740993"' }).waitFor();
+
+  await page.getByRole("tab", { name: "Table View" }).click();
+  const gold = goldField(page);
+  await gold.focus();
+  await gold.fill("0042");
+  assert.equal(await gold.inputValue(), "0042");
+  bridge.supersedeNextEdit();
+  await gold.press("Control+s");
+  await page
+    .getByRole("status")
+    .filter({
+      hasText: "The document changed. Refresh its snapshot before retrying.",
+    })
+    .waitFor();
+  assert.equal(await gold.inputValue(), "0042");
+  assert(await button(page, "Discard draft").isVisible());
+  assert.equal(bridge.callsFor(saveCommand).length, before + 1);
+}
+
 async function verifyRenderer(browser, canOverwrite) {
   const context = await browser.newContext({
     offline: true,
@@ -669,6 +739,7 @@ async function verifyRenderer(browser, canOverwrite) {
     if (canOverwrite) await verifyBackupRestoreReview(page, bridge);
     await verifyBankNavigation(page, bridge, canOverwrite);
     if (canOverwrite) await verifyMalformedBackupList(page, bridge);
+    await verifyDraftSave(page, bridge, canOverwrite);
     assert.deepEqual(bridge.unexpected, []);
     assert.deepEqual(errors, []);
     assert.deepEqual(rejected, []);

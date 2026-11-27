@@ -90,6 +90,12 @@ export async function verifyTableDraftSwitch(page, chooseBank) {
     "Enter an integer with optional comma grouping.",
   );
   assert.equal(await apply.isDisabled(), true);
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Save As…", exact: true })
+      .isDisabled(),
+    true,
+  );
   assert.equal(await gold.getAttribute("aria-invalid"), null);
   await rawTab.click();
   await decision

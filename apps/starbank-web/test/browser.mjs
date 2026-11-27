@@ -333,6 +333,11 @@ async function verifySimpleView(page, chooseBank) {
   }
 
   await score.fill("2.00");
+  assert(
+    await page
+      .getByRole("button", { name: "Save As…", exact: true })
+      .isDisabled(),
+  );
   await rawTab.press("Enter");
   await decision.getByRole("button", { name: "Review edits" }).click();
   await page.waitForFunction(() =>
@@ -571,7 +576,9 @@ async function verify(name) {
 
     await value.fill("1,000,000");
     assert.equal(await section.getAttribute("aria-description"), null);
-    await page.getByRole("button", { name: "Apply edits" }).click();
+    await downloadCopy(page, edited, "Control+s");
+    await page.keyboard.press("Escape");
+    await page.getByRole("tab", { name: "Table View" }).focus();
     await page
       .getByRole("status")
       .filter({ hasText: "Unsaved changes in 1 section" })
@@ -583,8 +590,6 @@ async function verify(name) {
     await section.locator(".editor-section-dirty").waitFor();
     assert.equal(await value.inputValue(), "1,000,000");
     await downloadOpeningBackup(page, initial);
-    await downloadCopy(page, edited, "Control+s");
-    await page.keyboard.press("Escape");
 
     await page.getByRole("tab", { name: "Raw View" }).click();
     const raw = page.locator(".cm-content");
@@ -593,6 +598,11 @@ async function verify(name) {
     assert.match(await raw.textContent(), /int="1000000"/u);
     await raw.fill("<Bank>");
     await page.keyboard.press("Meta+s");
+    await page
+      .getByRole("status")
+      .filter({ hasText: /bank XML could not be opened safely/i })
+      .first()
+      .waitFor();
     assert.equal(
       await page.getByRole("dialog", { name: "Save a bank copy" }).count(),
       0,
@@ -655,8 +665,19 @@ async function verify(name) {
     await page.keyboard.press("Control+Shift+z");
     await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
 
-    let dialog = await downloadCopy(page, rawEdited, "Meta+s");
+    const rawExported = rawEdited.replace(
+      "raw draft applied",
+      "raw draft exported",
+    );
+    await raw.press("ControlOrMeta+a");
+    await page.keyboard.insertText(rawExported);
+    const rawCopy = await downloadCopy(page, rawExported, "Meta+s");
+    await rawCopy.getByRole("button", { name: "Close", exact: true }).click();
+    await rawTab.focus();
+    await page.keyboard.press("Meta+z");
+    await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
 
+    let dialog = await downloadCopy(page, rawEdited, "Meta+s");
     await dialog.getByRole("button", { name: "Back" }).click();
     await dialog.getByLabel("Re-sign this copy").check();
     await dialog.getByLabel("Map author handle").fill("1-S2-1-999");
@@ -676,14 +697,19 @@ async function verify(name) {
     );
     await page.keyboard.press("Escape");
 
+    await raw.press("ControlOrMeta+a");
+    await page.keyboard.insertText(rawExported);
     await verifySaveMenu(page);
     dialog = page.getByRole("dialog", { name: "Copy bank XML" });
     const clipboard = await dialog.getByLabel("Prepared bank XML").inputValue();
     assert.equal(
       clipboard.replaceAll("\r\n", "\n"),
-      rawEdited.replaceAll("\r\n", "\n"),
+      rawExported.replaceAll("\r\n", "\n"),
     );
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await rawTab.focus();
+    await page.keyboard.press("Meta+z");
+    await raw.filter({ hasText: "<!-- raw draft applied -->" }).waitFor();
 
     const switchBank = page.getByRole("dialog", {
       name: "Unsaved bank changes",

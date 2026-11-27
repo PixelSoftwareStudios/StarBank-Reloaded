@@ -27,6 +27,7 @@ import {
 import {
   type BankEditorController,
   type BankEditorDocument,
+  type EditorAction,
   type EditorActionResult,
   type EditorDraft,
   type EditorProfileField,
@@ -112,8 +113,15 @@ export function BankEditor({
   tools?: ReactNode;
   mapContext?: MapContext;
 }) {
-  const { draft, profileDraft, view, setDraft, setProfileDraft, setView } =
-    useEditorState();
+  const {
+    draft,
+    profileDraft,
+    view,
+    getDraft,
+    setDraft,
+    setProfileDraft,
+    setView,
+  } = useEditorState();
   const profileController = controller.profile;
   const profile =
     profileController?.current.status === "matched"
@@ -141,6 +149,13 @@ export function BankEditor({
   const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
   const [rawRestart, setRawRestart] = useState(false);
   const target = { id: document.id, revision: document.revision };
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const tableDraft = draft?.kind === "table" ? draft : undefined;
   const rawDraft = draft?.kind === "raw" ? draft : undefined;
   const stale = draft !== undefined && draft.revision !== document.revision;
@@ -185,6 +200,12 @@ export function BankEditor({
   }>();
   const hasDraft = draft !== undefined || profileDraft !== undefined;
   const pending = busy || hasDraft;
+  const outputDisabled =
+    busy ||
+    Boolean(profileDraft) ||
+    stale ||
+    (tableDraft !== undefined && (!onEditValues || hasInvalidTableEdits)) ||
+    (rawDraft !== undefined && !onReplaceXml);
   useLayoutEffect(() => {
     onDraftChange?.(draft !== undefined || profileDraft !== undefined);
   }, [draft, profileDraft, onDraftChange]);
@@ -336,6 +357,35 @@ export function BankEditor({
     if (rawDraft && onReplaceXml)
       submitDraft("raw", () => onReplaceXml(target, rawDraft.text));
     else if (tableDraft) applyTable();
+  }
+
+  async function saveDraft(action: EditorAction): Promise<EditorActionResult> {
+    const submitted = draft;
+    const changed = {
+      ok: false,
+      message: "The bank changed while you were editing this draft.",
+    } as const;
+    if (outputDisabled || getDraft() !== submitted) return changed;
+    if (!submitted) return action(target);
+
+    const result =
+      submitted.kind === "raw"
+        ? await onReplaceXml?.(target, submitted.text)
+        : tableEdits && (await onEditValues?.(target, tableEdits));
+    if (!result) return changed;
+    if (!result.ok) return result;
+    if (
+      !mounted.current ||
+      result.target.id !== target.id ||
+      getDraft() !== submitted
+    ) {
+      return changed;
+    }
+    setDraft(undefined);
+    const output = await action(result.target);
+    return output.ok && !output.message
+      ? { ...output, message: result.message }
+      : output;
   }
 
   function discardDraft() {
@@ -758,6 +808,8 @@ export function BankEditor({
           controller={controller}
           target={target}
           disabled={pending}
+          outputDisabled={outputDisabled}
+          saveDraft={saveDraft}
           run={run}
         />
       </footer>
