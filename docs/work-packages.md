@@ -119,8 +119,9 @@ Depends on: 05,06,07,10,11.
 
 - [x] Implement controlled Table and CodeMirror Raw views, same-value bulk editing, draft safeguards and callback-driven file actions.
 - [x] Bind live Table, Raw, and Simple View and qualify the supported local save, backup and restore flows with synthetic banks. [Implementation evidence](verification/IMPLEMENTATION.md)
+- [x] Preserve numeric pointer selections when entering exact values and provide bounded, advisory Raw syntax hints. Verify both in all three headless browser engines. [Editor evidence](verification/IMPLEMENTATION.md#req-ui-06-editor-input-follow-ups)
 - [ ] Complete the installed native platform and assistive technology matrix. Keep writes scoped to qualified storage.
-- [ ] Implement and verify: REQ-UI-05, REQ-UI-06, REQ-UI-07, REQ-UI-08.
+- [ ] Complete installed native and assistive-technology acceptance for REQ-UI-05, REQ-UI-06, REQ-UI-07 and REQ-UI-08.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-13 — Settings and platform integration
@@ -130,7 +131,7 @@ Depends on: 11,12.
 - [x] Implement versioned browser preferences, legacy decoding and the shared settings page. Preserve in-flight drafts across settings navigation.
 - [x] Persist native preferences and authorized roots. Share account selection, appearance, automatic backup policy and platform capability information in Settings. Add explicit map-index rebuild. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Configure a managed backup folder and persist a retention count with a read-only review of older backups. Keep access to earlier managed folders. [Implementation evidence](verification/IMPLEMENTATION.md)
-- [ ] Implement and verify: REQ-UI-09.
+- [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-14 — StarBank Web
@@ -141,7 +142,7 @@ Depends on: 03,04,05,06,11,12.
 - [x] Verify live profile and structural editing controls and exact opening backups across the supported browser engines. [Browser write qualification](verification/BROWSER_WRITES.md)
 - [x] Ship static editor and worker response headers and verify local static hosting at a nested path in the browser matrix. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [ ] Verify the static hosted build. Reassess writable handles if browsers expose the needed conflict and recovery guarantees.
-- [ ] Implement and verify: REQ-WEB-01, REQ-WEB-02.
+- [ ] Qualify the hosted static deployment for REQ-WEB-01 and REQ-WEB-02; preserve the recorded three-engine local evidence.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-15 — CLI and agent skill
@@ -164,6 +165,7 @@ Depends on: 12,13,14,15.
 - [x] Verify the local unsigned macOS disk image and the Debian arm64 package and its install, launch and purge flow. [Distribution evidence](verification/DISTRIBUTION.md)
 - [x] Verify the unsigned Windows x64 NSIS installer, per-user Open With registration, and silent uninstall with a synthetic bank. [Hosted installer evidence](verification/DISTRIBUTION.md#windows-x64-nsis)
 - [x] Qualify the dormant Windows running-instance transport with five headless native probes. [Windows transport evidence](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#hosted-native-qualification)
+- [x] Wire Windows launch delivery into the guarded app queue and verify it with a real pipe and a windowless Tauri runtime. [Native app integration](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#desktop-integration)
 - [ ] Verify signed packages, Windows Explorer Open With visibility and open flows, installed macOS open flows, and release licensing.
 - [ ] Implement and verify: REQ-DIST-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).

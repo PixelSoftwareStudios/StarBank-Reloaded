@@ -38,7 +38,7 @@ The resulting `starbank-reloaded_0.1.0_arm64.deb` was 9,309,134 bytes with SHA-2
 
 ## Windows running-instance delivery
 
-The Windows association passes a selected bank through startup arguments. The desktop claims a logon-scoped local pipe before creating its window and forwards subsequent launches into the existing guarded pending-open queue. The sender reports refusals or uncertain delivery without automatically retrying. A retained handle keeps endpoint ownership while an editor is active even if the listener stops. Five native headless transport probes, including endpoint retention, passed at `933feec`. The desktop wiring and windowless app-queue test require their own Windows integration run. Explorer delivery and foreground focus remain unverified. [Transport and desktop qualification](../../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md)
+The Windows association passes a selected bank through startup arguments. The desktop claims a logon-scoped local pipe before creating its window and forwards subsequent launches into the existing guarded pending-open queue. The sender reports refusals or uncertain delivery without automatically retrying. A retained handle keeps endpoint ownership while an editor is active even if the listener stops. Five native headless transport probes, including endpoint retention, passed at `933feec`. At `836efb7`, the windowless app-queue integration and all 97 Windows desktop tests passed. Explorer delivery and foreground focus remain unverified. [Transport and desktop qualification](../../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md)
 
 ## Windows x64 NSIS
 
