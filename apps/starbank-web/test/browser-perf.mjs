@@ -192,7 +192,24 @@ async function measureBank(page, { rows, bank }) {
       document.querySelector(selector)?.value === initial,
     { selector: row(index), initial: String(index) },
   );
+  await page.evaluate((targetRow) => {
+    function drafted(event) {
+      if (!event.target.matches(targetRow)) return;
+      window.removeEventListener("input", drafted, true);
+      globalThis.__starbankPerf.watch(
+        "draftValidation",
+        performance.now(),
+        () =>
+          [...document.querySelectorAll(".editor-draft-actions button")].some(
+            (button) =>
+              button.textContent.trim() === "Apply edits" && !button.disabled,
+          ),
+      );
+    }
+    window.addEventListener("input", drafted, true);
+  }, row(index));
   await value.fill("9,007,199,254,740,993");
+  const draftValidation = await elapsed(page, "draftValidation");
   assert.equal(await value.inputValue(), "9,007,199,254,740,993");
   await page.evaluate(
     ({ targetRow, input }) => {
@@ -225,6 +242,7 @@ async function measureBank(page, { rows, bank }) {
     bytes: bank.length,
     open,
     scroll,
+    draftValidation,
     apply,
     initialMounted,
     distantMounted,

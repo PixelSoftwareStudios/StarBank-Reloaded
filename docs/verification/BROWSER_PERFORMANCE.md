@@ -18,6 +18,24 @@ The measurements use the browser's monotonic clock. Startup ends when the real e
 
 The large table mounted 12 data rows initially and 20 around row 9,000 in all 25 measurements. The small table mounted all 32. These local DOM timings cover the measured Chromium and inputs. Browser launch, physical screen paint, remote asset delivery, other engines, and process-tree CPU or memory are outside the measured intervals.
 
+## Rust draft validation run
+
+The production build of `028224f` passed the same five warmups and 25 timed pairs with the pins and host above. The asset fingerprint was `a9d9e7d629b49befef6d1dd8a652361ca02d3cc60e08caeb341f2e7c30cc7224`. The updated harness also measures the input event to the enabled Apply button, including the 150 ms debounce and the read-only Rust reply. Apply continues to measure only the subsequent click-to-accepted-revision interval.
+
+| Browser operation | Fixture | Median (ms) | p95 (ms) |
+| --- | --- | ---: | ---: |
+| Navigate to enabled bank picker, fresh context | Empty editor | 67.6 | 72.4 |
+| Navigate to enabled bank picker, warm cache | Empty editor | 65.2 | 81.8 |
+| File input change to first projected table row | 32 values | 14.3 | 16.0 |
+| File input change to first projected table row | 10,000 values | 63.0 | 84.7 |
+| Scroll to row 9,000 and mount its input | 10,000 values | 4.4 | 15.9 |
+| Input event to validated, enabled Apply | 32 values | 155.4 | 156.6 |
+| Input event to validated, enabled Apply | 10,000 values | 156.5 | 157.7 |
+| Apply one staged exact integer edit | 32 values | 54.0 | 58.4 |
+| Apply one staged exact integer edit at row 9,000 | 10,000 values | 70.5 | 75.8 |
+
+All trials retained exact values above 2^53, cold and warm request-count checks, and zero off-origin requests or page errors. These observations do not establish owner-approved performance budgets or installed native performance.
+
 ## Reproduce
 
 Build with the project pins and run the benchmark using the workspace's Playwright dependency.
