@@ -1,6 +1,6 @@
-# Synthetic engine and map index performance
+# Engine and map index performance
 
-The first baseline was measured on November 26, 2026, using repository revision `c078263` with the benchmark harness applied. The host was an Apple M1 Pro with 32 GiB of memory, macOS 14.7.2, and Rust 1.100.0 (`0ef1bc386`). These measurements cover local synthetic operations for REQ-PERF-01 and resource-bound checks for REQ-QA-01.
+The first baseline was measured on November 26, 2026, using repository revision `c078263` with the benchmark harness applied. The host was an Apple M1 Pro with 32 GiB of memory, macOS 14.7.2, and Rust 1.100.0 (`0ef1bc386`). That baseline covers local synthetic operations for REQ-PERF-01 and resource-bound checks for REQ-QA-01.
 
 ## Reproduce
 
@@ -49,6 +49,19 @@ Three paired runs used distinct optimized executables and alternated their run o
 | Warm metadata cache, 256 hits | 67.033 | 7.563 |
 | Uncached control, four files | 0.369 | 0.377 |
 | Uncached control, 256 files | 10.188 | 10.731 |
+
+## Four private cache copies
+
+At `14a35a1`, a scratch-only Rust helper called the public `scan_maps` API once with an initially absent metadata cache and once with the resulting cache. The input was the same four explicit local cache copies used by the [member compatibility checks](PRIVATE_SC2_CORPUS.md#existing-local-cache-snapshots), totalling 8,329,661 bytes. This REQ-MAP-03 check used Rust 1.100.0's debug profile on macOS 14.7.2 arm64.
+
+| Scan | Cache state | Records | Cache hits | Derived uncached records | Elapsed (ms) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Cold | Missing | 4 | 0 | 4 | 58.635 |
+| Warm | Loaded | 4 | 4 | 0 | 0.406 |
+
+Both scans returned identical ordered full map records, no issues and `incomplete: false`. All input bytes, SHA-256 values, file identities, modes, link counts, sizes, modification times and change times matched before and after. The generated cache, helper and build outputs were removed; private input copies remain outside the checkout.
+
+Uncached records are derived from successful records minus `cache_hits`. The [scan implementation](../../crates/discovery/starbank-map-index/src/scan.rs) returns a matching cached record before reading archive contents. Freshness metadata I/O still occurs; no OS file-open trace was collected. Cold means an absent application metadata cache, not a controlled cold OS cache. Each elapsed time covers one `scan_maps` call only. This single four-file observation supplies neither percentiles nor an approved performance budget and is not an optimized benchmark comparison.
 
 ## Open measurements
 

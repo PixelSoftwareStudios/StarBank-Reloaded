@@ -92,6 +92,7 @@ Depends on: 02.
 - [x] Exercise verified archival copies and explicit capability fallback with synthetic MPQ fixtures. [Copy qualification](../crates/adapters/starbank-mpq/verification/MAP_EXPORT.md)
 - [x] Verify add-only classic V1 output against original hash slots, block records and packed bytes. [Verifier tests](../crates/adapters/starbank-mpq/tests/v1_append.rs)
 - [x] Exercise opt-in macOS arm64 StormLib append and fuzz the pure verifier on synthetic fixtures. [Native append](../crates/adapters/starbank-mpq-stormlib/verification/NATIVE_APPEND.md) · [Fuzz run](../crates/adapters/starbank-mpq/fuzz/README.md)
+- [x] Compare four private local cache copies with StormLib, including declared origins and padded sector tables: eight exact member matches and four agreed absences. Capture provenance remains unknown. [Local cache evidence](verification/PRIVATE_SC2_CORPUS.md#existing-local-cache-snapshots)
 - [ ] Qualify authorized SC2 archives, exact original components and SC2 Editor repair and reopen.
 - [ ] Implement and verify: REQ-MPQ-01, REQ-MPQ-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
@@ -102,6 +103,7 @@ Depends on: 08,09.
 
 - [x] Implement bounded and cancellable metadata indexing, incremental cache and ambiguity-preserving association. Verify synthetic archives and cache failures.
 - [x] Connect map selection, filters, metadata, progress and generation-scoped cancellation to the native application. [Implementation evidence](verification/IMPLEMENTATION.md)
+- [x] Verify unchanged-cache reuse on the four private copies in a headless macOS scan: identical records, four warm hits and unchanged inputs. [Cache observation](verification/PERFORMANCE_BASELINE.md#four-private-cache-copies)
 - [ ] Test real cache layouts and live cancellation across platforms.
 - [ ] Implement and verify: REQ-MAP-02, REQ-MAP-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
