@@ -2,9 +2,17 @@
 
 Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
 
+## Hosted CI at `3cd3696`
+
+All 11 jobs passed on November 27, 2026, at `3cd36969b16c733b0bb063d2aee4da4443420571`. Windows x64 passed 240 default Rust tests, the opt-in NTFS probe, and all five serial single-instance transport cases. The headless cases verified the dormant component with synthetic subprocesses. Desktop activation, distinct-logon denial and installed Explorer open flows remain open. [Workflow run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46002526907) · [Windows transport evidence](../../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#hosted-native-qualification)
+
+The source job checked 257 Rust files, and cargo-audit scanned 502 locked dependencies against 1,571 advisories. The audit passed with unmaintained-package warnings for chrono and proc-macro-error. [Source job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46002526907/job/140517519329)
+
+All 11 jobs also passed at `4ffb6c4`. The hosted APFS test passed its reported-capacity and forced filler-exhaustion cases after an earlier hosted run failed with an unlabelled errno 28. The earlier failure's exact phase remains unknown. [Earlier passing run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46000630338) · [APFS evidence](../../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md#apfs-capacity-exhaustion)
+
 ## Hosted CI at `e4385da`
 
-All 11 jobs passed on November 27, 2026, at `e4385da821cb84552c5cf173f0636a62ee6b644a`. This includes source and dependency checks, wasm32, the three-engine frontend workflow, four native Rust legs and four native desktop legs. Later local changes through `6b91fb4` require their own hosted run. [Workflow run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45997318578) · [Dependency checks](DEPENDENCIES.md)
+All 11 jobs passed on November 27, 2026, at `e4385da821cb84552c5cf173f0636a62ee6b644a`. This includes source and dependency checks, wasm32, the three-engine frontend workflow, four native Rust legs and four native desktop legs. [Workflow run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45997318578) · [Dependency checks](DEPENDENCIES.md)
 
 On Windows x64, the Rust native job passed 229 default tests with two skipped and passed the opt-in NTFS rename probe. The desktop job passed the unsigned NSIS build, silent install and uninstall, packaged navigation policy and all 86 desktop tests. The previously failing `frozen_leaf_detects_a_different_file_at_the_same_path` identity regression passed. Production Windows write qualification remains open. [Rust native job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45997318578/job/140499862286) · [Desktop job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45997318578/job/140499862320) · [NTFS probe scope](../../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md#hosted-ntfs-probe)
 
