@@ -7,7 +7,8 @@
     "build:webview": "vite build",
     "dev": "tauri dev",
     "dev:webview": "vite",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.5",

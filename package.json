@@ -10,7 +10,7 @@
     "check": "pnpm run lint && pnpm run typecheck",
     "dev": "pnpm --filter starbank-web dev",
     "lint": "biome check package.json biome.json tsconfig.base.json apps packages",
-    "test": "pnpm --filter starbank-web test",
+    "test": "pnpm --filter starbank-web test && pnpm --filter starbank-desktop test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

@@ -1,11 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import type { BankBackupPresence } from "starbank-ui";
 
-interface Row {
-  readonly bankId: string;
-  readonly state: BankBackupPresence;
-}
+import { readInventoryBackupStatuses } from "./transport";
 
 interface Report {
   readonly generation: string;
@@ -29,9 +25,7 @@ export function useInventoryBackupStatuses(
       pending.current = pending.current.then(async () => {
         if (!current) return;
         try {
-          const rows = await invoke<readonly Row[]>("inventory_backup_status", {
-            generation,
-          });
+          const rows = await readInventoryBackupStatuses(generation);
           if (current) {
             setReport({
               generation,

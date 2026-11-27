@@ -199,19 +199,72 @@ export function exportActiveBackup(
   target: ActiveBankTarget,
   backupId: number,
 ): Promise<string | null> {
-  return invoke<string | null>("export_active_backup", { target, backupId });
+  return invokeChecked(v.nullable(v.string()), "export_active_backup", {
+    target,
+    backupId,
+  });
 }
 
-export interface BackupRestoreReview {
-  readonly description: string;
-  readonly comparison: XmlComparison;
+const lineNumber = v.pipe(v.number(), v.safeInteger(), v.minValue(1));
+const xmlExcerpt = v.object({
+  text: v.string(),
+  omitsStart: v.boolean(),
+  omitsEnd: v.boolean(),
+});
+const comparisonLines = {
+  firstDifferenceLine: v.nullable(lineNumber),
+  startLine: lineNumber,
+};
+const xmlComparison = v.object({
+  ...comparisonLines,
+  before: xmlExcerpt,
+  after: xmlExcerpt,
+});
+const backupRestoreReview = v.object({
+  description: v.string(),
+  comparison: xmlComparison,
+});
+const conflictReview = v.object({
+  id: v.pipe(v.string(), v.nonEmpty()),
+  ...comparisonLines,
+  editor: xmlExcerpt,
+  onDisk: xmlExcerpt,
+});
+const backupPresence = v.picklist(["never_backed_up", "recorded", "unknown"]);
+const activeBackupStatus = v.object({
+  state: backupPresence,
+  recordCount: count,
+  rejectedMetadata: count,
+  latestTimestampUtc: v.nullable(v.string()),
+  incomplete: v.boolean(),
+});
+const inventoryBackupStatuses = v.array(
+  v.object({
+    bankId: v.string(),
+    state: backupPresence,
+  }),
+);
+
+export type BackupRestoreReview = v.InferOutput<typeof backupRestoreReview>;
+export type XmlComparison = v.InferOutput<typeof xmlComparison>;
+export type ConflictReview = v.InferOutput<typeof conflictReview>;
+export type ActiveBackupStatus = v.InferOutput<typeof activeBackupStatus>;
+
+export function readActiveBackupStatus(target: ActiveBankTarget) {
+  return invokeChecked(activeBackupStatus, "active_backup_status", { target });
+}
+
+export function readInventoryBackupStatuses(generation: string) {
+  return invokeChecked(inventoryBackupStatuses, "inventory_backup_status", {
+    generation,
+  });
 }
 
 export function reviewActiveBackup(
   target: ActiveBankTarget,
   backupId: number,
 ): Promise<BackupRestoreReview> {
-  return invoke<BackupRestoreReview>("review_active_backup", {
+  return invokeChecked(backupRestoreReview, "review_active_backup", {
     target,
     backupId,
   });
@@ -227,29 +280,8 @@ export function restoreActiveBank(
   });
 }
 
-interface XmlExcerpt {
-  readonly text: string;
-  readonly omitsStart: boolean;
-  readonly omitsEnd: boolean;
-}
-
-export interface XmlComparison {
-  readonly firstDifferenceLine: number | null;
-  readonly startLine: number;
-  readonly before: XmlExcerpt;
-  readonly after: XmlExcerpt;
-}
-
-export interface ConflictReview {
-  readonly id: string;
-  readonly firstDifferenceLine: number | null;
-  readonly startLine: number;
-  readonly editor: XmlExcerpt;
-  readonly onDisk: XmlExcerpt;
-}
-
 export function compareBankConflict(target: ActiveBankTarget) {
-  return invoke<ConflictReview>("compare_bank_conflict", { target });
+  return invokeChecked(conflictReview, "compare_bank_conflict", { target });
 }
 
 export function reopenBankConflict(target: ActiveBankTarget, reviewId: string) {

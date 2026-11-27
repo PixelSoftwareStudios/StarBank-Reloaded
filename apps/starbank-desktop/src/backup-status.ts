@@ -1,21 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { EditorTarget } from "starbank-ui";
-import type { ActiveBankTarget } from "./transport";
-
-export interface ActiveBackupStatus {
-  readonly state: "never_backed_up" | "recorded" | "unknown";
-  readonly recordCount: number;
-  readonly rejectedMetadata: number;
-  readonly latestTimestampUtc: string | null;
-  readonly incomplete: boolean;
-}
-
-function readActiveBackupStatus(
-  target: ActiveBankTarget,
-): Promise<ActiveBackupStatus> {
-  return invoke<ActiveBackupStatus>("active_backup_status", { target });
-}
+import { type ActiveBackupStatus, readActiveBackupStatus } from "./transport";
 
 function describeBackupStatus(status: ActiveBackupStatus): string {
   if (status.state === "never_backed_up") return "No backups recorded";
