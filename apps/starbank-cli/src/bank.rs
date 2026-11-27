@@ -82,7 +82,7 @@ pub(crate) struct SignatureReport {
 }
 
 impl SignatureReport {
-	fn new(document: &BankDocument, context: Option<&SigningContext>) -> Self {
+	pub(crate) fn new(document: &BankDocument, context: Option<&SigningContext>) -> Self {
 		let status = SignatureState::from(verify_signature(document, context));
 		let digest = document
 			.signature()

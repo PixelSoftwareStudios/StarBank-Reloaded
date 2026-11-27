@@ -10,7 +10,8 @@ use starbank_fs::{
 use crate::{
 	args::BackupCommand,
 	backup::catalog,
-	bank::SHA256_BYTES,
+	bank::{SHA256_BYTES, SignatureReport, signing_context},
+	diff::BankDiff,
 	discovery::DisplayPath,
 	failure::{ErrorCode, Failure, Status},
 	output::{self, CommandName},
@@ -109,12 +110,23 @@ fn restore(
 	}
 	let mut catalog = catalog(limits)?;
 	let prepared = catalog.prepare_restore(source, current, path, BackupPlacement::Adjacent)?;
-	parse(prepared.selected().bytes(), limits)?;
+	let selected_document = parse(prepared.selected().bytes(), limits)?;
+	let current_document = parse(prepared.current().bytes(), limits).map_err(Failure::from);
+	// Restore reports signature verification when the destination provides a usable context.
+	let context = signing_context(source.path(), Default::default()).unwrap_or_default();
+	let signature = SignatureReport::new(&selected_document, context.as_ref());
+	let diff = current_document
+		.as_ref()
+		.ok()
+		.map(|current| BankDiff::new(current, &selected_document));
 
 	let mut report = RestoreReport {
 		snapshot: DisplayPath::new(path),
 		before_sha256: hex::encode(confirmed),
 		after_sha256: hex::encode(prepared.selected().fingerprint().sha256()),
+		diff,
+		comparison_diagnostic: current_document.as_ref().err(),
+		signature,
 		reversal_backup: None,
 		recovery: None,
 		outcome: RestoreOutcome::Prepared,
@@ -149,9 +161,22 @@ fn restore(
 	output::report(json, CommandName::BackupRestore, &report, |out| {
 		writeln!(
 			out,
-			"{:?} for {:?}.",
-			report.outcome, report.snapshot.display
+			"{:?} for {:?}. Signature {:?}.",
+			report.outcome, report.snapshot.display, report.signature.status
 		)?;
+		if let Some(diff) = &report.diff {
+			if diff.source_changed {
+				writeln!(
+					out,
+					"Bank bytes differ. {} sections have projected changes. Use --json for exact values.",
+					diff.sections.len()
+				)?;
+			} else {
+				writeln!(out, "The backup and live bank are byte-identical.")?;
+			}
+		} else if let Some(diagnostic) = report.comparison_diagnostic {
+			writeln!(out, "Comparison unavailable. {diagnostic}")?;
+		}
 		if let Some(reversal_backup) = &report.reversal_backup {
 			writeln!(out, "Reversal backup at {reversal_backup:?}.")?;
 		}
@@ -227,6 +252,9 @@ struct RestoreReport<'backup> {
 	snapshot: DisplayPath<'backup>,
 	before_sha256: String,
 	after_sha256: String,
+	diff: Option<BankDiff<'backup>>,
+	comparison_diagnostic: Option<&'backup Failure>,
+	signature: SignatureReport,
 	reversal_backup: Option<String>,
 	recovery: Option<String>,
 	outcome: RestoreOutcome,
