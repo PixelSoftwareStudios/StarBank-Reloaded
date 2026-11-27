@@ -62,6 +62,16 @@ const inventory = {
     },
   ],
 };
+const blockedInventory = {
+  ...inventory,
+  generation: "16",
+  status: "failed",
+  reason: "configuration_unavailable",
+  rootName: null,
+  incomplete: true,
+  maps: [],
+  banks: [],
+};
 const backups = {
   records: [
     {
@@ -122,6 +132,8 @@ function createBridge(engine, canOverwrite) {
   let openCount = 0;
   let saved = false;
   let malformedBackupList = false;
+  let inventoryResponse = canOverwrite ? blockedInventory : inventory;
+  let preferences = { ...settings };
 
   function dirtySnapshot(target) {
     const reply = JSON.parse(
@@ -149,11 +161,19 @@ function createBridge(engine, canOverwrite) {
       case "read_settings":
         return {
           value: {
-            settings,
+            settings: preferences,
             legacyRootPending: false,
             automaticBackupAvailable: canOverwrite,
           },
         };
+      case "change_setting":
+        assert.equal(args.change.key, "mapIndexWorkers");
+        assert(["auto", "1", "2", "3", "4"].includes(args.change.value));
+        preferences = {
+          ...preferences,
+          mapIndexWorkers: args.change.value,
+        };
+        return { value: null };
       case "read_backup_preferences":
         return { value: { location: { mode: "default" }, keepNewest: null } };
       case "list_open_requests":
@@ -163,7 +183,12 @@ function createBridge(engine, canOverwrite) {
       case "can_reveal_bank":
         return { value: false };
       case "refresh_inventory":
-        return { value: inventory };
+        return { value: inventoryResponse };
+      case "select_inventory_folder":
+        return { value: null };
+      case "use_automatic_inventory":
+        inventoryResponse = inventory;
+        return { value: inventoryResponse };
       case "inventory_backup_status":
         return { value: [{ bankId: "bank-a", state: "never_backed_up" }] };
       case "plugin:event|listen":
@@ -363,6 +388,58 @@ async function verifyRevert(page) {
   await button(page, "Undo").click();
   await status.waitFor();
   assert.equal(await goldField(page).inputValue(), "002");
+}
+
+async function openBank(page) {
+  await button(page, "Open Bank…").click();
+  await page.getByRole("heading", { name: initialName, exact: true }).waitFor();
+}
+
+async function verifyInventoryRecovery(page, bridge) {
+  await openBank(page);
+  await goldField(page).fill("002");
+  await button(page, "Settings").click();
+  const settingsPanel = page.getByRole("region", { name: "Settings" });
+  const blocked = settingsPanel.getByRole("status").filter({
+    hasText: "The saved bank folder could not be read.",
+  });
+  await blocked.waitFor();
+  assert.equal(await button(settingsPanel, "Refresh").count(), 0);
+  assert.equal(await button(settingsPanel, "Rebuild map index").count(), 0);
+  const workers = settingsPanel.getByRole("combobox", {
+    name: "Map index workers",
+    exact: true,
+  });
+  assert.equal(await workers.inputValue(), "auto");
+  await workers.selectOption("2");
+  await page.waitForFunction(
+    (select) => select.value === "2",
+    await workers.elementHandle(),
+  );
+  await button(settingsPanel, "Select Folder…").click();
+  await blocked.waitFor();
+  assert.equal(bridge.callsFor("select_inventory_folder").length, 1);
+  assert.equal(bridge.callsFor("use_automatic_inventory").length, 0);
+  await button(settingsPanel, "Use auto-detect").click();
+  await button(settingsPanel, "Refresh").waitFor();
+  assert.equal(bridge.callsFor("refresh_inventory").length, 1);
+  assert.equal(bridge.callsFor("use_automatic_inventory").length, 1);
+  await button(settingsPanel, "Back to editor").click();
+  assert.equal(await goldField(page).inputValue(), "002");
+  await button(page, "Settings").click();
+  assert.equal(await workers.inputValue(), "2");
+  await workers.selectOption("auto");
+  await page.waitForFunction(
+    (select) => select.value === "auto",
+    await workers.elementHandle(),
+  );
+  assert.deepEqual(bridge.callsFor("change_setting"), [
+    { change: { key: "mapIndexWorkers", value: "2" } },
+    { change: { key: "mapIndexWorkers", value: "auto" } },
+  ]);
+  await button(settingsPanel, "Back to editor").click();
+  assert.equal(await goldField(page).inputValue(), "002");
+  await button(page, "Apply edits").click();
 }
 
 async function verifyToolsMenu(page) {
@@ -571,6 +648,7 @@ async function verifyRenderer(browser, canOverwrite) {
     const bridge = createBridge(engine, canOverwrite);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (canOverwrite) await verifyInventoryRecovery(page, bridge);
     await button(
       page,
       /Synthetic Map.*1 bank without a recorded backup/,
@@ -581,14 +659,11 @@ async function verifyRenderer(browser, canOverwrite) {
     assert(firstMap && firstBank && options);
     assert(firstMap.y + firstMap.height <= firstBank.y);
     assert(firstBank.y < options.y);
-    await button(page, "Open Bank…").click();
-    await page
-      .getByRole("heading", { name: initialName, exact: true })
-      .waitFor();
+    if (!canOverwrite) await openBank(page);
     const footer = await page.locator(".editor-footer").boundingBox();
     assert(footer && footer.y + footer.height < 500);
     if (canOverwrite) await verifyToolsMenu(page);
-    await editGold(page, "002");
+    else await editGold(page, "002");
     await verifyRevert(page);
     await verifyBackupCopy(page, bridge, canOverwrite);
     if (canOverwrite) await verifyBackupRestoreReview(page, bridge);

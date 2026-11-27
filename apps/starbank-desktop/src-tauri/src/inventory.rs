@@ -13,6 +13,8 @@ mod batch;
 mod progress;
 mod projection;
 mod root_record;
+#[cfg(test)]
+mod root_recovery_tests;
 mod scan;
 
 pub(crate) use authority::BankAuthority;
@@ -45,12 +47,20 @@ pub(crate) struct InventoryService {
 #[derive(Default)]
 struct InventoryState {
 	manual_root: Option<ManualRoot>,
-	root_record_unavailable: bool,
+	root_record_status: RootRecordStatus,
 	active: Option<Cancellation>,
 	generation: u64,
 	banks: BTreeMap<String, BankAuthority>,
 	map_members: MapMembers,
 	ids: OpaqueIds,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RootRecordStatus {
+	#[default]
+	Current,
+	Unreadable,
+	WriteFailed,
 }
 
 enum ScanMode {
@@ -88,15 +98,12 @@ impl InventoryService {
 	}
 
 	pub(crate) fn with_root_record(mut self, path: Option<PathBuf>) -> Self {
-		if let Some(path) = path {
-			let store = RootRecordStore::new(path);
-			if let Ok(state) = self.state.get_mut() {
-				match store.load() {
-					Ok(root) => state.manual_root = root,
-					Err(_) => state.root_record_unavailable = true,
-				}
+		self.root_record = path.map(RootRecordStore::new);
+		if let Ok(state) = self.state.get_mut() {
+			match self.root_record.as_ref().map(RootRecordStore::load) {
+				Some(Ok(root)) => state.manual_root = root,
+				None | Some(Err(_)) => state.root_record_status = RootRecordStatus::Unreadable,
 			}
-			self.root_record = Some(store);
 		}
 		self
 	}
@@ -191,13 +198,17 @@ impl InventoryService {
 		notify: impl FnMut(InventoryProgress),
 	) -> Result<InventorySnapshot, InventoryError> {
 		let rebuilding = matches!(mode, ScanMode::RebuildMapIndex);
+		let lease = self.start_scan(mode)?;
+		let recovering = lease.root_record_status == RootRecordStatus::Unreadable;
+		if recovering && matches!(lease.change, RootChange::Keep) {
+			return Ok(blocked_saved_root(lease.generation));
+		}
 		let cache_path = self.cache_path.as_deref();
 		let cache = if rebuilding {
 			MapCache::Rebuild(cache_path.ok_or(InventoryError::MapIndexRebuildFailed)?)
 		} else {
 			MapCache::Reuse(cache_path)
 		};
-		let lease = self.start_scan(mode)?;
 		let mut progress = InventoryProgressPublisher::new(lease.generation, notify);
 		let ((mut snapshot, banks), accepted_root, rebuilt_cache) = collect_inventory(
 			lease.root.as_ref(),
@@ -223,8 +234,29 @@ impl InventoryService {
 			RootChange::Manual => accepted_root.as_ref().map(Some),
 			RootChange::Automatic => Some(None),
 		};
-		if let (Some(store), Some(manual)) = (&self.root_record, record_value) {
-			state.root_record_unavailable = store.save(manual).is_err();
+		if recovering {
+			let Some(manual) = record_value else {
+				return Ok(blocked_saved_root(lease.generation));
+			};
+			if matches!(lease.change, RootChange::Manual)
+				&& snapshot.status != InventoryStatus::Ready
+			{
+				return Ok(blocked_saved_root(lease.generation));
+			}
+			state.root_record_status = if let Some(store) = &self.root_record {
+				if store.recover(manual).is_err() {
+					return Ok(blocked_saved_root(lease.generation));
+				}
+				RootRecordStatus::Current
+			} else {
+				// An explicit scope can be used for this session without a config directory.
+				RootRecordStatus::WriteFailed
+			};
+		} else if let (Some(store), Some(manual)) = (&self.root_record, record_value) {
+			state.root_record_status = match store.save(manual) {
+				Ok(()) => RootRecordStatus::Current,
+				Err(_) => RootRecordStatus::WriteFailed,
+			};
 		}
 		match lease.change {
 			RootChange::Keep => {
@@ -241,7 +273,7 @@ impl InventoryService {
 		snapshot.generation = lease.generation.to_string();
 		state.banks = banks;
 		state.map_members = snapshot.map_members();
-		if state.root_record_unavailable {
+		if state.root_record_status == RootRecordStatus::WriteFailed {
 			snapshot.incomplete = true;
 			snapshot
 				.reason
@@ -280,11 +312,22 @@ impl InventoryService {
 			service: self,
 			root,
 			change,
+			root_record_status: state.root_record_status,
 			ids: state.ids.clone(),
 			generation: state.generation,
 			cancellation,
 		})
 	}
+}
+
+fn blocked_saved_root(generation: u64) -> InventorySnapshot {
+	let mut snapshot = InventorySnapshot::empty(
+		InventoryStatus::Failed,
+		Some(InventoryReason::ConfigurationUnavailable),
+	);
+	snapshot.generation = generation.to_string();
+	snapshot.incomplete = true;
+	snapshot
 }
 
 enum RootChange {
@@ -297,6 +340,7 @@ struct ScanLease<'a> {
 	service: &'a InventoryService,
 	root: Option<ManualRoot>,
 	change: RootChange,
+	root_record_status: RootRecordStatus,
 	ids: OpaqueIds,
 	generation: u64,
 	cancellation: Cancellation,

@@ -28,6 +28,8 @@ const FAILURE_TEXT = {
     "The saved bank folder could not be read or updated.",
 };
 const INVENTORY_FAILURE = "The bank inventory could not be loaded.";
+const ROOT_RECOVERY_REQUIRED =
+  "The saved bank folder could not be read. Select a folder or use auto-detect to continue.";
 
 export function openInventoryBank(id: string, control: string) {
   return invokeChecked(fileDialogReply, "open_bank_id", { id, control });
@@ -105,16 +107,22 @@ export function useInventory({
     backupGeneration,
   );
 
+  const rootRecoveryRequired =
+    snapshot?.status === "failed" &&
+    snapshot.reason === "configuration_unavailable";
   const controls = {
-    onRefresh: () => void run("refresh_inventory"),
+    onRefresh: rootRecoveryRequired
+      ? undefined
+      : () => void run("refresh_inventory"),
     onRebuildMapIndex:
       snapshot?.status === "ready" && snapshot.canRebuildMapIndex
         ? () => void run("rebuild_map_index")
         : undefined,
     onSelectDirectory: () => void run("select_inventory_folder"),
-    onUseAutomatic: snapshot?.manual
-      ? () => void run("use_automatic_inventory")
-      : undefined,
+    onUseAutomatic:
+      snapshot?.manual || rootRecoveryRequired
+        ? () => void run("use_automatic_inventory")
+        : undefined,
     onCancel: progress
       ? () => {
           void invoke("cancel_inventory", {
@@ -144,6 +152,13 @@ export function useInventory({
         : {}),
     };
   }
+  if (rootRecoveryRequired) {
+    return {
+      status: "failed",
+      controls,
+      message: message ?? ROOT_RECOVERY_REQUIRED,
+    };
+  }
   if (cancelled) return { status: "cancelled", controls, rootName, message };
   if (snapshot?.status === "ready") {
     return {
@@ -164,7 +179,7 @@ export function useInventory({
       rootName,
     };
   }
-  if (message || snapshot?.status === "failed") {
+  if (message || failure || snapshot?.status === "failed") {
     return {
       status: "failed",
       message: message ?? failure ?? INVENTORY_FAILURE,

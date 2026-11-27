@@ -29,17 +29,34 @@ impl RootRecordStore {
 		let Some(snapshot) = read_record(&self.0)? else {
 			return Ok(None);
 		};
-		let record: RootRecord = serde_json::from_slice(snapshot.bytes())?;
-		if record.version != RECORD_VERSION || record.platform != std::env::consts::OS {
-			return Err(invalid_record());
-		}
-		record.manual.map(StoredRoot::into_root).transpose()
+		decode_root(snapshot.bytes())
 	}
 
 	pub(super) fn save(&self, manual: Option<&ManualRoot>) -> io::Result<()> {
+		self.publish(manual, read_record(&self.0)?)
+	}
+
+	pub(super) fn recover(&self, manual: Option<&ManualRoot>) -> io::Result<()> {
+		let previous = read_record(&self.0)?;
+		if previous
+			.as_ref()
+			.is_some_and(|snapshot| decode_root(snapshot.bytes()).is_ok())
+		{
+			return Err(io::Error::new(
+				io::ErrorKind::ResourceBusy,
+				"another process recovered the root record",
+			));
+		}
+		self.publish(manual, previous)
+	}
+
+	fn publish(
+		&self,
+		manual: Option<&ManualRoot>,
+		previous: Option<starbank_fs::FileSnapshot>,
+	) -> io::Result<()> {
 		let parent = self.0.parent().ok_or_else(invalid_record)?;
 		fs::create_dir_all(parent)?;
-		let previous = read_record(&self.0)?;
 		let record = RootRecord {
 			version: RECORD_VERSION,
 			platform: std::env::consts::OS.to_owned(),
@@ -119,6 +136,14 @@ impl StoredRoot {
 			identity: Some(self.identity),
 		})
 	}
+}
+
+fn decode_root(bytes: &[u8]) -> io::Result<Option<ManualRoot>> {
+	let record: RootRecord = serde_json::from_slice(bytes)?;
+	if record.version != RECORD_VERSION || record.platform != std::env::consts::OS {
+		return Err(invalid_record());
+	}
+	record.manual.map(StoredRoot::into_root).transpose()
 }
 
 fn read_record(path: &Path) -> io::Result<Option<starbank_fs::FileSnapshot>> {
