@@ -245,7 +245,7 @@ impl Session {
 		ids: Arc<Identities>,
 	) -> Result<Revision, EditorError> {
 		self.require_revision(expected)?;
-		if self.document.source() == bytes.as_ref() {
+		if self.document.source() == bytes.as_ref() && self.ids == ids {
 			return Ok(self.revision);
 		}
 		let document = parse(&bytes, self.limits).map_err(EditorError::Parse)?;

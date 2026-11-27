@@ -120,6 +120,74 @@ fn raw_document_only_changes_leave_byte_identical_duplicate_sections_clean() {
 }
 
 #[test]
+fn reverting_byte_identical_raw_xml_restores_checkpoint_ids_and_undoes_cleanly() {
+	let mut session = Session::open(DUPLICATE_SECTIONS, Limits::default(), None).unwrap();
+	let opening_ids = section_ids(&session);
+	let value_id = first_value_id(&session);
+	let edited = session
+		.set_values(
+			Revision::INITIAL,
+			&[ValueChange {
+				id: value_id,
+				value: "031",
+			}],
+		)
+		.unwrap();
+	let pending = session.prepare(edited, ExportSigning::Preserve).unwrap();
+	let saved = pending.bytes().to_vec();
+	assert_eq!(
+		session.acknowledge_verified_active_save(pending).unwrap(),
+		edited
+	);
+
+	let away = session.replace_raw(edited, b"<Bank/>").unwrap();
+	let same_saved = session.replace_raw(away, &saved).unwrap();
+	let raw_ids = section_ids(&session);
+	assert_ne!(raw_ids, opening_ids);
+	assert!(!session.is_dirty());
+
+	let reverted = session.revert_to_saved(same_saved).unwrap();
+	assert!(reverted > same_saved);
+	assert_eq!(session.document().source(), saved);
+	assert_eq!(section_ids(&session), opening_ids);
+	assert_eq!(first_value_id(&session), value_id);
+	assert_eq!(session.revert_to_saved(reverted).unwrap(), reverted);
+	assert!(!session.is_dirty());
+
+	let undone = session.undo(reverted).unwrap();
+	assert_eq!(section_ids(&session), raw_ids);
+	assert_eq!(session.document().source(), saved);
+	let redone = session.redo(undone).unwrap();
+	assert_eq!(section_ids(&session), opening_ids);
+	assert_eq!(session.document().source(), saved);
+
+	let raw_opening = session.replace_raw(redone, DUPLICATE_SECTIONS).unwrap();
+	assert_ne!(section_ids(&session), opening_ids);
+	let reset = session.reset(raw_opening).unwrap();
+	assert!(reset > raw_opening);
+	assert_eq!(section_ids(&session), opening_ids);
+	assert_eq!(session.document().source(), DUPLICATE_SECTIONS);
+	assert!(session.is_dirty());
+	assert_eq!(session.dirty_sections().unwrap().count(), 1);
+	let edited_again = session
+		.set_values(
+			reset,
+			&[ValueChange {
+				id: value_id,
+				value: "041",
+			}],
+		)
+		.unwrap();
+	assert!(
+		session
+			.revert_section(edited_again, opening_ids[0])
+			.unwrap()
+			> edited_again
+	);
+	assert_eq!(session.document().source(), DUPLICATE_SECTIONS);
+}
+
+#[test]
 fn reverting_signed_utf16_restores_exact_bytes_even_after_a_later_raw_edit() {
 	let xml = "<?xml version='1.0' encoding='UTF-16'?>\r\n<Bank><Section name='星'><Key name='K'><Value int='001'/></Key></Section></Bank>\r\n";
 	let opening: Vec<_> = std::iter::once(0xfeff)
