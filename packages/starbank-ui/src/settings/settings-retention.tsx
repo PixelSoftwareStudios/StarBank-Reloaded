@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { EditorDialog } from "./editor-dialog";
+import { EditorDialog } from "../editor/editor-dialog";
 
 interface OlderBackup {
   readonly name: string;

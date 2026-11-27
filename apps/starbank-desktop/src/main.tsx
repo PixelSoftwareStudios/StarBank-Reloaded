@@ -221,6 +221,7 @@ function DesktopApp() {
             ? document.projection.breadcrumbs
             : undefined),
         dirty: snapshot.dirty,
+        dirtySectionCount: snapshot.dirty_section_count,
         sections: displaySections(snapshot),
         signatureStatus: snapshot.signature_status,
         xml: decodeBankXml(raw.bytes),
@@ -557,6 +558,7 @@ function DesktopApp() {
     onReplaceXml: (target, xml) =>
       update(target, { kind: "replace_raw_text" }, encodeBankXml(xml)),
     onReset: (target) => update(target, { kind: "reset" }),
+    onRevertToSaved: (target) => update(target, { kind: "revert_to_saved" }),
     onUndo: document?.canUndo
       ? (target) => update(target, { kind: "undo" })
       : undefined,
@@ -774,6 +776,7 @@ function displaySections(snapshot: EngineSnapshot) {
   return snapshot.sections.map((section) => ({
     id: section.id,
     name: section.name ?? "Unnamed section",
+    dirty: section.dirty,
     keys: section.keys.map((key) => ({
       id: key.id,
       name: key.name ?? "Unnamed key",

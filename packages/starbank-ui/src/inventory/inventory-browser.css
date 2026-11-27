@@ -27,11 +27,8 @@
 .inventory-actions button,
 .inventory-bank-filters button,
 .inventory-more {
-  border: 1px solid var(--control-edge);
-  border-radius: var(--control-radius);
-  background: var(--map-field-bg);
+  @apply rounded-control border border-control-edge bg-field text-ink;
   padding: 0.2rem 0.45rem;
-  color: var(--shell-fg);
   font-size: 0.8125rem;
 }
 
@@ -66,8 +63,7 @@
 }
 
 .inventory-bank-filters button[aria-pressed="true"] {
-  background: var(--map-selected-bg);
-  font-weight: 600;
+  @apply bg-selected font-semibold;
 }
 
 .inventory-maps,

@@ -8,7 +8,7 @@ import type {
   EditorActionResult,
   EditorTarget,
 } from "starbank-editor";
-import { EditorHelpButton, EditorTooltip } from "./editor-tooltip";
+import { EditorHelpButton, EditorTooltip } from "../shared/editor-tooltip";
 import {
   REDO_SHORTCUT,
   SAVE_SHORTCUT,
@@ -146,6 +146,7 @@ export function EditorActions({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const { onSave, onSaveAs, onExport, onReset, onUndo, onRedo } = controller;
+  const { document, onRevertToSaved } = controller;
   const save = onSave ?? onSaveAs ?? onExport;
   useEditorShortcuts(root, {
     disabled,
@@ -204,6 +205,27 @@ export function EditorActions({
       label: "Copy bank XML to clipboard",
       help: "Copy the prepared XML of the open bank",
       action: controller.onCopy,
+    },
+    {
+      id: "revert-to-saved",
+      group: "bank",
+      label: "Revert to Last Save",
+      help: "Restore the last saved bank in the editor",
+      action:
+        document?.dirty && onRevertToSaved
+          ? async (target) => {
+              if (
+                !window.confirm(
+                  "Replace the unsaved edits with the last saved bank?",
+                )
+              )
+                return { ok: true };
+              const result = await onRevertToSaved(target);
+              return result.ok
+                ? { ...result, message: "Reverted to the last save." }
+                : result;
+            }
+          : undefined,
     },
   ];
   const available = actions.flatMap(({ action, ...item }) =>

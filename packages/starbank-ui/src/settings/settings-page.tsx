@@ -4,8 +4,8 @@ import {
   AccountScopePicker,
   type AccountScopeSelection,
   InventoryActions,
-} from "./inventory-browser";
-import type { MapInventory } from "./map-sidebar";
+} from "../inventory/inventory-browser";
+import type { MapInventory } from "../inventory/map-sidebar";
 import {
   SettingsPlatformDetails,
   type SettingsPlatformInfo,
@@ -47,6 +47,7 @@ export interface SettingsPageProps {
   readonly readOnly?: boolean;
   readonly focusOnMount?: boolean;
   readonly breadcrumbAvailable?: boolean;
+  readonly revertToSavedAvailable?: boolean;
   readonly onRecover?: () => void;
   readonly platformInfo?: SettingsPlatformInfo;
   readonly backupSettings?: ReactNode;
@@ -94,6 +95,7 @@ export function SettingsPage({
   readOnly = false,
   focusOnMount = false,
   breadcrumbAvailable = false,
+  revertToSavedAvailable = false,
   onRecover,
   platformInfo,
   backupSettings,
@@ -228,6 +230,11 @@ export function SettingsPage({
         >
           Auto re-sign banks on save
         </Toggle>
+        <p className="settings-page-note">
+          Reset restores the bank as it was opened.
+          {revertToSavedAvailable &&
+            " Use Revert to Last Save to restore the last verified save."}
+        </p>
         {backupAvailable && (
           <>
             <ChoiceField

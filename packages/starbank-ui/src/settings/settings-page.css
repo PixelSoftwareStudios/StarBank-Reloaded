@@ -158,6 +158,7 @@
 
   :root[data-starbank-theme] .document-editor {
     --editor-danger: light-dark(#9e2635, #ff9da8);
+    --editor-unsaved: light-dark(#88530d, #e4ae62);
     --editor-primary-bg: light-dark(#2466a6, #477fbc);
     --editor-primary-text: light-dark(white, #070e16);
     --xml-tag: light-dark(#075bb4, #a0c9ff);

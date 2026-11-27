@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/app-shell.tsx",
-    "./settings": "./src/settings-page.tsx",
-    "./settings-retention": "./src/settings-retention.tsx",
-    "./settings.css": "./src/settings-page.css",
-    "./styles.css": "./src/styles.css"
+    ".": "./src/index.ts",
+    "./settings": "./src/settings/settings-page.tsx",
+    "./settings-retention": "./src/settings/settings-retention.tsx",
+    "./settings.css": "./src/settings/settings-page.css",
+    "./styles.css": "./src/styles/styles.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

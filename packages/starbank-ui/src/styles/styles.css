@@ -11,13 +11,27 @@
 @import "@heroui/styles/components/separator.css" layer(components);
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/tooltip.css" layer(components);
-@import "./editor.css";
-@import "./bank-breadcrumbs.css";
-@import "./simple-editor.css";
+@import "../editor/editor.css";
+@import "../editor/bank-breadcrumbs.css";
+@import "../editor/simple-editor.css";
 
-@import "./inventory-browser.css";
+@import "../inventory/inventory-browser.css";
 
-@source "./";
+@source "../";
+
+@theme inline {
+  --color-canvas: var(--workspace-bg);
+  --color-surface: var(--map-pane-bg);
+  --color-ink: var(--shell-fg);
+  --color-muted: var(--shell-muted);
+  --color-line: var(--shell-divider);
+  --color-field: var(--map-field-bg);
+  --color-hover: var(--map-hover-bg);
+  --color-selected: var(--map-selected-bg);
+  --color-focus: var(--map-focus);
+  --color-control-edge: var(--control-edge);
+  --radius-control: var(--control-radius);
+}
 
 :root {
   color-scheme: light dark;
@@ -60,13 +74,11 @@
 }
 
 .starbank-shell {
-  display: grid;
+  @apply grid bg-canvas text-ink;
   grid-template:
     "workspace" minmax(12rem, 1fr)
     "maps" auto;
   min-height: 100dvh;
-  background: var(--workspace-bg);
-  color: var(--shell-fg);
 }
 
 .bank-workspace {
@@ -74,12 +86,11 @@
 }
 
 .map-pane {
+  @apply grid border-line bg-surface;
   grid-area: maps;
-  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.625rem;
-  background: var(--map-pane-bg);
-  border-block-start: 1px solid var(--shell-divider);
+  border-block-start-width: 1px;
 }
 
 .map-divider {
@@ -89,7 +100,7 @@
 }
 
 .empty-message {
-  color: var(--shell-muted);
+  @apply text-muted;
 }
 
 .map-search {
@@ -109,14 +120,10 @@
 }
 
 .map-search input {
-  width: 100%;
+  @apply w-full rounded-control border border-control-edge bg-field text-sm;
   min-block-size: var(--control-height);
-  border: 1px solid var(--control-edge);
-  border-radius: var(--control-radius);
   padding: 0.25rem 0.5rem;
   padding-inline-start: 1.9rem;
-  background: var(--map-field-bg);
-  font-size: 0.875rem;
   color: inherit;
 }
 
@@ -143,13 +150,12 @@
 }
 
 .map-list button:hover {
-  background: var(--map-hover-bg);
+  @apply bg-hover;
 }
 
 .map-list button[aria-current="true"] {
-  background: var(--map-selected-bg);
+  @apply bg-selected font-semibold;
   border-inline-start-color: var(--selection-edge);
-  font-weight: 600;
 }
 
 .map-list .empty-message:empty {

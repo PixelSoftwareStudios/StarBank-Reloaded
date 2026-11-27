@@ -80,7 +80,11 @@ export function TableEditor({
   const rowsInScope = useMemo(() => {
     const visible = unified ? sections : section ? [section] : [];
     return visible.flatMap((item) =>
-      item.rows.map((row) => ({ row, sectionName: item.name })),
+      item.rows.map((row) => ({
+        row,
+        sectionName: item.name,
+        sectionDirty: item.dirty,
+      })),
     );
   }, [section, sections, unified]);
   const visibleRows = useMemo(() => {
@@ -166,7 +170,10 @@ export function TableEditor({
     });
   }
 
-  function renderRow({ row, sectionName }: TableRowProjection, index?: number) {
+  function renderRow(
+    { row, sectionName, sectionDirty }: TableRowProjection,
+    index?: number,
+  ) {
     const editable = canEdit && row.editable !== false;
     const edited = values?.get(row.id);
     const value = edited ?? row.value;
@@ -183,8 +190,14 @@ export function TableEditor({
         data-bank-row-index={index}
       >
         {unified && (
-          <td title={windowed ? sectionName : undefined}>
+          <td
+            aria-description={sectionDirty ? "Unsaved changes" : undefined}
+            title={windowed ? sectionName : undefined}
+          >
             {sectionName || "Unnamed section"}
+            {sectionDirty && (
+              <span className="editor-section-dirty" aria-hidden="true" />
+            )}
           </td>
         )}
         <th scope="row" title={windowed ? name : undefined}>
@@ -214,7 +227,12 @@ export function TableEditor({
           )}
           {name || "Unnamed key"}
         </th>
-        <td title={windowed ? row.type : undefined}>{row.type || "Unknown"}</td>
+        <td
+          className="editor-table-type"
+          title={windowed ? row.type : undefined}
+        >
+          {row.type || "Unknown"}
+        </td>
         <td>
           {windowed || editable || values?.has(row.id) ? (
             <input
@@ -268,6 +286,7 @@ export function TableEditor({
                 key={item.id}
                 type="button"
                 aria-current={item.id === section?.id ? "true" : undefined}
+                aria-description={item.dirty ? "Unsaved changes" : undefined}
                 onClick={() => {
                   setSectionId(item.id);
                   selectionAnchor.current = undefined;
@@ -276,6 +295,9 @@ export function TableEditor({
                 }}
               >
                 {item.name || "Unnamed section"}
+                {item.dirty && (
+                  <span className="editor-section-dirty" aria-hidden="true" />
+                )}
               </button>
             ))}
           </div>

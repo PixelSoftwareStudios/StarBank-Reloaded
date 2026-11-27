@@ -10,12 +10,19 @@ import {
 } from "react";
 import type { BankEditorController } from "starbank-editor";
 import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
-import { EditorPane } from "./editor-pane";
-import { type BankListItem, useBankAccountScope } from "./inventory-browser";
-import { resolveMapContext } from "./map-context";
-import { type MapInventory, type MapOptions, MapSidebar } from "./map-sidebar";
-import type { ChangeSetting } from "./settings-page";
-import type { SettingsPlatformInfo } from "./settings-platform";
+import { EditorPane } from "../editor/editor-pane";
+import {
+  type BankListItem,
+  useBankAccountScope,
+} from "../inventory/inventory-browser";
+import { resolveMapContext } from "../inventory/map-context";
+import {
+  type MapInventory,
+  type MapOptions,
+  MapSidebar,
+} from "../inventory/map-sidebar";
+import type { ChangeSetting } from "../settings/settings-page";
+import type { SettingsPlatformInfo } from "../settings/settings-platform";
 import { SidebarSplitter } from "./sidebar-splitter";
 
 interface PreferencesController {
@@ -27,10 +34,12 @@ interface PreferencesController {
   automaticBackupAvailable?: boolean;
 }
 
-let settingsPage: Promise<typeof import("./settings-page")> | undefined;
+let settingsPage:
+  | Promise<typeof import("../settings/settings-page")>
+  | undefined;
 
 export function preloadSettingsPage() {
-  settingsPage ??= import("./settings-page");
+  settingsPage ??= import("../settings/settings-page");
   return settingsPage;
 }
 
@@ -161,6 +170,7 @@ export function AppShell({
                 readOnly={preferences.readOnly}
                 backupAvailable={preferences.automaticBackupAvailable}
                 breadcrumbAvailable={breadcrumbAvailable}
+                revertToSavedAvailable={Boolean(editor?.onRevertToSaved)}
                 focusOnMount
                 platformInfo={platformInfo}
                 backupSettings={backupSettings}
@@ -194,28 +204,3 @@ export function AppShell({
     </div>
   );
 }
-
-export { Dropdown } from "@heroui/react/dropdown";
-export {
-  type BankEditorController,
-  type BankEditorDocument,
-  type EditorAction,
-  type EditorActionResult,
-  type EditorRow,
-  type EditorSection,
-  type EditorTarget,
-  type EditorValueEdit,
-  normalizeDraft,
-  prepareTableDraft,
-} from "starbank-editor";
-export { preloadEditorTools, preloadRawEditor } from "./bank-editor";
-export { ToolsMenuTrigger } from "./editor-actions";
-export type { BankBackupPresence } from "./inventory-browser";
-export {
-  filterMaps,
-  type MapFilters,
-  type MapInventory,
-  type MapListItem,
-  type MapOptions,
-} from "./map-sidebar";
-export type { SettingsPlatformInfo } from "./settings-platform";

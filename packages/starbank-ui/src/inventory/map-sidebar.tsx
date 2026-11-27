@@ -1,6 +1,10 @@
 import { Search } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 import {
+  SEARCH_SHORTCUT,
+  useMapSearchShortcut,
+} from "../editor/keyboard-shortcuts";
+import {
   type AccountScopeSelection,
   BankBrowser,
   type BankBrowserModel,
@@ -9,7 +13,6 @@ import {
   type InventoryControls,
   mapsWithUnbackedBanks,
 } from "./inventory-browser";
-import { SEARCH_SHORTCUT, useMapSearchShortcut } from "./keyboard-shortcuts";
 import { MapArchiveDate } from "./map-context";
 
 const MAP_PAGE_SIZE = 80;

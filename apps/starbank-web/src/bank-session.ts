@@ -303,10 +303,12 @@ function projectDocument(
     xml: xmlDecoder.decode(bytes),
     sourceEncoding,
     dirty: snapshot.dirty,
+    dirtySectionCount: snapshot.dirty_section_count,
     signatureStatus: signatureText[snapshot.signature_status],
     sections: snapshot.sections.map((section) => ({
       id: section.id,
       name: section.name ?? "(Unnamed section)",
+      dirty: section.dirty,
       keys: section.keys.map((key) => ({
         id: key.id,
         name: key.name ?? "(Unnamed key)",

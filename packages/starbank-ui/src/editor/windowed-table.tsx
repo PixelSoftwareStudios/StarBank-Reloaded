@@ -19,6 +19,7 @@ const INITIAL_ROW_HEIGHT = 34;
 export interface TableRowProjection {
   row: EditorRow;
   sectionName: string;
+  sectionDirty?: boolean;
 }
 
 interface WindowPosition {

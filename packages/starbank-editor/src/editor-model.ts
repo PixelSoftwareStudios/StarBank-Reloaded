@@ -28,6 +28,7 @@ export interface EditorKey {
 export interface EditorSection {
   id: string;
   name: string;
+  dirty?: boolean;
   keys?: readonly EditorKey[];
   rows: readonly EditorRow[];
 }
@@ -37,6 +38,7 @@ export interface BankEditorDocument extends EditorTarget {
   breadcrumbs?: readonly string[];
   xml: string;
   dirty: boolean;
+  dirtySectionCount?: number;
   sections: readonly EditorSection[];
   signatureStatus?: string;
 }
@@ -94,6 +96,7 @@ export interface BankEditorController {
   onExport?: EditorAction;
   onCopy?: EditorAction;
   onReset?: EditorAction;
+  onRevertToSaved?: EditorAction;
   onUndo?: EditorAction;
   onRedo?: EditorAction;
 }

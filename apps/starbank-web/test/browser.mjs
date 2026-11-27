@@ -411,13 +411,21 @@ async function verify(name) {
     await value.waitFor();
     assert.equal(await value.inputValue(), "001");
     await page.getByRole("columnheader", { name: "Section" }).waitFor();
+    const section = page.getByRole("cell", { name: "Player", exact: true });
+    assert.equal(await section.getAttribute("aria-description"), null);
 
     await value.fill("1,000,000");
+    assert.equal(await section.getAttribute("aria-description"), null);
     await page.getByRole("button", { name: "Apply edits" }).click();
     await page
       .getByRole("status")
-      .filter({ hasText: "Unsaved changes" })
+      .filter({ hasText: "Unsaved changes in 1 section" })
       .waitFor();
+    assert.equal(
+      await section.getAttribute("aria-description"),
+      "Unsaved changes",
+    );
+    await section.locator(".editor-section-dirty").waitFor();
     assert.equal(await value.inputValue(), "1,000,000");
     await downloadOpeningBackup(page, initial);
     await downloadCopy(page, edited, "Control+s");

@@ -11,7 +11,7 @@ import {
   filterBanks,
   mapsWithUnbackedBanks,
   resolveBankAccountScope,
-} from "../../../packages/starbank-ui/src/inventory-browser";
+} from "../../../packages/starbank-ui/src/inventory/inventory-browser";
 
 const maps = [
   { id: "alpha", name: "Alpha", isBlizzard: false, hasBankFiles: true },

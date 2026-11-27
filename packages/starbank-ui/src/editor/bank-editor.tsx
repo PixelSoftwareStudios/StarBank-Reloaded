@@ -19,6 +19,7 @@ import {
 } from "starbank-editor";
 import type { EngineDiff } from "starbank-engine-client/protocol";
 import type { AppSettings } from "starbank-platform/settings";
+import { type MapContext, MapContextDetails } from "../inventory/map-context";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
 import {
@@ -28,7 +29,6 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
-import { type MapContext, MapContextDetails } from "./map-context";
 import { RawDraftDialog } from "./raw-draft-dialog";
 import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
@@ -262,11 +262,15 @@ export function BankEditor({
     }
   }
 
-  const status =
-    notice ||
-    controller.status ||
-    profileStatus(profileController?.current) ||
-    (document.dirty ? "Unsaved changes" : "");
+  const status = busy
+    ? "Working…"
+    : notice || controller.status || profileStatus(profileController?.current);
+  const dirtyCount = document.dirtySectionCount ?? 0;
+  const dirtyStatus = document.dirty
+    ? dirtyCount > 0
+      ? `Unsaved changes in ${dirtyCount} ${dirtyCount === 1 ? "section" : "sections"}`
+      : "Unsaved changes"
+    : undefined;
   const showBreadcrumbs =
     Boolean(document.breadcrumbs?.length) &&
     settings?.showBreadcrumbs !== false;
@@ -528,7 +532,10 @@ export function BankEditor({
 
       <footer className="editor-footer">
         <div className="editor-status" role="status">
-          {busy ? "Working…" : status}
+          {status}
+          {dirtyStatus && (
+            <span className="editor-dirty-status">{dirtyStatus}</span>
+          )}
           {document.signatureStatus && <span>{document.signatureStatus}</span>}
           {controller.backupStatus && <span>{controller.backupStatus}</span>}
         </div>

@@ -298,6 +298,52 @@ async function editGold(page, value) {
   await button(page, "Undo").click({ trial: true });
 }
 
+async function verifyRevert(page) {
+  const status = page
+    .getByRole("status")
+    .filter({ hasText: "Unsaved changes in 1 section" });
+  const section = page
+    .getByRole("navigation", { name: "Bank sections" })
+    .getByRole("button", { name: "Player", exact: true });
+  const more = button(page, "More save options");
+  const revert = page.getByRole("menuitem", {
+    name: "Revert to Last Save",
+    exact: true,
+  });
+  await status.waitFor();
+  await section.locator(".editor-section-dirty").waitFor();
+  assert.equal(
+    await section.getAttribute("aria-description"),
+    "Unsaved changes",
+  );
+
+  for (const approve of [false, true]) {
+    await more.press("ArrowDown");
+    const decision = page.waitForEvent("dialog").then(async (dialog) => {
+      assert.equal(dialog.type(), "confirm");
+      assert.equal(
+        dialog.message(),
+        "Replace the unsaved edits with the last saved bank?",
+      );
+      if (approve) await dialog.accept();
+      else await dialog.dismiss();
+    });
+    await revert.click();
+    await decision;
+    if (!approve) assert.equal(await goldField(page).inputValue(), "002");
+  }
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Reverted to the last save." })
+    .waitFor();
+  assert.equal(await goldField(page).inputValue(), "001");
+  assert.equal(await section.getAttribute("aria-description"), null);
+  assert.equal(await status.count(), 0);
+  await button(page, "Undo").click();
+  await status.waitFor();
+  assert.equal(await goldField(page).inputValue(), "002");
+}
+
 async function verifyToolsMenu(page) {
   const tools = button(page, "Tools");
   await tools.press("Enter");
@@ -506,6 +552,7 @@ async function verifyRenderer(browser, canOverwrite) {
     assert(footer && footer.y + footer.height < 500);
     if (canOverwrite) await verifyToolsMenu(page);
     await editGold(page, "002");
+    await verifyRevert(page);
     await verifyBackupCopy(page, bridge, canOverwrite);
     if (canOverwrite) await verifyBackupRestoreReview(page, bridge);
     await verifyBankNavigation(page, bridge, canOverwrite);
@@ -513,7 +560,7 @@ async function verifyRenderer(browser, canOverwrite) {
     assert.deepEqual(errors, []);
     assert.deepEqual(rejected, []);
     console.log(
-      `Chromium ${browser.version()} desktop renderer passed backup copy and guarded navigation (${canOverwrite ? "overwrite" : "save as"}).`,
+      `Chromium ${browser.version()} desktop renderer passed dirty tracking, save checkpoint revert, backup copy and guarded navigation (${canOverwrite ? "overwrite" : "save as"}).`,
     );
   } finally {
     await context.close();
