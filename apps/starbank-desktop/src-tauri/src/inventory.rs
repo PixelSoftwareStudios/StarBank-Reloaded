@@ -29,7 +29,7 @@ use progress::InventoryProgressPublisher;
 use projection::OpaqueIds;
 pub(crate) use projection::{InventoryReason, InventorySnapshot, InventoryStatus};
 use root_record::{ManualRoot, RootRecordStore};
-use scan::{MapCache, MapScanOptions, check_cancelled, collect_inventory};
+use scan::{MapCache, MapScanOptions, collect_inventory};
 
 const PICK_FOLDER_TITLE: &str = "Select SC2 Bank Folder";
 const OPEN_REQUEST: &str = "open";
@@ -210,7 +210,7 @@ impl InventoryService {
 			MapCache::Reuse(cache_path)
 		};
 		let mut progress = InventoryProgressPublisher::new(lease.generation, notify);
-		let ((mut snapshot, banks), accepted_root, rebuilt_cache) = collect_inventory(
+		let collected = collect_inventory(
 			lease.root.as_ref(),
 			map_roots,
 			MapScanOptions { cache, max_workers },
@@ -219,68 +219,7 @@ impl InventoryService {
 			&lease.cancellation,
 			&mut progress,
 		)?;
-		let mut state = self.state.lock().map_err(|_| InventoryError::Unavailable)?;
-		check_cancelled(&lease.cancellation)?;
-		if rebuilding && snapshot.status == InventoryStatus::Ready {
-			// The lease serializes cancellation with the final replacement.
-			rebuilt_cache
-				.filter(|_| !snapshot.incomplete)
-				.ok_or(InventoryError::MapIndexRebuildFailed)?
-				.publish()
-				.map_err(|_| InventoryError::MapIndexRebuildFailed)?;
-		}
-		let record_value = match lease.change {
-			RootChange::Keep => None,
-			RootChange::Manual => accepted_root.as_ref().map(Some),
-			RootChange::Automatic => Some(None),
-		};
-		if recovering {
-			let Some(manual) = record_value else {
-				return Ok(blocked_saved_root(lease.generation));
-			};
-			if matches!(lease.change, RootChange::Manual)
-				&& snapshot.status != InventoryStatus::Ready
-			{
-				return Ok(blocked_saved_root(lease.generation));
-			}
-			state.root_record_status = if let Some(store) = &self.root_record {
-				if store.recover(manual).is_err() {
-					return Ok(blocked_saved_root(lease.generation));
-				}
-				RootRecordStatus::Current
-			} else {
-				// An explicit scope can be used for this session without a config directory.
-				RootRecordStatus::WriteFailed
-			};
-		} else if let (Some(store), Some(manual)) = (&self.root_record, record_value) {
-			state.root_record_status = match store.save(manual) {
-				Ok(()) => RootRecordStatus::Current,
-				Err(_) => RootRecordStatus::WriteFailed,
-			};
-		}
-		match lease.change {
-			RootChange::Keep => {
-				if accepted_root.is_some() {
-					state.manual_root = accepted_root;
-				}
-			}
-			RootChange::Manual => {
-				// Keep an invalid explicit selection visible so a refresh cannot use a different scope.
-				state.manual_root = accepted_root.or_else(|| lease.root.clone());
-			}
-			RootChange::Automatic => state.manual_root = None,
-		}
-		snapshot.generation = lease.generation.to_string();
-		state.banks = banks;
-		state.map_members = snapshot.map_members();
-		if state.root_record_status == RootRecordStatus::WriteFailed {
-			snapshot.incomplete = true;
-			snapshot
-				.reason
-				.get_or_insert(InventoryReason::ConfigurationUnavailable);
-		}
-		drop(state);
-		Ok(snapshot)
+		lease.publish(cache, collected)
 	}
 
 	fn start_scan(&self, mode: ScanMode) -> Result<ScanLease<'_>, InventoryError> {

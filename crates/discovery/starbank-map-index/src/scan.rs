@@ -221,8 +221,7 @@ pub fn scan_maps(
 	cancellation: &Cancellation,
 	on_progress: impl FnMut(Progress<'_>),
 ) -> Result<IndexReport, ScanError> {
-	let (mut report, update) =
-		inspect_maps(request, cancellation, CachePolicy::Reuse, on_progress)?;
+	let (mut report, update) = prepare_map_cache_refresh(request, cancellation, on_progress)?;
 	if let Some(update) = update {
 		let path = update.path.clone();
 		if let Err(source) = update.publish() {
@@ -234,6 +233,23 @@ pub fn scan_maps(
 		}
 	}
 	Ok(report)
+}
+
+/// Builds an index with existing cache entries and stages a changed cache for publication.
+///
+/// The caller can serialize publication with its final cancellation check.
+/// A compatible and unchanged cache requires no replacement.
+///
+/// # Errors
+///
+/// Cancellation, a limit crossing or a worker startup failure aborts the scan
+/// and leaves the previous persisted cache alone.
+pub fn prepare_map_cache_refresh(
+	request: IndexRequest<'_>,
+	cancellation: &Cancellation,
+	on_progress: impl FnMut(Progress<'_>),
+) -> Result<(IndexReport, Option<PreparedCacheUpdate>), ScanError> {
+	inspect_maps(request, cancellation, CachePolicy::Reuse, on_progress)
 }
 
 /// Inspects the same authorized map roots without reading the old cache.
@@ -250,9 +266,7 @@ pub fn prepare_map_cache_rebuild(
 	cancellation: &Cancellation,
 	on_progress: impl FnMut(Progress<'_>),
 ) -> Result<(IndexReport, Option<PreparedCacheUpdate>), ScanError> {
-	let result = inspect_maps(request, cancellation, CachePolicy::Rebuild, on_progress)?;
-	cancellation.check()?;
-	Ok(result)
+	inspect_maps(request, cancellation, CachePolicy::Rebuild, on_progress)
 }
 
 fn inspect_maps(
@@ -346,16 +360,15 @@ fn inspect_maps(
 		}
 	}
 	sort_issues(&mut issues);
-	Ok((
-		IndexReport {
-			index: MapIndex::from_records(maps),
-			cache_hits,
-			cache_state,
-			incomplete: !enumeration.complete,
-			issues,
-		},
-		prepared,
-	))
+	let report = IndexReport {
+		index: MapIndex::from_records(maps),
+		cache_hits,
+		cache_state,
+		incomplete: !enumeration.complete,
+		issues,
+	};
+	cancellation.check()?;
+	Ok((report, prepared))
 }
 
 fn sort_issues(issues: &mut [IndexIssue]) {

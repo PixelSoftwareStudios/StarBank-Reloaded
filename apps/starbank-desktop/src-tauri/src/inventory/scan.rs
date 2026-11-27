@@ -6,7 +6,7 @@ use std::{
 
 use starbank_map_index::{
 	Cancellation, IndexLimits, IndexRequest, PreparedCacheUpdate, ScanError,
-	prepare_map_cache_rebuild, scan_maps,
+	prepare_map_cache_rebuild, prepare_map_cache_refresh,
 };
 use starbank_paths::{
 	PathError, PathSelection, ScanLimits, get_sc2_root_path, inventory_banks, is_valid_bank_path,
@@ -14,7 +14,9 @@ use starbank_paths::{
 
 use super::{
 	InventoryError, InventoryProgress, InventoryReason, InventorySnapshot, InventoryStatus,
+	RootChange, RootRecordStatus, ScanLease,
 	authority::{AuthorizedRoot, DirectoryIdentity, is_native_disk_path, ordinary_directories},
+	blocked_saved_root,
 	progress::InventoryProgressPublisher,
 	projection::{self, OpaqueIds, Projection, project},
 	root_record::ManualRoot,
@@ -38,7 +40,93 @@ pub(super) struct MapScanOptions<'a> {
 	pub(super) max_workers: Option<NonZeroUsize>,
 }
 
-type CollectedInventory = (Projection, Option<ManualRoot>, Option<PreparedCacheUpdate>);
+pub(super) type CollectedInventory = (Projection, Option<ManualRoot>, Option<PreparedCacheUpdate>);
+
+impl ScanLease<'_> {
+	pub(super) fn publish(
+		self,
+		cache: MapCache<'_>,
+		((mut snapshot, banks), accepted_root, cache_update): CollectedInventory,
+	) -> Result<InventorySnapshot, InventoryError> {
+		let recovering = self.root_record_status == RootRecordStatus::Unreadable;
+		let mut state = self
+			.service
+			.state
+			.lock()
+			.map_err(|_| InventoryError::Unavailable)?;
+		check_cancelled(&self.cancellation)?;
+		// Use the same lock as cancellation for both kinds of cache publication.
+		match cache {
+			MapCache::Rebuild(_) if snapshot.status == InventoryStatus::Ready => {
+				cache_update
+					.filter(|_| !snapshot.incomplete)
+					.ok_or(InventoryError::MapIndexRebuildFailed)?
+					.publish()
+					.map_err(|_| InventoryError::MapIndexRebuildFailed)?;
+			}
+			MapCache::Reuse(_) => {
+				if let Some(update) = cache_update
+					&& update.publish().is_err()
+				{
+					snapshot.incomplete = true;
+				}
+			}
+			MapCache::Rebuild(_) => {}
+		}
+		let record_value = match self.change {
+			RootChange::Keep => None,
+			RootChange::Manual => accepted_root.as_ref().map(Some),
+			RootChange::Automatic => Some(None),
+		};
+		if recovering {
+			let Some(manual) = record_value else {
+				return Ok(blocked_saved_root(self.generation));
+			};
+			if matches!(self.change, RootChange::Manual)
+				&& snapshot.status != InventoryStatus::Ready
+			{
+				return Ok(blocked_saved_root(self.generation));
+			}
+			state.root_record_status = if let Some(store) = &self.service.root_record {
+				if store.recover(manual).is_err() {
+					return Ok(blocked_saved_root(self.generation));
+				}
+				RootRecordStatus::Current
+			} else {
+				// An explicit scope can be used for this session without a config directory.
+				RootRecordStatus::WriteFailed
+			};
+		} else if let (Some(store), Some(manual)) = (&self.service.root_record, record_value) {
+			state.root_record_status = match store.save(manual) {
+				Ok(()) => RootRecordStatus::Current,
+				Err(_) => RootRecordStatus::WriteFailed,
+			};
+		}
+		match self.change {
+			RootChange::Keep => {
+				if accepted_root.is_some() {
+					state.manual_root = accepted_root;
+				}
+			}
+			RootChange::Manual => {
+				// Keep an invalid explicit selection visible so a refresh cannot use a different scope.
+				state.manual_root = accepted_root.or_else(|| self.root.clone());
+			}
+			RootChange::Automatic => state.manual_root = None,
+		}
+		snapshot.generation = self.generation.to_string();
+		state.banks = banks;
+		state.map_members = snapshot.map_members();
+		if state.root_record_status == RootRecordStatus::WriteFailed {
+			snapshot.incomplete = true;
+			snapshot
+				.reason
+				.get_or_insert(InventoryReason::ConfigurationUnavailable);
+		}
+		drop(state);
+		Ok(snapshot)
+	}
+}
 
 pub(super) fn collect_inventory(
 	manual: Option<&ManualRoot>,
@@ -133,21 +221,21 @@ pub(super) fn collect_inventory(
 	progress.indexing_maps();
 	let notify = |update: starbank_map_index::Progress<'_>| progress.inspected_archive(update);
 	let result = match options.cache {
-		MapCache::Reuse(_) => scan_maps(request, cancellation, notify).map(|report| (report, None)),
+		MapCache::Reuse(_) => prepare_map_cache_refresh(request, cancellation, notify),
 		MapCache::Rebuild(_) if roots.is_empty() => {
 			return Err(InventoryError::MapIndexRebuildFailed);
 		}
 		MapCache::Rebuild(_) => prepare_map_cache_rebuild(request, cancellation, notify),
 	};
-	let (report, rebuilt_cache) = match result {
-		Ok((report, rebuilt_cache)) => (Some(report), rebuilt_cache),
+	let (report, cache_update) = match result {
+		Ok((report, cache_update)) => (Some(report), cache_update),
 		Err(ScanError::Cancelled) => return Err(InventoryError::Cancelled),
 		Err(_) => (None, None),
 	};
 	check_cancelled(cancellation)?;
 	let mut projection = project(root, manual.is_some(), &banks, report.as_ref(), ids);
 	projection.0.can_rebuild_map_index = cache_path.is_some() && !roots.is_empty();
-	Ok((projection, accepted, rebuilt_cache))
+	Ok((projection, accepted, cache_update))
 }
 
 fn manual_selection(path: &Path) -> Result<PathSelection, PathError> {
@@ -168,7 +256,7 @@ fn manual_selection(path: &Path) -> Result<PathSelection, PathError> {
 	Ok(selected)
 }
 
-pub(super) fn check_cancelled(cancellation: &Cancellation) -> Result<(), InventoryError> {
+fn check_cancelled(cancellation: &Cancellation) -> Result<(), InventoryError> {
 	if cancellation.is_cancelled() {
 		Err(InventoryError::Cancelled)
 	} else {
@@ -214,3 +302,6 @@ fn empty_projection(
 		.map(projection::display_name);
 	(snapshot, BTreeMap::new())
 }
+
+#[cfg(test)]
+mod cache_tests;
