@@ -8,6 +8,7 @@ import {
   simulateUnavailableBank,
   verifyLocalImports,
 } from "./local-bank-library.mjs";
+import { verifyNumericCaret } from "./numeric-caret.mjs";
 import { verifyAcceptedOpenRecovery } from "./open-recovery.mjs";
 import { verifySaveMenu } from "./save-menu.mjs";
 import { verifySimpleDraftRecovery } from "./simple-draft-recovery.mjs";
@@ -567,6 +568,7 @@ async function verify(name) {
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
     await verifySnapshotRefresh(browser, server.url, bankPicker, viewport);
+    await verifyNumericCaret(browser, server.url, bankPicker);
     await verifySimpleDraftRecovery(browser, server.url, bankPicker, viewport);
     await verifyAcceptedOpenRecovery(browser, server.url, bankPicker, viewport);
     const tableDraftPage = await context.newPage();

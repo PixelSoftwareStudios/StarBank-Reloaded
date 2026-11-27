@@ -10,6 +10,7 @@ import {
 } from "react";
 import { buttonClasses, focusOutlineClasses } from "../shared/control-styles";
 import { type EditorRow, type EditorSection, groupNumberLexeme } from "./index";
+import { useNumericEditingFocus } from "./numeric-editing-focus";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
 const WINDOW_THRESHOLD = 150;
@@ -83,7 +84,7 @@ export function TableEditor({
   );
   const selectionAnchor = useRef<string | undefined>(undefined);
   const [bulkValue, setBulkValue] = useState("");
-  const [editing, setEditing] = useState<string>();
+  const editing = useNumericEditingFocus();
   const [revealed, setRevealed] = useState<{
     rowId: string;
     sectionId: string;
@@ -260,10 +261,12 @@ export function TableEditor({
     const editable = canEdit && row.editable !== false;
     const edited = values?.get(row.id);
     const value = edited ?? row.value;
-    const shownValue =
-      groupNumbers && edited === undefined && row.id !== editing
+    const groupedValue =
+      groupNumbers && edited === undefined
         ? groupNumberLexeme(row.type, value)
         : value;
+    const focused = editing.focused?.rowId === row.id;
+    const shownValue = focused && editing.focused?.exact ? value : groupedValue;
     const issue = issues?.get(row.id);
     const issueId =
       issue !== undefined ? `${issueDescriptionId}-${row.id}` : undefined;
@@ -330,7 +333,7 @@ export function TableEditor({
           {row.type || "Unknown"}
         </td>
         <td className={cellClasses}>
-          {windowed || editable || editing === row.id || values?.has(row.id) ? (
+          {windowed || editable || focused || values?.has(row.id) ? (
             <input
               type="text"
               className={`${tableFieldClasses} w-full${index === undefined ? "" : " h-[calc(var(--editor-windowed-row-height)_-_0.375rem)]"}`}
@@ -343,9 +346,12 @@ export function TableEditor({
               data-bank-field={windowed ? "value" : undefined}
               readOnly={!editable}
               value={shownValue}
-              onFocus={() => setEditing(row.id)}
-              onBlur={() => setEditing(undefined)}
-              onChange={(event) => onChange([row], event.currentTarget.value)}
+              {...editing.handlers(row.id, groupedValue, value)}
+              onChange={(event) => {
+                const field = event.currentTarget;
+                editing.inputChanged(row.id, field);
+                onChange([row], field.value);
+              }}
             />
           ) : (
             <span>{shownValue}</span>
