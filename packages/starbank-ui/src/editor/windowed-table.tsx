@@ -40,6 +40,7 @@ interface WindowedTableProps {
   columns: number;
   header: ReactNode;
   canEdit: boolean;
+  revealRowId?: string;
   renderRow: RowRenderer;
 }
 
@@ -54,6 +55,7 @@ export function WindowedTable({
   columns,
   header,
   canEdit,
+  revealRowId,
   renderRow,
 }: WindowedTableProps) {
   const tableId = useId();
@@ -112,7 +114,8 @@ export function WindowedTable({
   const first = Math.min(position.first, Math.max(0, rows.length - 1));
   const start = Math.max(0, first - OVERSCAN_ROWS);
   const end = Math.min(rows.length, first + position.count + OVERSCAN_ROWS);
-  const pinned = focusId === undefined ? undefined : byId.get(focusId);
+  const pinnedId = revealRowId ?? focusId;
+  const pinned = pinnedId === undefined ? undefined : byId.get(pinnedId);
   const indices = range(start, end);
   if (pinned !== undefined && pinned < start) indices.unshift(pinned);
   if (pinned !== undefined && pinned >= end) indices.push(pinned);

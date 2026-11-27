@@ -1,5 +1,13 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useId, useMemo, useRef, useState } from "react";
+import {
+  type Ref,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { buttonClasses, focusOutlineClasses } from "../shared/control-styles";
 import { type EditorRow, type EditorSection, groupNumberLexeme } from "./index";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
@@ -34,7 +42,12 @@ function rowLabel(row: EditorRow) {
   return row.childName ? `${row.name} · ${row.childName}` : row.name;
 }
 
+export interface TableEditorHandle {
+  repairIssue: (rowId: string) => boolean;
+}
+
 export function TableEditor({
+  ref,
   sections,
   values,
   issues,
@@ -47,6 +60,7 @@ export function TableEditor({
   onOpenStructure,
   onOpenDiff,
 }: {
+  ref?: Ref<TableEditorHandle>;
   sections: readonly EditorSection[];
   values?: ReadonlyMap<string, string>;
   issues?: ReadonlyMap<string, string>;
@@ -70,16 +84,24 @@ export function TableEditor({
   const selectionAnchor = useRef<string | undefined>(undefined);
   const [bulkValue, setBulkValue] = useState("");
   const [editing, setEditing] = useState<string>();
+  const [revealed, setRevealed] = useState<{
+    rowId: string;
+    sectionId: string;
+  }>();
+  const [repairFocusId, setRepairFocusId] = useState<string>();
+  const repairField = useRef<HTMLInputElement>(null);
   const section = sections.find(({ id }) => id === sectionId) ?? sections[0];
   const unified = layout === "unified";
   const query = filterText(rowQuery);
   const sectionFilter = sections.length > 1 ? filterText(sectionQuery) : "";
   const filteredSections = useMemo(
     () =>
-      sections.filter((item) =>
-        item.name.toLowerCase().includes(sectionFilter),
+      sections.filter(
+        (item) =>
+          item.id === revealed?.sectionId ||
+          item.name.toLowerCase().includes(sectionFilter),
       ),
-    [sectionFilter, sections],
+    [revealed, sectionFilter, sections],
   );
   const rowsInScope = useMemo(() => {
     const visible = unified ? sections : section ? [section] : [];
@@ -95,6 +117,7 @@ export function TableEditor({
     const matches = query
       ? rowsInScope.filter(
           ({ row, sectionName }) =>
+            row.id === revealed?.rowId ||
             rowLabel(row).toLowerCase().includes(query) ||
             (unified && sectionName.toLowerCase().includes(query)),
         )
@@ -105,7 +128,7 @@ export function TableEditor({
         ? nameOrder.compare(a.name, b.name)
         : nameOrder.compare(b.name, a.name),
     );
-  }, [query, rowsInScope, sort, unified]);
+  }, [query, revealed, rowsInScope, sort, unified]);
   const rowsById = useMemo(
     () =>
       new Map(visibleRows.map(({ row }, index) => [row.id, { row, index }])),
@@ -130,6 +153,46 @@ export function TableEditor({
         )
       : false;
   const windowed = visibleRows.length > WINDOW_THRESHOLD;
+  useImperativeHandle(
+    ref,
+    () => ({
+      repairIssue(rowId) {
+        if (!canEdit || !issues?.has(rowId)) return false;
+        const location = sections.find(({ rows }) =>
+          rows.some((row) => row.id === rowId && row.editable !== false),
+        );
+        if (!location) return false;
+        if (!unified) setSectionId(location.id);
+        setRevealed({ rowId, sectionId: location.id });
+        setRepairFocusId(rowId);
+        return true;
+      },
+    }),
+    [canEdit, issues, sections, unified],
+  );
+
+  useLayoutEffect(() => {
+    if (!repairFocusId) return;
+    const field = repairField.current;
+    if (field && !field.readOnly && issues?.has(repairFocusId)) {
+      const viewport = field.closest(".editor-windowed-table");
+      const header = viewport?.querySelector("thead");
+      if (viewport && header) {
+        const bounds = field.getBoundingClientRect();
+        const viewportBounds = viewport.getBoundingClientRect();
+        const top = header.getBoundingClientRect().bottom;
+        const bottom = viewportBounds.bottom;
+        if (top < bottom && (bounds.top < top || bounds.bottom > bottom)) {
+          // Center in the visible rows below the sticky heading.
+          viewport.scrollTop += (bounds.top + bounds.bottom - top - bottom) / 2;
+        }
+        viewport.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+      field.focus({ preventScroll: viewport !== null });
+    }
+    setRepairFocusId(undefined);
+  }, [issues, repairFocusId]);
+
   const label = unified
     ? "All bank values"
     : section?.name || "Unnamed section";
@@ -275,6 +338,7 @@ export function TableEditor({
               aria-label={`${name} value`}
               aria-invalid={issue !== undefined || undefined}
               data-table-draft={edited !== undefined || undefined}
+              ref={repairFocusId === row.id ? repairField : undefined}
               aria-describedby={issueId}
               data-bank-field={windowed ? "value" : undefined}
               readOnly={!editable}
@@ -315,7 +379,10 @@ export function TableEditor({
               type="search"
               placeholder="Filter…"
               value={sectionQuery}
-              onChange={(event) => setSectionQuery(event.currentTarget.value)}
+              onChange={(event) => {
+                setRevealed(undefined);
+                setSectionQuery(event.currentTarget.value);
+              }}
             />
           )}
           {filteredSections.length === 0 && sectionFilter && (
@@ -335,6 +402,7 @@ export function TableEditor({
                 aria-current={item.id === section?.id ? "true" : undefined}
                 aria-description={item.dirty ? "Unsaved changes" : undefined}
                 onClick={() => {
+                  setRevealed(undefined);
                   setSectionId(item.id);
                   selectionAnchor.current = undefined;
                   setSelectedRows(new Set());
@@ -366,7 +434,10 @@ export function TableEditor({
                 type="search"
                 placeholder="Filter names…"
                 value={rowQuery}
-                onChange={(event) => setRowQuery(event.currentTarget.value)}
+                onChange={(event) => {
+                  setRevealed(undefined);
+                  setRowQuery(event.currentTarget.value);
+                }}
               />
             )}
             {onOpenStructure && (
@@ -444,6 +515,7 @@ export function TableEditor({
                 columns={unified ? 4 : 3}
                 label={label}
                 canEdit={canEdit}
+                revealRowId={repairFocusId}
                 renderRow={renderRow}
               />
             ) : (

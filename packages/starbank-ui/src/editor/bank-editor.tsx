@@ -41,7 +41,7 @@ import {
   type TableValidationRequest,
   useTableDraftValidation,
 } from "./table-draft-validation";
-import { TableEditor } from "./table-editor";
+import { TableEditor, type TableEditorHandle } from "./table-editor";
 
 type EditorView = NonNullable<ReturnType<typeof useEditorState>["view"]>;
 
@@ -135,6 +135,7 @@ export function BankEditor({
   }>();
   const simplePanel = useRef<HTMLDivElement>(null);
   const tablePanel = useRef<HTMLDivElement>(null);
+  const tableEditor = useRef<TableEditorHandle>(null);
   const [retainTable, setRetainTable] = useState(false);
   const rawEditor = useRef<RawEditorHandle>(null);
   const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
@@ -518,6 +519,7 @@ export function BankEditor({
           ref={tablePanel}
         >
           <TableEditor
+            ref={tableEditor}
             sections={document.sections}
             values={tableDraft?.values}
             issues={tableIssues}
@@ -613,18 +615,22 @@ export function BankEditor({
                 );
                 (field ?? panel)?.focus();
               } else {
-                const panel = tablePanel.current;
-                const field =
-                  panel?.querySelector<HTMLInputElement>(
-                    'input[aria-invalid="true"]:not([readonly])',
-                  ) ??
-                  panel?.querySelector<HTMLInputElement>(
-                    "input[data-table-draft]:not([readonly])",
-                  ) ??
-                  panel?.querySelector<HTMLInputElement>(
-                    "[data-table-filter-search]",
-                  );
-                (field ?? panel)?.focus();
+                const issueId = stale
+                  ? undefined
+                  : tableIssues?.keys().next().value;
+                if (!issueId || !tableEditor.current?.repairIssue(issueId)) {
+                  const panel = tablePanel.current;
+                  const field =
+                    (issueId === undefined && !stale
+                      ? panel?.querySelector<HTMLInputElement>(
+                          "input[data-table-draft]:not([readonly])",
+                        )
+                      : undefined) ??
+                    panel?.querySelector<HTMLInputElement>(
+                      "[data-table-filter-search]",
+                    );
+                  (field ?? panel)?.focus();
+                }
               }
             }
             setDraftSwitch(undefined);

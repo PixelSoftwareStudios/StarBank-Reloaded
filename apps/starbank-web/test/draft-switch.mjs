@@ -166,4 +166,157 @@ export async function verifyTableDraftSwitch(page, chooseBank) {
     .getByRole("heading", { name: "ReplacementDraftFixture.SC2Bank" })
     .waitFor();
   assert.equal(await gold.inputValue(), "003");
+  assert.equal(await invalid.count(), 0);
+
+  await verifyRepairFocus(page, chooseBank);
+}
+
+async function verifyRepairFocus(page, chooseBank) {
+  const rowCount = 180;
+  const rowName = (index) => `Amount ${String(index).padStart(3, "0")}`;
+  const keys = Array.from(
+    { length: rowCount },
+    (_, index) => `<Key name="${rowName(index)}"><Value int="${index}"/></Key>`,
+  ).join("");
+  await chooseBank(
+    "RepairFixture.SC2Bank",
+    `<Bank><Section name="Inventory">${keys}</Section><Section name="Other"><Key name="Visible valid"><Value int="7"/></Key></Section></Bank>`,
+  );
+  const inventory = page.getByRole("table", { name: "Inventory", exact: true });
+  const field = (index) =>
+    inventory.getByRole("textbox", {
+      name: `${rowName(index)} · Value value`,
+      exact: true,
+    });
+  const selection = (index) =>
+    inventory.getByRole("checkbox", {
+      name: `Select ${rowName(index)} · Value`,
+      exact: true,
+    });
+  const section = (name) =>
+    page
+      .getByRole("navigation", { name: "Bank sections" })
+      .getByRole("button", { name, exact: true });
+  const viewport = page.locator(".editor-windowed-table");
+  const invalid = page.locator('input[aria-invalid="true"]');
+  const rowFilter = page.getByRole("searchbox", {
+    name: "Filter rows by name",
+  });
+  const sectionFilter = page.getByRole("searchbox", {
+    name: "Filter sections by name",
+  });
+  const apply = page.getByRole("button", { name: "Apply edits", exact: true });
+  const rawTab = page.getByRole("tab", { name: "Raw View" });
+  const decision = page.getByRole("dialog", {
+    name: "Table draft could not be applied",
+  });
+  const last = rowCount - 1;
+
+  const scrollTo = (index) =>
+    viewport.evaluate((scroll, offset) => {
+      const sample = scroll.querySelector("[data-bank-row-index]");
+      scroll.scrollTop = offset * sample.getBoundingClientRect().height;
+    }, index);
+
+  async function repair() {
+    await rawTab.press("Enter");
+    await decision
+      .getByRole("button", { name: "Repair edits", exact: true })
+      .click();
+    await page.waitForFunction(
+      (label) => document.activeElement?.getAttribute("aria-label") === label,
+      `${rowName(last)} · Value value`,
+    );
+    assert.equal(await field(last).inputValue(), "12,34");
+    assert.equal(await apply.isDisabled(), true);
+  }
+
+  await field(0).waitFor();
+  await scrollTo(last);
+  await selection(last).check();
+  await scrollTo(0);
+  await selection(0).check();
+  await page.getByLabel("Set value for 2 rows", { exact: true }).fill("12,34");
+  await page.getByRole("button", { name: "Stage values", exact: true }).click();
+  await field(0).and(invalid).waitFor();
+  const nameSort = inventory.getByRole("button", { name: "Name", exact: true });
+  await nameSort.click();
+  await nameSort.click();
+  await scrollTo(last);
+  await field(0).and(invalid).waitFor();
+  assert.equal(await field(last).count(), 0);
+  await repair();
+  assert.equal(
+    await inventory
+      .getByRole("columnheader", { name: "Name" })
+      .getAttribute("aria-sort"),
+    "descending",
+  );
+  assert.equal(await selection(last).isChecked(), true);
+  const rowBounds = await field(last).evaluate((input) => {
+    const bounds = input.getBoundingClientRect();
+    const scroll = input.closest(".editor-windowed-table");
+    return {
+      top: bounds.top,
+      bottom: bounds.bottom,
+      heading: scroll.querySelector("thead").getBoundingClientRect().bottom,
+      viewport: scroll.getBoundingClientRect().bottom,
+      offset: scroll.scrollTop,
+      size: scroll.clientHeight,
+    };
+  });
+  const middle = (rowBounds.top + rowBounds.bottom) / 2;
+  assert(
+    middle >= rowBounds.heading && middle <= rowBounds.viewport,
+    JSON.stringify(rowBounds),
+  );
+  if (
+    rowBounds.viewport - rowBounds.heading >=
+    rowBounds.bottom - rowBounds.top
+  ) {
+    assert(
+      rowBounds.top >= rowBounds.heading &&
+        rowBounds.bottom <= rowBounds.viewport,
+      JSON.stringify(rowBounds),
+    );
+  }
+  await scrollTo(last);
+  await selection(0).waitFor();
+  assert.equal(await selection(0).isChecked(), true);
+  assert.equal(await field(0).inputValue(), "12,34");
+  assert.equal(
+    await page.getByLabel("Set value for 2 rows", { exact: true }).inputValue(),
+    "12,34",
+  );
+
+  await rowFilter.fill("Amount 060");
+  assert.equal(await invalid.count(), 0);
+  await repair();
+  assert.equal(await rowFilter.inputValue(), "Amount 060");
+  await field(60).waitFor();
+
+  await section("Other").click();
+  await rowFilter.fill("Visible valid");
+  await sectionFilter.fill("Other");
+  assert.equal(await section("Inventory").count(), 0);
+  const other = page.getByRole("textbox", {
+    name: "Visible valid · Value value",
+    exact: true,
+  });
+  await other.fill("0017");
+  await repair();
+  assert.equal(await section("Inventory").getAttribute("aria-current"), "true");
+  assert.equal(await sectionFilter.inputValue(), "Other");
+  assert.equal(await rowFilter.inputValue(), "Visible valid");
+  assert.equal(
+    await inventory
+      .getByRole("columnheader", { name: "Name" })
+      .getAttribute("aria-sort"),
+    "descending",
+  );
+  await rowFilter.fill("Amount 060");
+  assert.equal(await field(last).count(), 0);
+  await section("Other").click();
+  await rowFilter.fill("Visible valid");
+  assert.equal(await other.inputValue(), "0017");
 }
