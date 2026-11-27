@@ -15,6 +15,8 @@ const MAX_ENTRY_BYTES: u32 = 16 * 1024 * 1024;
 const MAX_SECTORS: usize = 4096;
 const ZLIB_CODEC: u8 = 0x02;
 const SECTOR_OFFSET_BYTES: usize = size_of::<u32>();
+// StormLib bounds opaque extra DWORDs before the first sector to 1 KiB.
+const MAX_EXTRA_SECTOR_OFFSET_BYTES: usize = 1024;
 const SUPPORTED_FLAGS: MpqFileFlags = MpqFileFlags::EXISTS
 	.union(MpqFileFlags::SINGLE_UNIT)
 	.union(MpqFileFlags::COMPRESS);
@@ -106,7 +108,13 @@ impl MetadataEntry {
 			.iter()
 			.map(|bytes| le32(bytes) as usize);
 		let mut start = offsets.next().ok_or(MpqError::InvalidEntry(self))?;
-		if start != table_len {
+		let extra_table_bytes = start
+			.checked_sub(table_len)
+			.ok_or(MpqError::InvalidEntry(self))?;
+		if extra_table_bytes > MAX_EXTRA_SECTOR_OFFSET_BYTES
+			|| !extra_table_bytes.is_multiple_of(SECTOR_OFFSET_BYTES)
+			|| start > input.len()
+		{
 			return Err(MpqError::InvalidEntry(self));
 		}
 
