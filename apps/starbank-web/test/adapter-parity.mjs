@@ -95,6 +95,81 @@ function command(args, status = 0) {
   return report;
 }
 
+function checkValueValidation(dispatch, encoding, opening) {
+  const originalText = opening.replace(
+    "</Key>",
+    "<Decimal fixed='2.00'/></Key>",
+  );
+  const original = encode(originalText, encoding);
+  const opened = dispatch("open", "snapshot", {
+    payload: { context, discard_current: true },
+    attachment: original,
+  });
+  const [integer, , fixed] = opened.payload.sections[0].keys[0].values;
+  const groupedFixed = "-9,007,199,254,740,993.500";
+  const exactFixed = "-9007199254740993.500";
+  const validDraft = {
+    edits: [
+      { id: integer.id, value: groupedInteger },
+      { id: fixed.id, value: groupedFixed },
+    ],
+  };
+  const valid = dispatch("validate_values", "value_validation", {
+    payload: validDraft,
+  });
+  assert.deepEqual(valid.payload.issues, []);
+  assert.equal(valid.bytes, undefined);
+  assert.equal(valid.revision, opened.revision);
+
+  const invalid = dispatch("validate_values", "value_validation", {
+    payload: {
+      edits: [
+        { id: fixed.id, value: "12,34.500" },
+        { id: integer.id, value: "1,,2" },
+      ],
+    },
+  });
+  assert.deepEqual(
+    invalid.payload.issues.map(({ id, code }) => ({ id, code })),
+    [
+      { id: fixed.id, code: "invalid_fixed" },
+      { id: integer.id, code: "invalid_integer" },
+    ],
+  );
+  assert.equal(invalid.bytes, undefined);
+  assert.equal(invalid.revision, opened.revision);
+  for (const attachment of [new Uint8Array(), Uint8Array.of(1)]) {
+    const unexpected = dispatch("validate_values", "error", {
+      payload: validDraft,
+      attachment,
+    });
+    assert.equal(unexpected.payload.code, "unexpected_attachment");
+    assert.equal(unexpected.bytes, undefined);
+    assert.equal(unexpected.revision, opened.revision);
+  }
+  const untouched = dispatch("snapshot", "snapshot");
+  assert.deepEqual(untouched.payload, opened.payload);
+  assert.equal(untouched.revision, opened.revision);
+  assert.deepEqual(dispatch("raw", "raw").bytes, original);
+
+  const applied = dispatch("set_values", "snapshot", { payload: validDraft });
+  const revisedText = originalText
+    .replace("0007", editedInteger)
+    .replace("2.00", exactFixed);
+  assert.notEqual(applied.revision, opened.revision);
+  const stale = dispatch("validate_values", "error", {
+    payload: validDraft,
+    revision: opened.revision,
+  });
+  assert.equal(stale.payload.code, "stale_revision");
+  assert.equal(stale.bytes, undefined);
+  assert.equal(stale.revision, applied.revision);
+  const revised = dispatch("snapshot", "snapshot");
+  assert.deepEqual(revised.payload, applied.payload);
+  assert.equal(revised.revision, applied.revision);
+  assert.deepEqual(dispatch("raw", "raw").bytes, encode(revisedText, encoding));
+}
+
 function checkProtocol(encoding, opening, changed, unsigned, signed) {
   const engine = new WasmBankEngine();
   const requests = [];
@@ -135,6 +210,7 @@ function checkProtocol(encoding, opening, changed, unsigned, signed) {
       });
       return {
         payload: result.result.payload,
+        revision: result.revision,
         bytes: bytes && Buffer.from(bytes),
       };
     } finally {
@@ -227,6 +303,7 @@ function checkProtocol(encoding, opening, changed, unsigned, signed) {
       dispatch("prepare", "prepared", { payload: { context } }).bytes,
       encode(withSignature(extraText), encoding),
     );
+    checkValueValidation(dispatch, encoding, opening);
     const replay = requests
       .map((request) => JSON.stringify(request))
       .join("\n");

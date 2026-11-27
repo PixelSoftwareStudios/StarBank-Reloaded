@@ -13,11 +13,11 @@ pnpm --filter starbank-web run wasm
 node apps/starbank-web/test/adapter-parity.mjs
 ```
 
-The test replays 23 identical protocol requests per encoding and compares complete JSON responses and byte attachments. It checks that grouped integer input above JavaScript's safe integer limit produces the same native bytes through structured editing and Raw XML text. Malformed Raw XML, grouped numbers in Raw XML, opposite byte order, and stale revisions leave the document unchanged. Undo and opening snapshots return the original bytes. The CLI's unedited export, structured edit and signed copy agree with independently constructed bytes. Its dry-runs leave the directory and source unchanged, and an existing destination or stale patch fingerprint yields a typed conflict.
+The test replays 34 identical protocol requests per encoding and compares complete JSON responses and byte attachments. It checks that grouped integer input above JavaScript's safe integer limit produces the same native bytes through structured editing and Raw XML text. Malformed Raw XML, grouped numbers in Raw XML, opposite byte order, and stale revisions leave the document unchanged. Undo and opening snapshots return the original bytes. Read-only draft checks compare ordered integer/fixed diagnostics, exact grouped values above 2^53, unchanged snapshots and raw bytes, stale revisions, and rejection of both empty and nonempty attachments. The CLI's unedited export, structured edit and signed copy agree with independently constructed bytes. Its dry-runs leave the directory and source unchanged, and an existing destination or stale patch fingerprint yields a typed conflict.
 
 ## Evidence
 
-At `0157e0c`, all three encodings passed on macOS arm64 with Rust 1.100.0, wasm-bindgen 0.2.129 and Node 24.10.0. Repeating the comparison at `d0d3d9d` with pinned Node 24.22.3 reproduced all 69 replies and the same file digests. The independently computed legacy signature is `B19D9C042524092B16FDC91EC5D3BC6085D26383` for all three encodings.
+At `0157e0c`, all three encodings passed on macOS arm64 with Rust 1.100.0, wasm-bindgen 0.2.129 and Node 24.10.0. Repeating the comparison at `d0d3d9d` with pinned Node 24.22.3 reproduced all 69 replies and the same file digests. The expanded fixture passed 102 exact native/release-WASM replies on November 27, 2026 using Rust 1.100.0, wasm-bindgen 0.2.129 and pinned Node 24.22.3. The three historical signed-byte digests were unchanged. The independently computed legacy signature is `B19D9C042524092B16FDC91EC5D3BC6085D26383` for all three encodings.
 
 | Bank encoding | Signed file SHA-256 |
 |---|---|
