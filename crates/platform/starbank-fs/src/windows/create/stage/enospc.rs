@@ -17,12 +17,14 @@ use std::{
 	ptr,
 };
 use windows_sys::Win32::{
-	Foundation::{ERROR_DISK_FULL, ERROR_HANDLE_DISK_FULL},
+	Foundation::{ERROR_ACCESS_DENIED, ERROR_DISK_FULL, ERROR_HANDLE_DISK_FULL},
 	Storage::FileSystem::{
 		FILE_ATTRIBUTE_ARCHIVE, GetDiskFreeSpaceExW, GetFinalPathNameByHandleW,
 		GetVolumeInformationByHandleW, VOLUME_NAME_GUID,
 	},
 };
+
+mod access;
 
 const ROOT_ENV: &str = "STARBANK_ENOSPC_NTFS_ROOT";
 const VOLUME_ENV: &str = "STARBANK_ENOSPC_NTFS_VOLUME";
@@ -182,7 +184,16 @@ fn exercise_disk_full(
 	let original = prepared.join(ORIGINAL_NAME);
 	// prepare_reduced_fixture has already read back the actual user-only DACL on this directory.
 	eprintln!("NTFS disk-full fixture: opening the ACL-verified directory under the reduced actor");
-	let scope = Scope::open(&target)?;
+	let scope = Scope::open(&target).inspect_err(|error| {
+		if matches!(error,
+			StorageError::Io {
+				operation: "open writable directory relative to held ancestor", source
+			} if source.raw_os_error() == Some(ERROR_ACCESS_DENIED.cast_signed())
+		) && let Err(diagnostic) = access::report(prepared, owned_scope)
+		{
+			eprintln!("NTFS access diagnostics incomplete: {diagnostic}");
+		}
+	})?;
 	assert_eq!(scope.directory.identity, owned_scope.identity);
 	eprintln!("NTFS disk-full fixture: verified writable scope, opening the baseline scope");
 	assert!(mount.free_bytes()? > PAYLOAD_BYTES as u64);

@@ -34,6 +34,8 @@ use crate::StorageError;
 
 use super::DirectoryScope;
 
+#[cfg(test)]
+pub(super) mod diagnostics;
 mod relative;
 
 #[cfg(test)]
