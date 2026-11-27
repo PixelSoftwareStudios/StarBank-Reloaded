@@ -280,10 +280,27 @@ async function verifySimpleView(page, chooseBank) {
     "../../../crates/domain/starbank-profiles/tests/fixtures/",
     import.meta.url,
   );
-  const profile = await readFile(new URL("training.json", profileFixtures));
-  const bank = await readFile(
+  const profile = JSON.parse(
+    await readFile(new URL("training.json", profileFixtures), "utf8"),
+  );
+  const trainingBank = await readFile(
     new URL("training.sc2bank", profileFixtures),
     "utf8",
+  );
+  const extraFields = [];
+  for (let index = 0; index < 32; index += 1) {
+    const name = `Fixture field ${index + 1}`;
+    extraFields.push(`<Key name="${name}"><Value string="synthetic"/></Key>`);
+    profile.groups[1].fields.push({
+      id: `extra-${index}`,
+      label: name,
+      path: { section: { name: "Stats" }, key: { name } },
+      control: { kind: "text", storage: "string" },
+    });
+  }
+  const bank = trainingBank.replace(
+    '<Key name="Note">',
+    `${extraFields.join("")}<Key name="Note">`,
   );
   await chooseBank("TrainingBank.SC2Bank", bank);
   await page.getByRole("heading", { name: "TrainingBank.SC2Bank" }).waitFor();
@@ -298,7 +315,7 @@ async function verifySimpleView(page, chooseBank) {
     await fileInput.setInputFiles({
       name: "training.json",
       mimeType: "application/json",
-      buffer: profile,
+      buffer: Buffer.from(JSON.stringify(profile)),
     });
   };
   await loadProfile("9-S2-1-124");
@@ -324,6 +341,32 @@ async function verifySimpleView(page, chooseBank) {
     name: "Proposed profile changes",
   });
   const xml = page.getByRole("textbox", { name: "Bank XML" });
+
+  const simpleFields = panel.locator(".simple-fields");
+  const scroll = await simpleFields.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  assert(scroll > 0);
+  await tableTab.click();
+  await tab.click();
+  assert.equal(
+    await simpleFields.evaluate((element) => element.scrollTop),
+    scroll,
+  );
+  await rawTab.click();
+  await xml.waitFor();
+  await tab.click();
+  assert.equal(
+    await simpleFields.evaluate((element) => element.scrollTop),
+    scroll,
+  );
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Back to editor" }).click();
+  assert.equal(
+    await simpleFields.evaluate((element) => element.scrollTop),
+    scroll,
+  );
 
   async function stagePreview() {
     await score.fill("2.00");

@@ -142,6 +142,7 @@ export function BankEditor({
     message: string;
   }>();
   const simplePanel = useRef<HTMLDivElement>(null);
+  const [retainedSimpleProfile, setRetainedSimpleProfile] = useState<string>();
   const tablePanel = useRef<HTMLDivElement>(null);
   const tableEditor = useRef<TableEditorHandle>(null);
   const [retainTable, setRetainTable] = useState(false);
@@ -301,6 +302,7 @@ export function BankEditor({
   }
 
   function showView(nextView: EditorView) {
+    if (simpleVisible && profile) setRetainedSimpleProfile(profile.profile_id);
     if (selectedView === "table") setRetainTable(true);
     if (selectedView === "raw" && !rawDraft)
       setRetainedRawRevision(document.revision);
@@ -549,8 +551,15 @@ export function BankEditor({
         </Tabs.List>
         {profile && (
           <Tabs.Content
+            key={profile.profile_id}
             value="simple"
             className={viewClasses}
+            forceMount={
+              simpleVisible || retainedSimpleProfile === profile.profile_id
+                ? true
+                : undefined
+            }
+            hidden={!simpleVisible}
             ref={simplePanel}
           >
             <SimpleEditor
