@@ -1,5 +1,8 @@
 //! Windows read-only snapshots of ordinary local files.
-#![allow(unsafe_code, reason = "Win32 handle metadata calls are isolated here")]
+#![allow(
+	unsafe_code,
+	reason = "Win32 handle operations are isolated in this platform boundary"
+)]
 
 use std::ffi::{OsStr, OsString};
 use std::fs::{File, OpenOptions};
@@ -30,9 +33,15 @@ use windows_sys::Win32::{
 
 use crate::{FileSnapshot, Fingerprint, StorageError};
 
+#[cfg(test)]
+mod create;
 mod identity;
 #[cfg(test)]
+mod publication;
+#[cfg(test)]
 mod stage_security;
+#[cfg(test)]
+mod sync;
 
 pub use identity::{WindowsDirectoryIdentity, WindowsFileIdentity};
 

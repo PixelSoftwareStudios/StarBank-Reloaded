@@ -82,6 +82,12 @@ jobs:
           cargo nextest run --locked -p starbank-fs --lib
           --run-ignored only --no-tests fail --success-output immediate
           -E 'test(=windows::rename_qualification::local_ntfs_handle_relative_create_only_publication)'
+      - name: Qualify the Windows create-only transaction candidate
+        if: runner.os == 'Windows'
+        run: >-
+          cargo nextest run --locked -p starbank-fs --lib
+          --run-ignored only --no-tests fail --success-output immediate
+          -E 'test(=windows::create::tests::local_ntfs_create_candidate_transactions)'
       - name: Qualify Windows single-instance launch delivery
         if: runner.os == 'Windows'
         shell: pwsh

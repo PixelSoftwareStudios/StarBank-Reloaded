@@ -94,14 +94,14 @@ impl CommitReceipt {
 	}
 }
 
-/// A pending or displaced sibling retained for explicit recovery.
+/// A recorded pending, displaced or published location retained for explicit recovery.
 #[derive(Debug)]
 pub struct RecoveryArtifact {
 	pub(crate) path: PathBuf,
 }
 
 impl RecoveryArtifact {
-	/// The sibling path at the time of the attempt. Inspect before operating on it.
+	/// The last recorded location. It may have moved; inspect before operating on it.
 	#[must_use]
 	pub fn path(&self) -> &Path {
 		&self.path
@@ -122,7 +122,8 @@ impl CommitIssue {
 		&self.error
 	}
 
-	/// The sibling location reserved for the transaction. It may have already moved.
+	/// The last recorded transaction location; it may be a sibling or the published target.
+	/// This inspection hint does not grant authority and may have already moved.
 	#[must_use]
 	pub fn recovery(&self) -> &RecoveryArtifact {
 		&self.recovery
