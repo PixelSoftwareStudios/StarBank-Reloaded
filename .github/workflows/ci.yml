@@ -88,6 +88,11 @@ jobs:
           cargo nextest run --locked -p starbank-fs --lib
           --run-ignored only --no-tests fail --success-output immediate
           -E 'test(=windows::create::tests::local_ntfs_create_candidate_transactions)'
+      - name: Exercise NTFS staging space exhaustion
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 3
+        run: '& ./crates/platform/starbank-fs/verification/windows-enospc.ps1'
       - name: Qualify Windows single-instance launch delivery
         if: runner.os == 'Windows'
         shell: pwsh

@@ -12,6 +12,9 @@ use windows_sys::Win32::Storage::FileSystem::{
 	FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle,
 };
 
+#[cfg(test)]
+mod enospc;
+
 const RANDOM_BYTES: usize = 16;
 const PENDING_PREFIX: &str = ".starbank-pending-";
 const PRIMARY_EXTENSION: &str = "000";
