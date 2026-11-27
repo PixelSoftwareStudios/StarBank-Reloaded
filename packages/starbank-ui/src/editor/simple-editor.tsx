@@ -126,6 +126,7 @@ export function SimpleEditor({
                   <input
                     id={inputId}
                     type="checkbox"
+                    data-profile-draft={input !== undefined || undefined}
                     checked={
                       input?.kind === "checked"
                         ? input.value
@@ -143,6 +144,7 @@ export function SimpleEditor({
                   <input
                     id={inputId}
                     type="text"
+                    data-profile-draft={input !== undefined || undefined}
                     inputMode={field.kind === "number" ? "decimal" : "text"}
                     value={input?.kind === "text" ? input.value : field.value}
                     readOnly={blocked}

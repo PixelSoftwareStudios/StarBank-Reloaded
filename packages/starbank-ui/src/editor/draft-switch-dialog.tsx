@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef } from "react";
 import type { EditorDraft } from "starbank-editor";
 
+export type DraftSwitchKind = EditorDraft["kind"] | "simple";
+
 type DraftDecision = "repair" | "discard" | "cancel";
 
 const draftCopy = {
@@ -14,8 +16,13 @@ const draftCopy = {
     repair: "Repair edits",
     review: "Review Table View",
   },
+  simple: {
+    title: "Simple draft needs review",
+    repair: "Review edits",
+    review: "Review Simple View",
+  },
 } satisfies Record<
-  EditorDraft["kind"],
+  DraftSwitchKind,
   { title: string; repair: string; review: string }
 >;
 
@@ -25,7 +32,7 @@ export function DraftSwitchDialog({
   repairable,
   onDecision,
 }: {
-  kind: EditorDraft["kind"];
+  kind: DraftSwitchKind;
   message: string;
   repairable: boolean;
   onDecision: (decision: DraftDecision) => void;
@@ -34,16 +41,16 @@ export function DraftSwitchDialog({
   const heading = useId();
   const description = useId();
   const dialog = useRef<HTMLDialogElement>(null);
-  const decision = useRef<DraftDecision>("cancel");
 
   useEffect(() => {
     const element = dialog.current;
     if (element && !element.open) element.showModal();
+    return () => element?.close();
   }, []);
 
   function close(next: DraftDecision) {
-    decision.current = next;
     dialog.current?.close();
+    onDecision(next);
   }
 
   return (
@@ -52,7 +59,10 @@ export function DraftSwitchDialog({
       aria-labelledby={heading}
       aria-describedby={description}
       ref={dialog}
-      onClose={() => onDecision(decision.current)}
+      onCancel={(event) => {
+        event.preventDefault();
+        close("cancel");
+      }}
     >
       <header className="editor-dialog-header">
         <h2 id={heading}>{copy.title}</h2>

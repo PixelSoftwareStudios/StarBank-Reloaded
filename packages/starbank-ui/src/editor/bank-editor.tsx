@@ -24,7 +24,7 @@ import type { AppSettings } from "starbank-platform/settings";
 import { type MapContext, MapContextDetails } from "../inventory/map-context";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
-import { DraftSwitchDialog } from "./draft-switch-dialog";
+import { DraftSwitchDialog, type DraftSwitchKind } from "./draft-switch-dialog";
 import {
   EditorActions,
   fileDropHandlers,
@@ -116,10 +116,11 @@ export function BankEditor({
   }>();
   const [diff, setDiff] = useState<{ revision: string; value: EngineDiff }>();
   const [draftSwitch, setDraftSwitch] = useState<{
-    kind: EditorDraft["kind"];
+    kind: DraftSwitchKind;
     nextView: EditorView;
     message: string;
   }>();
+  const simplePanel = useRef<HTMLDivElement>(null);
   const tablePanel = useRef<HTMLDivElement>(null);
   const [retainTable, setRetainTable] = useState(false);
   const rawEditor = useRef<RawEditorHandle>(null);
@@ -146,6 +147,7 @@ export function BankEditor({
     onDraftChange?.(draft !== undefined || profileDraft !== undefined);
   }, [draft, profileDraft, onDraftChange]);
 
+  const simpleVisible = selectedView === "simple";
   const staleProfile =
     profileDraft !== undefined &&
     (profileDraft.revision !== document.revision ||
@@ -167,7 +169,14 @@ export function BankEditor({
   }
 
   function previewProfile() {
-    if (!profileController || !profileDraft || staleProfile || busy) return;
+    if (
+      !simpleVisible ||
+      !profileController ||
+      !profileDraft ||
+      staleProfile ||
+      busy
+    )
+      return;
     const proposed = profileDraft;
     run(async () => {
       const preview = await profileController.onPreview(target, {
@@ -190,11 +199,23 @@ export function BankEditor({
 
   function applyProfile() {
     const preview = profileDraft?.preview;
-    if (!preview || !profileController || staleProfile || busy) return;
+    if (
+      !simpleVisible ||
+      !preview ||
+      !profileController ||
+      staleProfile ||
+      busy
+    )
+      return;
     run(
       () => profileController.onApply(target, preview.preview_id),
       () => setProfileDraft(undefined),
     );
+  }
+
+  function discardProfileDraft() {
+    setProfileDraft(undefined);
+    clearNotice();
   }
 
   function stageValues(rows: readonly EditorRow[], value: string) {
@@ -283,9 +304,19 @@ export function BankEditor({
   }
 
   function selectView(nextView: EditorView) {
-    if (nextView === selectedView || (draft && busy)) return;
+    if (nextView === selectedView || (hasDraft && busy)) return;
     const staleMessage = "The bank changed while you were editing this draft.";
-    if (selectedView === "raw" && rawDraft) {
+    if (simpleVisible && profileDraft) {
+      setDraftSwitch({
+        kind: "simple",
+        nextView,
+        message: staleProfile
+          ? "The bank or profile changed. Discard this draft to continue."
+          : profileDraft.preview
+            ? "Apply the reviewed edits in Simple View before switching."
+            : "Preview the edits in Simple View before applying them.",
+      });
+    } else if (selectedView === "raw" && rawDraft) {
       setRetainedRawRevision(undefined);
       if (stale || !onReplaceXml) {
         setDraftSwitch({
@@ -378,7 +409,7 @@ export function BankEditor({
       <Tabs.Root
         className="editor-views"
         value={selectedView}
-        activationMode={draft ? "manual" : "automatic"}
+        activationMode={hasDraft ? "manual" : "automatic"}
         onValueChange={(key) => {
           if (key === "simple" || key === "table" || key === "raw")
             selectView(key);
@@ -390,7 +421,7 @@ export function BankEditor({
           onKeyDown={(event) => {
             // Radix activates the tab from keydown. Its native button click can
             // otherwise activate the newly focused dialog button.
-            if (draft && (event.key === "Enter" || event.key === " "))
+            if (hasDraft && (event.key === "Enter" || event.key === " "))
               event.preventDefault();
           }}
         >
@@ -407,7 +438,11 @@ export function BankEditor({
           </Tabs.Trigger>
         </Tabs.List>
         {profile && (
-          <Tabs.Content value="simple" className="editor-view">
+          <Tabs.Content
+            value="simple"
+            className="editor-view"
+            ref={simplePanel}
+          >
             <SimpleEditor
               profile={profile}
               draft={profileDraft}
@@ -495,16 +530,27 @@ export function BankEditor({
           kind={draftSwitch.kind}
           message={draftSwitch.message}
           repairable={
-            !stale &&
-            Boolean(draftSwitch.kind === "raw" ? onReplaceXml : onEditValues)
+            draftSwitch.kind === "simple"
+              ? !staleProfile
+              : !stale &&
+                Boolean(
+                  draftSwitch.kind === "raw" ? onReplaceXml : onEditValues,
+                )
           }
           onDecision={(decision) => {
             if (decision === "discard") {
-              discardDraft();
+              if (draftSwitch.kind === "simple") discardProfileDraft();
+              else discardDraft();
               showView(draftSwitch.nextView);
             } else if (decision === "repair") {
               if (draftSwitch.kind === "raw") rawEditor.current?.focus();
-              else {
+              else if (draftSwitch.kind === "simple") {
+                const panel = simplePanel.current;
+                const field = panel?.querySelector<HTMLInputElement>(
+                  "[data-profile-draft]:not([readonly]):not(:disabled)",
+                );
+                (field ?? panel)?.focus();
+              } else {
                 const panel = tablePanel.current;
                 const field =
                   panel?.querySelector<HTMLInputElement>(
@@ -569,21 +615,20 @@ export function BankEditor({
             className="editor-button"
             type="button"
             disabled={busy}
-            onClick={() => {
-              setProfileDraft(undefined);
-              clearNotice();
-            }}
+            onClick={discardProfileDraft}
           >
             Discard draft
           </button>
-          <button
-            className="editor-button editor-primary"
-            type="button"
-            disabled={busy || staleProfile}
-            onClick={profileDraft.preview ? applyProfile : previewProfile}
-          >
-            {profileDraft.preview ? "Apply preview" : "Preview edits"}
-          </button>
+          {simpleVisible && (
+            <button
+              className="editor-button editor-primary"
+              type="button"
+              disabled={busy || staleProfile}
+              onClick={profileDraft.preview ? applyProfile : previewProfile}
+            >
+              {profileDraft.preview ? "Apply preview" : "Preview edits"}
+            </button>
+          )}
         </div>
       )}
 

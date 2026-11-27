@@ -315,18 +315,63 @@ async function verifySimpleView(page, chooseBank) {
   const score = panel.getByRole("textbox", { name: /^Score/ });
   await score.waitFor();
   assert.equal(await score.inputValue(), "01.00");
-  await score.fill("2.00");
-  await page.getByRole("button", { name: "Preview edits" }).click();
+  const rawTab = page.getByRole("tab", { name: "Raw View" });
+  const tableTab = page.getByRole("tab", { name: "Table View" });
+  const decision = page.getByRole("dialog", {
+    name: "Simple draft needs review",
+  });
   const preview = panel.getByRole("region", {
     name: "Proposed profile changes",
   });
+  const xml = page.getByRole("textbox", { name: "Bank XML" });
+
+  async function stagePreview() {
+    await score.fill("2.00");
+    await page.getByRole("button", { name: "Preview edits" }).click();
+    await preview.getByRole("cell", { name: "12.25", exact: true }).waitFor();
+    await preview.getByRole("cell", { name: "4.25", exact: true }).waitFor();
+  }
+
+  await score.fill("2.00");
+  await rawTab.press("Enter");
+  await decision.getByRole("button", { name: "Review edits" }).click();
+  await page.waitForFunction(() =>
+    document.activeElement?.matches(".simple-field input"),
+  );
+  assert.equal(await tab.getAttribute("aria-selected"), "true");
+  assert.equal(await score.inputValue(), "2.00");
+  assert.equal(await xml.isVisible(), false);
+
+  await stagePreview();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await preview.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Back to editor" }).click();
   await preview.getByRole("cell", { name: "12.25", exact: true }).waitFor();
   await preview.getByRole("cell", { name: "4.25", exact: true }).waitFor();
+
+  await tableTab.click();
+  await decision.waitFor();
+  await page.keyboard.press("Escape");
+  await decision.waitFor({ state: "detached" });
+  assert.equal(await tab.getAttribute("aria-selected"), "true");
+  await preview.getByRole("cell", { name: "12.25", exact: true }).waitFor();
+
+  await rawTab.press("Space");
+  await decision.getByRole("button", { name: "Discard and switch" }).click();
+  await xml.filter({ hasText: /<Score fixed='01.00'/ }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Apply preview" }).count(),
+    0,
+  );
+  await tab.click();
+  assert.equal(await score.inputValue(), "01.00");
+  assert.equal(await preview.isVisible(), false);
+
+  await stagePreview();
   await page.getByRole("button", { name: "Apply preview" }).click();
   await preview.waitFor({ state: "hidden" });
 
-  await page.getByRole("tab", { name: "Raw View" }).click();
-  const xml = page.locator(".cm-content");
+  await rawTab.click();
   await xml.filter({ hasText: /<Score fixed='2.00'/ }).waitFor();
   assert.match(await xml.textContent(), /<Reward fixed="12\.25"/u);
   assert.match(await xml.textContent(), /<Total fixed="4\.25"/u);
