@@ -34,4 +34,10 @@ The resulting `starbank-reloaded_0.1.0_arm64.deb` was 9,309,134 bytes with SHA-2
 - A disposable container with networking disabled installed it with `dpkg -i`. It resolved the declared runtime libraries and opened the branded 850×500 welcome window in Xvfb as an unprivileged user.
 - `dpkg --purge starbank-reloaded` removed the app and launcher. Checksums of the synthetic bank, its backup and existing MIME defaults remained identical. The package contains no installation scripts and declares no MIME handler.
 
+## Windows running-instance delivery
+
+The Windows association passes a selected bank through startup arguments. Forwarding it to an already-running editor remains unimplemented. Explorer delivery and installer registration still require native Windows verification.
+
+Tauri single-instance 2.5.5 matches the pinned Tauri series and supports a Windows-only dependency. Its Windows receiver decodes and allocates incoming arguments before the application callback can apply its queue limit. The receiver also assumes its native pointers are valid. A bounded receiver is required before adding this dependency for running-instance delivery. [Pinned plugin manifest](https://github.com/tauri-apps/plugins-workspace/blob/128190689dbe59b59d344e01bf07b00862aa3791/plugins/single-instance/Cargo.toml) · [Windows receiver](https://github.com/tauri-apps/plugins-workspace/blob/128190689dbe59b59d344e01bf07b00862aa3791/plugins/single-instance/src/platform_impl/windows.rs#L175-L207)
+
 Signed release artifacts, the Windows installer and Explorer flow, native Windows runtime, and final rights and license approval remain open.
