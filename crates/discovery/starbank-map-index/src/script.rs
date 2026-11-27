@@ -14,15 +14,26 @@ const MAX_VARIABLES: usize = 4096;
 const MAX_IDENTIFIER_BYTES: usize = 256;
 
 pub(crate) fn headings(source: &str) -> (Option<&str>, Option<&str>) {
-	let comments = || {
-		source
-			.lines()
-			.filter_map(|line| line.trim_start().strip_prefix("//"))
-			.map(str::trim_start)
-	};
-	let title = comments().find_map(|line| line.strip_prefix(TITLE_HEADING).and_then(display_text));
-	let author =
-		comments().find_map(|line| line.strip_prefix(AUTHOR_HEADING).and_then(display_text));
+	let mut lexer = Lexer { source, cursor: 0 };
+	let mut title = None;
+	let mut author = None;
+	while title.is_none() || author.is_none() {
+		let next = lexer.next_token(|start, text| {
+			let line_prefix = source[..start]
+				.rsplit(['\r', '\n'])
+				.next()
+				.unwrap_or_default();
+			if !line_prefix.trim().is_empty() {
+				return;
+			}
+			let text = text.trim_start();
+			title = title.or_else(|| text.strip_prefix(TITLE_HEADING).and_then(display_text));
+			author = author.or_else(|| text.strip_prefix(AUTHOR_HEADING).and_then(display_text));
+		});
+		if next.is_none() {
+			break;
+		}
+	}
 	(title, author)
 }
 
@@ -172,14 +183,17 @@ impl<'a> Lexer<'a> {
 		&self.source.as_bytes()[self.cursor..]
 	}
 
-	fn skip_trivia(&mut self) {
+	fn skip_trivia(&mut self, mut on_line_comment: impl FnMut(usize, &'a str)) {
 		loop {
 			let input = self.remaining();
 			if input.starts_with(b"//") {
-				self.cursor += input
-					.iter()
-					.position(|byte| matches!(byte, b'\r' | b'\n'))
-					.unwrap_or(input.len());
+				let end = self.cursor
+					+ input
+						.iter()
+						.position(|byte| matches!(byte, b'\r' | b'\n'))
+						.unwrap_or(input.len());
+				on_line_comment(self.cursor, &self.source[self.cursor + 2..end]);
+				self.cursor = end;
 			} else if let Some(comment) = input.strip_prefix(b"/*") {
 				let end = comment
 					.windows(2)
@@ -211,13 +225,9 @@ impl<'a> Lexer<'a> {
 		self.cursor = self.source.len();
 		Token::Other
 	}
-}
 
-impl<'a> Iterator for Lexer<'a> {
-	type Item = Token<'a>;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		self.skip_trivia();
+	fn next_token(&mut self, on_line_comment: impl FnMut(usize, &'a str)) -> Option<Token<'a>> {
+		self.skip_trivia(on_line_comment);
 		let start = self.cursor;
 		let byte = *self.remaining().first()?;
 		self.cursor += 1;
@@ -246,5 +256,13 @@ impl<'a> Iterator for Lexer<'a> {
 			}
 			byte => Token::Symbol(byte),
 		})
+	}
+}
+
+impl<'a> Iterator for Lexer<'a> {
+	type Item = Token<'a>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.next_token(|_, _| {})
 	}
 }

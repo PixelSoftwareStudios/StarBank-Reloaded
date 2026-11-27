@@ -335,6 +335,31 @@ fn lexer_extracts_static_names_and_leaves_dynamic_assignments_unknown() -> Resul
 }
 
 #[test]
+fn headings_use_only_standalone_lexical_line_comments() -> Result<(), MetadataError> {
+	let decoys = [
+		"/*\n// Name: Block title\n// Author: Blizzard Entertainment\n*/\n",
+		"string example = \"example \\\" text\n// Name: String title\n// Author: Blizzard Entertainment\nend\";\n",
+		"int ignored = 0; // Name: Trailing title\nignored = 1; // Author: Blizzard Entertainment\n",
+	];
+	let actual =
+		"// Name: Real Map\n  // Author: Real Studio\nBankLoad( /* docs */ \"Actual\", 1);";
+	for decoy in decoys {
+		let absent = parse_metadata(Some(decoy.as_bytes()), None)?;
+		assert!(absent.title.is_none(), "unexpected title in {decoy:?}");
+		assert!(absent.author.is_none(), "unexpected author in {decoy:?}");
+
+		let script = format!("{decoy}{actual}");
+		let metadata = parse_metadata(Some(script.as_bytes()), None)?;
+		assert_eq!(metadata.title.as_deref(), Some("Real Map"));
+		assert_eq!(metadata.title_source, Some(MapTitleSource::Script));
+		assert_eq!(metadata.author.as_deref(), Some("Real Studio"));
+		assert_eq!(metadata.declared_blizzard(), Some(false));
+		assert_eq!(metadata.bank_names, ["actual"]);
+	}
+	Ok(())
+}
+
+#[test]
 fn headers_only_fill_missing_or_placeholder_title() -> Result<(), MetadataError> {
 	let complete = b"DocInfo/Name..xyz\0R\xc3\xa9sum\xc3\xa9\x01\0";
 	let metadata = parse_metadata(Some(b"// Name: ?????\n"), Some(complete))?;

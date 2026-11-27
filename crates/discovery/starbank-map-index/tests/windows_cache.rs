@@ -2,7 +2,7 @@
 
 use std::{fs, os::windows::fs::OpenOptionsExt};
 
-use starbank_map_index::{Cancellation, IndexLimits, IndexRequest, scan_maps};
+use starbank_map_index::{CacheState, Cancellation, IndexLimits, IndexRequest, scan_maps};
 
 #[test]
 fn windows_cache_detects_identity_only_replacement_and_reuses_without_data_access()
@@ -27,8 +27,8 @@ fn windows_cache_detects_identity_only_replacement_and_reuses_without_data_acces
 	assert_eq!(original.index.maps().len(), 1);
 	assert_eq!(scan()?.cache_hits, 1);
 
-	// A previously persisted Windows cache has no modern identity field. It stays
-	// readable, but must be rebuilt rather than serving its weaker fingerprint.
+	// Keep the current parser version so this exercises the optional identity
+	// field. The cache loads, but its identity-less record must miss.
 	let mut legacy: serde_json::Value = serde_json::from_slice(&fs::read(&cache)?)?;
 	let records = legacy["records"].as_object_mut().expect("cache records");
 	assert_eq!(records.len(), 1);
@@ -43,6 +43,7 @@ fn windows_cache_detects_identity_only_replacement_and_reuses_without_data_acces
 	fs::write(&cache, serde_json::to_vec(&legacy)?)?;
 	let migrated = scan()?;
 	assert!(migrated.issues.is_empty(), "{:?}", migrated.issues);
+	assert_eq!(migrated.cache_state, CacheState::Loaded);
 	assert_eq!(migrated.cache_hits, 0);
 	assert_eq!(scan()?.cache_hits, 1);
 

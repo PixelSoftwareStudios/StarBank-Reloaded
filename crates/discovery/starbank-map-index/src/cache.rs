@@ -12,7 +12,8 @@ use tempfile::NamedTempFile;
 
 use crate::{IndexIssue, IndexIssueKind, MapMetadata};
 
-const CACHE_FORMAT: u32 = 1;
+// Version 2 requires headings from standalone lexical line comments.
+const CACHE_FORMAT: u32 = 2;
 const MAX_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 pub(crate) fn locate(path: &Path, input_roots: &BTreeSet<PathBuf>) -> io::Result<PathBuf> {
