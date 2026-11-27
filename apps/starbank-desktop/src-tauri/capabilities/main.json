@@ -37,6 +37,7 @@
     "allow-review-backup-retention",
     "allow-create-batch-backup",
     "allow-cancel-batch-backup",
+    "allow-review-batch-backup",
     "allow-refresh-inventory",
     "allow-inventory-backup-status",
     "allow-rebuild-map-index",

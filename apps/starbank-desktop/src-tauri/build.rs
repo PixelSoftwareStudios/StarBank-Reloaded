@@ -35,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"review_backup_retention",
 			"create_batch_backup",
 			"cancel_batch_backup",
+			"review_batch_backup",
 			"refresh_inventory",
 			"inventory_backup_status",
 			"rebuild_map_index",

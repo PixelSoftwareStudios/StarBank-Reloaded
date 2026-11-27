@@ -109,6 +109,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			crate::backup_retention::review_backup_retention,
 			crate::batch_backup::create_batch_backup,
 			crate::batch_backup::cancel_batch_backup,
+			crate::batch_backup::review_batch_backup,
 			crate::inventory::refresh_inventory,
 			crate::inventory::inventory_backup_status,
 			crate::inventory::rebuild_map_index,

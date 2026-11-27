@@ -67,14 +67,14 @@ struct RecoveryEditorTarget {
 }
 
 #[derive(Debug, Serialize)]
-struct DisplayPath {
-	display: String,
-	truncated: bool,
-	lossy: bool,
+pub(crate) struct DisplayPath {
+	pub(crate) display: String,
+	pub(crate) truncated: bool,
+	pub(crate) lossy: bool,
 }
 
 impl DisplayPath {
-	fn new(path: &Path) -> Self {
+	pub(crate) fn new(path: &Path) -> Self {
 		let (display, truncated) = bounded(&path.to_string_lossy(), MAX_DISPLAY_PATH_BYTES);
 		Self {
 			display,
@@ -242,7 +242,7 @@ fn receipt(
 	backup: BackupEvidence,
 	reason: &dyn Display,
 ) -> RecoveryReceipt {
-	let (reason, reason_truncated) = bounded(&reason.to_string(), MAX_REASON_BYTES);
+	let (reason, reason_truncated) = bounded_reason(reason);
 	RecoveryReceipt {
 		operation: context.operation,
 		outcome,
@@ -258,6 +258,10 @@ fn receipt(
 		reason_truncated,
 		editor_target: None,
 	}
+}
+
+pub(crate) fn bounded_reason(reason: &dyn Display) -> (String, bool) {
+	bounded(&reason.to_string(), MAX_REASON_BYTES)
 }
 
 fn bounded(value: &str, max_bytes: usize) -> (String, bool) {
