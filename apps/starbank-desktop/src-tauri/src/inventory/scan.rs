@@ -45,6 +45,7 @@ pub(super) fn collect_inventory(
 ) -> Result<CollectedInventory, InventoryError> {
 	check_cancelled(cancellation)?;
 	progress.locating_folder();
+	check_cancelled(cancellation)?;
 	let manual_path = manual.map(|root| root.path.as_path());
 	if let Some(root) = manual
 		&& let Some(identity) = root.identity
@@ -96,6 +97,7 @@ pub(super) fn collect_inventory(
 		identity: Some(root.identity()),
 	});
 	progress.enumerating_banks();
+	check_cancelled(cancellation)?;
 	let banks = match inventory_banks(&selection, BANK_SCAN_LIMITS) {
 		Ok(banks) => banks,
 		Err(error) => return Ok((path_failure(manual_path, &error), accepted, None)),

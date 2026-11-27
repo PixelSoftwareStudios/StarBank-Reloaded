@@ -119,14 +119,17 @@ impl InventoryService {
 		if !OpaqueIds::accepts_bank_id(id) {
 			return Err(InventoryError::UnknownBank);
 		}
-		let authority = self
-			.state
-			.lock()
-			.map_err(|_| InventoryError::Unavailable)?
-			.banks
-			.get(id)
-			.cloned()
-			.ok_or(InventoryError::UnknownBank)?;
+		let authority = {
+			let state = self.state.lock().map_err(|_| InventoryError::Unavailable)?;
+			if state.active.is_some() {
+				return Err(InventoryError::Busy);
+			}
+			state
+				.banks
+				.get(id)
+				.cloned()
+				.ok_or(InventoryError::UnknownBank)?
+		};
 		authority.validate()?;
 		Ok(authority)
 	}
@@ -207,8 +210,17 @@ impl InventoryService {
 		if let (Some(store), Some(manual)) = (&self.root_record, record_value) {
 			state.root_record_unavailable = store.save(manual).is_err();
 		}
-		if accepted_root.is_some() {
-			state.manual_root = accepted_root;
+		match lease.change {
+			RootChange::Keep => {
+				if accepted_root.is_some() {
+					state.manual_root = accepted_root;
+				}
+			}
+			RootChange::Manual => {
+				// Keep an invalid explicit selection visible so a refresh cannot use a different scope.
+				state.manual_root = accepted_root.or_else(|| lease.root.clone());
+			}
+			RootChange::Automatic => state.manual_root = None,
 		}
 		snapshot.generation = lease.generation.to_string();
 		state.banks = banks;
@@ -228,26 +240,19 @@ impl InventoryService {
 		if state.active.is_some() {
 			return Err(InventoryError::Busy);
 		}
-		let change = match mode {
-			ScanMode::Refresh | ScanMode::RebuildMapIndex => RootChange::Keep,
-			ScanMode::Manual(path) => {
-				if state.manual_root.as_ref().map(|root| &root.path) != Some(&path) {
-					state.banks.clear();
-					state.map_members.clear();
-				}
-				state.manual_root = Some(ManualRoot {
+		// Keep the published root and bank IDs until the scan crosses its final cancellation check.
+		let (root, change) = match mode {
+			ScanMode::Refresh | ScanMode::RebuildMapIndex => {
+				(state.manual_root.clone(), RootChange::Keep)
+			}
+			ScanMode::Manual(path) => (
+				Some(ManualRoot {
 					path,
 					identity: None,
-				});
-				RootChange::Manual
-			}
-			ScanMode::Automatic => {
-				if state.manual_root.take().is_some() {
-					state.banks.clear();
-					state.map_members.clear();
-				}
-				RootChange::Automatic
-			}
+				}),
+				RootChange::Manual,
+			),
+			ScanMode::Automatic => (None, RootChange::Automatic),
 		};
 		let cancellation = Cancellation::default();
 		state.generation = state
@@ -257,7 +262,7 @@ impl InventoryService {
 		state.active = Some(cancellation.clone());
 		Ok(ScanLease {
 			service: self,
-			root: state.manual_root.clone(),
+			root,
 			change,
 			ids: state.ids.clone(),
 			generation: state.generation,

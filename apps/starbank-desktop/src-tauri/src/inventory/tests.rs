@@ -163,6 +163,75 @@ fn a_cancellation_releases_the_scan_lease_without_executing_another_scan() -> io
 }
 
 #[test]
+fn cancelling_folder_or_auto_detection_preserves_the_published_and_saved_scope() -> io::Result<()> {
+	let sandbox = tempfile::tempdir()?;
+	let root = sandbox.path().canonicalize()?;
+	let config = root.join("config").join("inventory.json");
+	let previous = root.join("Published folder");
+	let pending = root.join("Pending folder");
+	let published = write(&previous, "Published.SC2Bank", b"<Bank/>")?;
+	write(&pending, "Pending.SC2Bank", b"<Bank/>")?;
+
+	let service = InventoryService::default().with_root_record(Some(config.clone()));
+	let first = manual_snapshot(&service, &previous, &[])?;
+	let bank_id = first["banks"][0]["id"].as_str().expect("published bank ID");
+	let persisted = fs::read(&config)?;
+
+	for (mode, last_stage, generation) in [
+		(ScanMode::Manual(pending), "indexing_maps", 2),
+		(ScanMode::Automatic, "locating_folder", 3),
+	] {
+		let mut cancelled_at_phase = false;
+		let result = service.scan_with_progress(mode, &[], |event| {
+			let progress = serde_json::to_value(event).expect("progress event");
+			assert!(!cancelled_at_phase, "no later phases may run after cancel");
+			if progress["stage"] == last_stage {
+				assert_eq!(progress["generation"], generation.to_string());
+				assert!(matches!(
+					service.authorize_bank(bank_id),
+					Err(InventoryError::Busy)
+				));
+				service
+					.cancel(generation)
+					.expect("cancel current generation");
+				cancelled_at_phase = true;
+			}
+		});
+		assert!(cancelled_at_phase);
+		assert!(matches!(result, Err(InventoryError::Cancelled)));
+		assert_eq!(
+			service.picker_directory().expect("picker path"),
+			Some(previous.clone())
+		);
+		assert_eq!(
+			service
+				.authorize_bank(bank_id)
+				.expect("retained authority")
+				.path(),
+			published
+		);
+		assert_eq!(fs::read(&config)?, persisted);
+	}
+
+	let restarted = InventoryService::default().with_root_record(Some(config));
+	for inventory in [&service, &restarted] {
+		let refresh = inventory
+			.scan_with_roots(ScanMode::Refresh, &[])
+			.expect("retained root");
+		let refresh = serialize_snapshot(refresh)?;
+		assert_eq!(refresh["status"], "ready");
+		assert_eq!(refresh["manual"], true);
+		assert_eq!(refresh["rootName"], "Published folder");
+		assert_eq!(
+			refresh["banks"].as_array().expect("published banks").len(),
+			1
+		);
+		assert_eq!(refresh["banks"][0]["name"], "Published.SC2Bank");
+	}
+	Ok(())
+}
+
+#[test]
 fn a_stale_manual_root_failure_keeps_the_override_and_redacts_the_path() -> io::Result<()> {
 	let temp = tempfile::tempdir()?;
 	let root = temp.path().canonicalize()?.join("Former collection");
