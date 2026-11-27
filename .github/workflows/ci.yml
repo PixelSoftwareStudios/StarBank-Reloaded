@@ -69,6 +69,77 @@ jobs:
           cargo nextest run --locked -p starbank-fs --lib
           --run-ignored only --no-tests fail --success-output immediate
           -E 'test(=windows::rename_qualification::local_ntfs_handle_relative_create_only_publication)'
+      - name: Verify the pinned native StormLib append backend
+        if: matrix.os == 'macos-15'
+        shell: bash
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+        run: |
+          work="$(mktemp -d "$RUNNER_TEMP/starbank-stormlib-ci.XXXXXX")"
+          trap 'rm -rf -- "$work"' EXIT
+          cmake_asset=cmake-4.4.4-macos-universal.tar.gz
+          cmake_sha256=4b7b73704b1db9b374e5c9ab8e17ac6148b817b6396ee75cd94a852cbac9d305
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "$work/$cmake_asset" \
+            "https://github.com/Kitware/CMake/releases/download/v4.4.4/$cmake_asset"
+          printf '%s  %s\n' "$cmake_sha256" "$work/$cmake_asset" | shasum -a 256 --check
+          tar -xzf "$work/$cmake_asset" -C "$work"
+          cmake_bin="$(find "$work" -type f -path '*/bin/cmake' -print)"
+          test -x "$cmake_bin"
+          export PATH="${cmake_bin%/*}:$PATH"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "$work/StormLib-v9.40.tar.gz" \
+            https://codeload.github.com/ladislav-zezula/StormLib/tar.gz/refs/tags/v9.40
+          STARBANK_STORMLIB_ARTIFACT="$(
+            sh crates/adapters/starbank-mpq-stormlib/verification/bootstrap-macos-arm64.sh \
+              "$work/StormLib-v9.40.tar.gz"
+          )"
+          export STARBANK_STORMLIB_ARTIFACT
+          cargo clippy --locked -p starbank-mpq-stormlib --features native-stormlib --all-targets -- -D warnings
+          cargo nextest run --locked -p starbank-mpq-stormlib --features native-stormlib --no-tests fail
+      - name: Run bounded MPQ append verifier fuzzing under AddressSanitizer
+        if: matrix.os == 'macos-15'
+        id: mpq_fuzz
+        shell: bash
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+        run: |
+          work="$(mktemp -d "$RUNNER_TEMP/starbank-mpq-fuzz.XXXXXX")"
+          printf 'evidence=%s\n' "$work" >> "$GITHUB_OUTPUT"
+          (
+            set -e
+            fuzz_toolchain=nightly-2026-11-04
+            rustup toolchain install "$fuzz_toolchain" --profile minimal
+            cargo +1.100.0 install cargo-fuzz --version '=0.13.2' --locked
+            test "$(cargo "+$fuzz_toolchain" fuzz --version)" = 'cargo-fuzz 0.13.2'
+            cargo "+$fuzz_toolchain" metadata --locked --format-version 1 > /dev/null
+            mkdir "$work/corpus" "$work/artifacts"
+            cp Cargo.lock "$work/Cargo.lock"
+            cp crates/adapters/starbank-mpq/tests/fixtures/append-v1-{source,output}.s2ma "$work/corpus/"
+            for selector in 000 001 002 003 004 005 006 007; do
+              printf '%b' "\\$selector\\000\\001\\002" > "$work/corpus/operation-$selector"
+            done
+            printf '\006\001x' > "$work/corpus/traversal-name"
+            printf '\006\002Edited.txt' > "$work/corpus/arbitrary-name"
+            cargo "+$fuzz_toolchain" fuzz run \
+              --fuzz-dir crates/adapters/starbank-mpq/fuzz --features fuzzing \
+              --target-dir target/starbank-mpq-fuzz --sanitizer address v1_append "$work/corpus" -- \
+              -seed=1 -max_len=4096 -len_control=0 -max_total_time=20 -rss_limit_mb=1024 \
+              -timeout=5 -print_funcs=0 -print_final_stats=1 "-artifact_prefix=$work/artifacts/"
+            cmp Cargo.lock "$work/Cargo.lock"
+          ) 2>&1 | tee "$work/run.log"
+          rm -rf -- "$work"
+      - name: Retain failed MPQ fuzz evidence
+        if: failure() && steps.mpq_fuzz.outcome == 'failure' && steps.mpq_fuzz.outputs.evidence != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mpq-append-fuzz-failure
+          path: |
+            ${{ steps.mpq_fuzz.outputs.evidence }}/run.log
+            ${{ steps.mpq_fuzz.outputs.evidence }}/corpus/
+            ${{ steps.mpq_fuzz.outputs.evidence }}/artifacts/
+          if-no-files-found: error
+          retention-days: 7
       - run: cargo test --workspace --doc --locked
       - run: cargo doc --workspace --no-deps --locked
         env:
