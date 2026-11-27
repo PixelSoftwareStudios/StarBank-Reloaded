@@ -1,6 +1,7 @@
 use std::{fs, io, path::PathBuf};
 
 use super::*;
+use crate::xml_comparison::EXCERPT_BYTES;
 
 const ORIGINAL: &str = "<Bank><Section name='Wallet'/></Bank>";
 const EDITED: &str = "<Bank><Section name='Edited'/></Bank>";

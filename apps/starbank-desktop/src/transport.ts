@@ -183,6 +183,21 @@ export function exportActiveBackup(
   return invoke<string | null>("export_active_backup", { target, backupId });
 }
 
+export interface BackupRestoreReview {
+  readonly description: string;
+  readonly comparison: XmlComparison;
+}
+
+export function reviewActiveBackup(
+  target: ActiveBankTarget,
+  backupId: number,
+): Promise<BackupRestoreReview> {
+  return invoke<BackupRestoreReview>("review_active_backup", {
+    target,
+    backupId,
+  });
+}
+
 export function restoreActiveBank(
   target: ActiveBankTarget,
   backupId: number,
@@ -193,18 +208,25 @@ export function restoreActiveBank(
   });
 }
 
-export interface ConflictExcerpt {
+interface XmlExcerpt {
   readonly text: string;
   readonly omitsStart: boolean;
   readonly omitsEnd: boolean;
+}
+
+export interface XmlComparison {
+  readonly firstDifferenceLine: number | null;
+  readonly startLine: number;
+  readonly before: XmlExcerpt;
+  readonly after: XmlExcerpt;
 }
 
 export interface ConflictReview {
   readonly id: string;
   readonly firstDifferenceLine: number | null;
   readonly startLine: number;
-  readonly editor: ConflictExcerpt;
-  readonly onDisk: ConflictExcerpt;
+  readonly editor: XmlExcerpt;
+  readonly onDisk: XmlExcerpt;
 }
 
 export function compareBankConflict(target: ActiveBankTarget) {

@@ -20,6 +20,7 @@ mod reveal;
 mod save;
 mod selection;
 mod settings;
+mod xml_comparison;
 
 fn main() -> tauri::Result<()> {
 	desktop::run()

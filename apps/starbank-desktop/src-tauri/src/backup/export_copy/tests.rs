@@ -117,6 +117,7 @@ fn backup_selection_is_one_shot_and_specific_to_the_list_request() -> io::Result
 		document_id: target.document_id.clone(),
 		revision,
 		records: vec![backup],
+		reviewed_restore: None,
 	});
 	let stale_list = ActiveTarget {
 		document_id: target.document_id.clone(),

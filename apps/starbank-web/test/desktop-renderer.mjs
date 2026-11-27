@@ -194,6 +194,31 @@ function createBridge(engine, canOverwrite) {
       case "export_active_backup":
         dirtySnapshot(args.target);
         return { value: "Backup Copy.SC2Bank" };
+      case "review_active_backup":
+        dirtySnapshot(args.target);
+        return {
+          value: {
+            description:
+              "A reversal backup will be verified first. This discards the unsaved changes.",
+            comparison: {
+              firstDifferenceLine: 1,
+              startLine: 1,
+              before: {
+                text: initialBank.toString(),
+                omitsStart: false,
+                omitsEnd: false,
+              },
+              after: {
+                text: initialBank.toString().replace('"001"', '"003"'),
+                omitsStart: false,
+                omitsEnd: false,
+              },
+            },
+          },
+        };
+      case "restore_active_bank":
+        dirtySnapshot(args.target);
+        return { value: null };
       case "confirm_bank_navigation":
         assert(navigation);
         dirtySnapshot(args.target);
@@ -308,7 +333,10 @@ async function verifyBackupCopy(page, bridge, canOverwrite) {
   assert(
     await dialog.getByRole("radio", { name: /Verified\.SC2Bank/ }).isChecked(),
   );
-  assert.equal(await button(dialog, "Continue").count(), canOverwrite ? 1 : 0);
+  assert.equal(
+    await button(dialog, "Review Restore…").count(),
+    canOverwrite ? 1 : 0,
+  );
   await button(dialog, "Save a Copy…").click();
   await page
     .getByRole("status")
@@ -329,6 +357,35 @@ async function verifyBackupCopy(page, bridge, canOverwrite) {
   assert.deepEqual(bridge.callsFor("save_active_bank"), []);
   assert.deepEqual(bridge.callsFor("save_bank_as"), []);
   assert.equal(bridge.callsFor("open_bank").length, 1);
+}
+
+async function verifyBackupRestoreReview(page, bridge) {
+  await button(page, "More save options").click();
+  await page.getByRole("menuitem", { name: "Restore Backup…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Restore Bank Backup" });
+  await button(dialog, "Review Restore…").click();
+  await dialog.getByRole("heading", { name: "Current file" }).waitFor();
+  await dialog.getByRole("heading", { name: "Backup", exact: true }).waitFor();
+  assert.deepEqual(await dialog.locator("pre").allTextContents(), [
+    initialBank.toString(),
+    initialBank.toString().replace('"001"', '"003"'),
+  ]);
+  await dialog.getByText(/discards the unsaved changes/).waitFor();
+  assert.deepEqual(bridge.callsFor("restore_active_bank"), []);
+  await button(dialog, "Back").click();
+  await button(dialog, "Review Restore…").click();
+  await button(dialog, "Restore…").click();
+  await dialog.waitFor({ state: "hidden" });
+  const reviewed = {
+    target: bridge.callsFor("list_active_backups").at(-1).target,
+    backupId: verifiedBackupId,
+  };
+  assert.deepEqual(bridge.callsFor("review_active_backup"), [
+    reviewed,
+    reviewed,
+  ]);
+  assert.deepEqual(bridge.callsFor("restore_active_bank"), [reviewed]);
+  assert.equal(await goldField(page).inputValue(), "002");
 }
 
 async function verifyBankNavigation(page, bridge, canOverwrite) {
@@ -440,6 +497,7 @@ async function verifyRenderer(browser, canOverwrite) {
     if (canOverwrite) await verifyToolsMenu(page);
     await editGold(page, "002");
     await verifyBackupCopy(page, bridge, canOverwrite);
+    if (canOverwrite) await verifyBackupRestoreReview(page, bridge);
     await verifyBankNavigation(page, bridge, canOverwrite);
     assert.deepEqual(bridge.unexpected, []);
     assert.deepEqual(errors, []);

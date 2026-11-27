@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { ConflictExcerpt, ConflictReview } from "./transport";
+import type { ConflictReview } from "./transport";
+import { XmlComparisonView } from "./xml-comparison";
 
 export interface BankConflictPrompt {
   compare: () => Promise<ConflictReview>;
@@ -68,17 +69,17 @@ export function BankConflictDialog({
         Your editor is still open. Compare with the file before reopening it.
       </p>
       {review && (
-        <div className="mt-3">
-          <p role="status">
-            {review.firstDifferenceLine === null
-              ? "The XML text matches. The file bytes or metadata differ."
-              : `First XML difference at line ${review.firstDifferenceLine}. Both excerpts start at line ${review.startLine}.`}
-          </p>
-          <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2">
-            <Excerpt title="In the editor" excerpt={review.editor} />
-            <Excerpt title="On disk" excerpt={review.onDisk} />
-          </div>
-        </div>
+        <XmlComparisonView
+          comparison={{
+            firstDifferenceLine: review.firstDifferenceLine,
+            startLine: review.startLine,
+            before: review.editor,
+            after: review.onDisk,
+          }}
+          beforeTitle="In the editor"
+          afterTitle="On disk"
+          matchingText="The XML text matches. The file bytes or metadata differ."
+        />
       )}
       {error && (
         <p className="mt-3" role="alert">
@@ -124,24 +125,5 @@ export function BankConflictDialog({
         )}
       </div>
     </dialog>
-  );
-}
-
-function Excerpt({
-  title,
-  excerpt,
-}: {
-  title: string;
-  excerpt: ConflictExcerpt;
-}) {
-  return (
-    <div className="min-w-0 rounded border border-neutral-400 p-2 dark:border-neutral-600">
-      <h3 className="mb-1 font-semibold">{title}</h3>
-      {excerpt.omitsStart && <p className="text-xs">Earlier text omitted</p>}
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs">
-        {excerpt.text}
-      </pre>
-      {excerpt.omitsEnd && <p className="text-xs">Later text omitted</p>}
-    </div>
   );
 }

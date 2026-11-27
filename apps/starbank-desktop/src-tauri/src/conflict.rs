@@ -11,9 +11,8 @@ use tauri::{Manager as _, State, WebviewWindow};
 use crate::commands::{CommandError, DesktopEngine, OpenedBank};
 use crate::save::{ActiveTarget, DesktopSession, confirm, trusted_fingerprint};
 use crate::selection::bank_name;
+use crate::xml_comparison::{Excerpt, XmlComparison};
 
-const BEFORE_DIFFERENCE_BYTES: usize = 2_048;
-const EXCERPT_BYTES: usize = 16_384;
 const RAW_TEXT: &str = "raw_text";
 
 #[cfg(test)]
@@ -46,14 +45,6 @@ pub(crate) struct ConflictReview {
 	start_line: usize,
 	editor: Excerpt,
 	on_disk: Excerpt,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Excerpt {
-	text: String,
-	omits_start: bool,
-	omits_end: bool,
 }
 
 #[tauri::command]
@@ -222,48 +213,12 @@ fn cannot_compare(reason: impl std::fmt::Display) -> CommandError {
 }
 
 fn excerpt_review(id: u64, editor: &str, disk: &str) -> ConflictReview {
-	let common_prefix = editor
-		.bytes()
-		.zip(disk.bytes())
-		.take_while(|(editor, disk)| editor == disk)
-		.count();
-	let first_difference = editor.floor_char_boundary(common_prefix);
-	let (first_difference_line, start) = if common_prefix == editor.len()
-		&& common_prefix == disk.len()
-	{
-		(None, 0)
-	} else {
-		(
-			Some(line_at(editor, first_difference)),
-			editor.floor_char_boundary(first_difference.saturating_sub(BEFORE_DIFFERENCE_BYTES)),
-		)
-	};
+	let comparison = XmlComparison::between(editor, disk);
 	ConflictReview {
 		id: id.to_string(),
-		first_difference_line,
-		start_line: line_at(editor, start),
-		editor: excerpt(editor, start),
-		on_disk: excerpt(disk, start),
-	}
-}
-
-fn line_at(text: &str, index: usize) -> usize {
-	let bytes = text.as_bytes();
-	bytes[..index]
-		.iter()
-		.enumerate()
-		.filter(|(offset, byte)| {
-			**byte == b'\n' || (**byte == b'\r' && bytes.get(offset + 1) != Some(&b'\n'))
-		})
-		.count()
-		+ 1
-}
-
-fn excerpt(text: &str, start: usize) -> Excerpt {
-	let end = text.floor_char_boundary(text.len().min(start + EXCERPT_BYTES));
-	Excerpt {
-		text: text[start..end].to_owned(),
-		omits_start: start > 0,
-		omits_end: end < text.len(),
+		first_difference_line: comparison.first_difference_line,
+		start_line: comparison.start_line,
+		editor: comparison.before,
+		on_disk: comparison.after,
 	}
 }

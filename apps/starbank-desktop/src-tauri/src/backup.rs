@@ -1,29 +1,26 @@
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Serialize;
 use starbank_backup::BackupError;
 use starbank_core::Revision;
-use starbank_editor::{NativeRestorePolicy, NativeRestoreReceipt, max_attachment_bytes};
+use starbank_editor::max_attachment_bytes;
 use starbank_fs::{
 	BackupHealth, BackupPlacement, BackupRecord, BackupVerification, CommitOutcome, Fingerprint,
-	NativeBackupCatalog, NativeBackupPolicy, PreparedRestore, backup_source, read_snapshot,
+	NativeBackupCatalog, NativeBackupPolicy, backup_source,
 };
-use starbank_signature::SignatureStatus;
-use tauri::{AppHandle, Manager as _, State, WebviewWindow};
+use tauri::{AppHandle, Manager as _, WebviewWindow};
 
-use crate::save::{
-	ActiveTarget, DesktopSession, SelectedBank, confirm, trusted_fingerprint, verify_write,
-	write_rejected,
-};
+use crate::save::{ActiveTarget, DesktopSession, trusted_fingerprint, write_rejected};
 use crate::settings::AutomaticBackup;
 use crate::{
 	backup_location::{ManagedBackupFolder, backup_folder, backup_history},
-	commands::{CommandError, DesktopEngine, OpenedBank},
+	commands::{CommandError, DesktopEngine},
 	export::can_export_bank,
 };
 
 pub(crate) mod export_copy;
+pub(crate) mod restore;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +64,7 @@ pub(crate) struct BackupSelection {
 	document_id: String,
 	revision: Revision,
 	records: Vec<SelectedBackup>,
+	reviewed_restore: Option<usize>,
 }
 
 struct SelectedBackup {
@@ -89,20 +87,31 @@ impl SelectedBackup {
 	}
 }
 
+fn backup_selection<'a>(
+	session: &'a DesktopSession,
+	target: &ActiveTarget,
+	revision: Revision,
+	backup_id: usize,
+) -> Result<&'a BackupSelection, CommandError> {
+	session
+		.backup_selection
+		.as_ref()
+		.filter(|selection| {
+			selection.request_id == target.request_id
+				&& selection.document_id == target.document_id
+				&& selection.revision == revision
+				&& backup_id < selection.records.len()
+		})
+		.ok_or(CommandError::InvalidControl)
+}
+
 fn take_backup(
 	session: &mut DesktopSession,
 	target: &ActiveTarget,
 	revision: Revision,
 	backup_id: usize,
 ) -> Result<SelectedBackup, CommandError> {
-	if !session.backup_selection.as_ref().is_some_and(|selection| {
-		selection.request_id == target.request_id
-			&& selection.document_id == target.document_id
-			&& selection.revision == revision
-			&& backup_id < selection.records.len()
-	}) {
-		return Err(CommandError::InvalidControl);
-	}
+	backup_selection(session, target, revision, backup_id)?;
 	session
 		.backup_selection
 		.take()
@@ -238,181 +247,13 @@ fn list_backups(app: &AppHandle, target: &ActiveTarget) -> Result<BackupChoices,
 		document_id: target.document_id.clone(),
 		revision,
 		records: selections,
+		reviewed_restore: None,
 	});
 	Ok(BackupChoices {
 		records,
 		rejected_metadata,
 		unavailable_locations: history.unavailable,
 	})
-}
-
-#[tauri::command]
-pub(crate) async fn restore_active_bank(
-	window: WebviewWindow,
-	state: State<'_, DesktopEngine>,
-	target: ActiveTarget,
-	backup_id: usize,
-) -> Result<Option<OpenedBank>, CommandError> {
-	if !cfg!(target_os = "macos") {
-		return Err(CommandError::Unavailable);
-	}
-	let _dialog = state.dialog()?;
-	let app = window.app_handle().clone();
-	let prepare_app = app.clone();
-	let (target, prepared) =
-		tauri::async_runtime::spawn_blocking(move || -> Result<_, CommandError> {
-			let prepared = prepare_restore(&prepare_app, &target, backup_id)?;
-			Ok((target, prepared))
-		})
-		.await
-		.map_err(|_| CommandError::Unavailable)??;
-	if !confirm(&window, "Restore this bank backup?", &prepared.description).await {
-		return Ok(None);
-	}
-	tauri::async_runtime::spawn_blocking(move || publish_restore(&app, &target, prepared))
-		.await
-		.map_err(|_| CommandError::Unavailable)?
-		.map(Some)
-}
-
-struct Restore {
-	path: PathBuf,
-	storage: PreparedRestore,
-	editor: NativeRestoreReceipt,
-	description: String,
-}
-
-fn prepare_restore(
-	app: &AppHandle,
-	target: &ActiveTarget,
-	backup_id: usize,
-) -> Result<Restore, CommandError> {
-	let state = app.state::<DesktopEngine>();
-	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-	let (selected, revision) = session.selected_for(target)?;
-	starbank_fs::check_replace_scope(&selected.path).map_err(write_rejected)?;
-	let current = read_snapshot(&selected.path, max_attachment_bytes()).map_err(write_rejected)?;
-	if current.fingerprint() != trusted_fingerprint(selected)? {
-		return Err(write_rejected(starbank_fs::StorageError::Conflict));
-	}
-	let path = selected.path.clone();
-	let source = backup_source(&path).map_err(write_rejected)?;
-	let backup = take_backup(&mut session, target, revision, backup_id)?;
-	let catalog = catalog(&mut session)?;
-	let placement = backup.placement(catalog);
-	let storage = catalog
-		.prepare_restore(&source, current, backup.record.id().path(), placement)
-		.map_err(write_rejected)?;
-	if storage.record() != &backup.record {
-		return Err(write_rejected(
-			"This backup changed. Open the backup list again.",
-		));
-	}
-	let dirty = session
-		.editor
-		.native_active_target()
-		.ok_or(CommandError::Unavailable)?
-		.dirty;
-	let policy = if dirty {
-		NativeRestorePolicy::DiscardChanges
-	} else {
-		NativeRestorePolicy::RequireClean
-	};
-	let editor = session
-		.editor
-		.prepare_native_active_restore(
-			&target.document_id,
-			revision,
-			storage.selected().bytes(),
-			policy,
-		)
-		.map_err(write_rejected)?;
-	let description = describe_restore(&storage, editor.signature_status(), dirty);
-	Ok(Restore {
-		path,
-		storage,
-		editor,
-		description,
-	})
-}
-
-fn describe_restore(storage: &PreparedRestore, signature: SignatureStatus, dirty: bool) -> String {
-	let original = storage.current().bytes();
-	let backup = storage.selected().bytes();
-	let change = if original == backup {
-		String::from("The backup and the current file have identical bytes.")
-	} else {
-		let first_changed_byte = original
-			.iter()
-			.zip(backup)
-			.take_while(|(live_byte, backup_byte)| live_byte == backup_byte)
-			.count()
-			+ 1;
-		format!(
-			"The first difference is at byte {first_changed_byte}. The file changes from {} to {} bytes.",
-			original.len(),
-			backup.len()
-		)
-	};
-	let timestamp = storage.record().timestamp();
-	let mut description = format!(
-		"Backup {timestamp} UTC. {change} A reversal backup will be verified before replacing the current file."
-	);
-	if !matches!(
-		signature,
-		SignatureStatus::Valid | SignatureStatus::Unsigned
-	) {
-		description.push_str(" The restored signature could not be verified.");
-	}
-	if dirty {
-		description.push_str(" This also discards the unsaved changes in the editor.");
-	}
-	description
-}
-
-fn publish_restore(
-	app: &AppHandle,
-	target: &ActiveTarget,
-	prepared: Restore,
-) -> Result<OpenedBank, CommandError> {
-	let state = app.state::<DesktopEngine>();
-	let mut session = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
-	let (selected, _) = session.selected_for(target)?;
-	if selected.path != prepared.path
-		|| trusted_fingerprint(selected)? != prepared.storage.current().fingerprint()
-	{
-		return Err(CommandError::Unavailable);
-	}
-	session
-		.editor
-		.validate_native_active_restore(&prepared.editor)
-		.map_err(write_rejected)?;
-	let managed = backup_folder(app, true)?;
-	let catalog = catalog(&mut session)?;
-	managed.authorize(catalog);
-	let effect = catalog
-		.restore(prepared.storage, BackupPlacement::Managed(managed.path()))
-		.map_err(write_rejected)?;
-	let committed = verify_write(&mut session, effect.commit, true)?;
-	let outcome = session
-		.editor
-		.acknowledge_verified_native_active_restore(prepared.editor)
-		.map_err(|_| {
-			session.selected = None;
-			CommandError::SavedNeedsReopen
-		})?;
-	session.backups = None;
-	session.selected = Some(SelectedBank {
-		document_id: outcome.document_id.clone(),
-		path: prepared.path.clone(),
-		fingerprint: Some(committed.fingerprint().clone()),
-	});
-	session.snapshot(
-		&target.request_id,
-		outcome.document_id,
-		outcome.revision,
-		&prepared.path,
-	)
 }
 
 pub(crate) fn fresh_catalog() -> Result<NativeBackupCatalog, CommandError> {

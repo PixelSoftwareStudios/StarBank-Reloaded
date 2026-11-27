@@ -23,7 +23,11 @@ import type {
   SettingsPlatformInfo,
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
-import { type BackupAction, BackupPicker } from "./backup-picker";
+import {
+  type BackupAction,
+  BackupPicker,
+  type BackupPrompt,
+} from "./backup-picker";
 import {
   BackupPreferencesFields,
   useBackupPreferences,
@@ -39,11 +43,7 @@ import {
 } from "./manual-signing-sheet";
 import { OpenRequests, openRequestedBank } from "./open-requests";
 import { resignOpenBank } from "./resign-bank";
-import type {
-  ActiveBankTarget,
-  BackupChoices,
-  FileDialogReply,
-} from "./transport";
+import type { ActiveBankTarget, FileDialogReply } from "./transport";
 import {
   canExportBank,
   canRevealBank,
@@ -59,6 +59,7 @@ import {
   reopenBankConflict,
   restoreActiveBank,
   revealActiveBank,
+  reviewActiveBackup,
   saveActiveBank,
   saveBankAs,
 } from "./transport";
@@ -91,11 +92,7 @@ function DesktopApp() {
   const [exportAvailable, setExportAvailable] = useState(false);
   const [revealAvailable, setRevealAvailable] = useState(false);
   const [overwriteAvailable, setOverwriteAvailable] = useState(false);
-  const [backupPrompt, setBackupPrompt] = useState<{
-    choices: BackupChoices;
-    canRestore: boolean;
-    select: (action?: BackupAction) => void;
-  }>();
+  const [backupPrompt, setBackupPrompt] = useState<BackupPrompt>();
   const [conflictPrompt, setConflictPrompt] = useState<BankConflictPrompt>();
   const [signingPrompt, setSigningPrompt] = useState<ManualSigningPrompt>();
   const inProgress = useRef(false);
@@ -446,7 +443,9 @@ function DesktopApp() {
         (resolve) => {
           setBackupPrompt({
             choices,
-            canRestore: overwriteAvailable,
+            reviewRestore: overwriteAvailable
+              ? (id) => reviewActiveBackup(nativeTarget, id)
+              : undefined,
             select(selection) {
               setBackupPrompt(undefined);
               resolve(selection);
@@ -765,11 +764,7 @@ function DesktopApp() {
       {signingPrompt ? <ManualSigningSheet {...signingPrompt} /> : null}
       {conflictPrompt ? <BankConflictDialog {...conflictPrompt} /> : null}
       {backupPrompt ? (
-        <BackupPicker
-          choices={backupPrompt.choices}
-          canRestore={backupPrompt.canRestore}
-          select={backupPrompt.select}
-        />
+        <BackupPicker {...backupPrompt} messageFor={messageFor} />
       ) : null}
     </>
   );
