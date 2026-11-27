@@ -192,3 +192,28 @@ export function restoreActiveBank(
     backupId,
   });
 }
+
+export interface ConflictExcerpt {
+  readonly text: string;
+  readonly omitsStart: boolean;
+  readonly omitsEnd: boolean;
+}
+
+export interface ConflictReview {
+  readonly id: string;
+  readonly firstDifferenceLine: number | null;
+  readonly startLine: number;
+  readonly editor: ConflictExcerpt;
+  readonly onDisk: ConflictExcerpt;
+}
+
+export function compareBankConflict(target: ActiveBankTarget) {
+  return invoke<ConflictReview>("compare_bank_conflict", { target });
+}
+
+export function reopenBankConflict(target: ActiveBankTarget, reviewId: string) {
+  return invoke<FileDialogReply | null>("reopen_bank_conflict", {
+    target,
+    reviewId,
+  });
+}

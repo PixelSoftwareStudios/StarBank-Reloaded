@@ -30,6 +30,7 @@ import {
 } from "./backup-preferences";
 import { BackupRetentionReview } from "./backup-retention";
 import { useActiveBackupStatus } from "./backup-status";
+import { BankConflictDialog, type BankConflictPrompt } from "./bank-conflict";
 import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
 import { resignExternalBank } from "./external-sign";
 import {
@@ -46,6 +47,7 @@ import type {
 import {
   canExportBank,
   canRevealBank,
+  compareBankConflict,
   confirmBankNavigation,
   decodeBankXml,
   dispatchBank,
@@ -54,6 +56,7 @@ import {
   exportBankCopy,
   listActiveBackups,
   pickBank,
+  reopenBankConflict,
   restoreActiveBank,
   revealActiveBank,
   saveActiveBank,
@@ -93,6 +96,7 @@ function DesktopApp() {
     canRestore: boolean;
     select: (action?: BackupAction) => void;
   }>();
+  const [conflictPrompt, setConflictPrompt] = useState<BankConflictPrompt>();
   const [signingPrompt, setSigningPrompt] = useState<ManualSigningPrompt>();
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
@@ -359,6 +363,18 @@ function DesktopApp() {
     target: EditorTarget,
     mode: "overwrite" | "backup" | "new",
   ): Promise<EditorActionResult> {
+    try {
+      return await saveRevision(target, mode);
+    } catch (error) {
+      if (error !== "external_bank_changed" || mode === "new") throw error;
+      return resolveConflict(target);
+    }
+  }
+
+  async function saveRevision(
+    target: EditorTarget,
+    mode: "overwrite" | "backup" | "new",
+  ): Promise<EditorActionResult> {
     const nativeTarget = activeTarget(target);
     const saved =
       mode === "new"
@@ -380,6 +396,46 @@ function DesktopApp() {
           ? `Saved ${saved.name} with a backup.`
           : `Saved ${saved.name}.`,
     };
+  }
+
+  function resolveConflict(target: EditorTarget) {
+    return new Promise<EditorActionResult>((resolve) => {
+      function finish(result: EditorActionResult) {
+        setConflictPrompt(undefined);
+        resolve(result);
+      }
+      setConflictPrompt({
+        compare: () => compareBankConflict(activeTarget(target)),
+        reopen: async (reviewId) => {
+          const nativeTarget = activeTarget(target);
+          const opened = await reopenBankConflict(nativeTarget, reviewId);
+          if (!opened) return;
+          await adopt(
+            opened.name,
+            decodeEngineReply(opened.control, nativeTarget.requestId),
+            opened.breadcrumbs,
+          );
+          setOverwriteAvailable(opened.can_overwrite === true);
+          setBackupGeneration((value) => value + 1);
+          finish({ ok: false, message: `Reopened ${opened.name} from disk.` });
+        },
+        saveAs: exportAvailable
+          ? async () => {
+              const saved = await saveRevision(target, "new");
+              if (saved.ok && saved.message !== undefined) {
+                finish({ ok: false, message: saved.message });
+              }
+            }
+          : undefined,
+        cancel: () =>
+          finish({
+            ok: false,
+            message:
+              "The bank changed on disk. The current editor remained open.",
+          }),
+        messageFor,
+      });
+    });
   }
 
   function browseBackups(target: EditorTarget) {
@@ -707,6 +763,7 @@ function DesktopApp() {
         }
       />
       {signingPrompt ? <ManualSigningSheet {...signingPrompt} /> : null}
+      {conflictPrompt ? <BankConflictDialog {...conflictPrompt} /> : null}
       {backupPrompt ? (
         <BackupPicker
           choices={backupPrompt.choices}
@@ -755,6 +812,10 @@ function displaySections(snapshot: EngineSnapshot) {
 
 function messageFor(error: unknown): string {
   switch (error) {
+    case "external_bank_changed":
+      return "The bank changed on disk.";
+    case "conflict_review_changed":
+      return "The bank changed during this review. Compare again before reopening.";
     case "reveal_unavailable":
       return "Open in Folder is unavailable on this platform.";
     case "reveal_invalid_target":
@@ -788,6 +849,14 @@ function messageFor(error: unknown): string {
     typeof error.active_write_rejected === "string"
   ) {
     return `The bank operation was refused. ${error.active_write_rejected}`;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "cannot_compare_bank" in error &&
+    typeof error.cannot_compare_bank === "string"
+  ) {
+    return `The bank on disk could not be reviewed. ${error.cannot_compare_bank}`;
   }
   if (error === "write_uncertain") {
     return "The export outcome is uncertain. Inspect the destination before retrying.";

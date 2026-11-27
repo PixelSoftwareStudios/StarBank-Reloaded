@@ -6,12 +6,15 @@ use starbank_core::Revision;
 use starbank_editor::{
 	Engine, NativeSaveReceipt, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
 };
-use starbank_fs::{CommitIntent, CommitOutcome, CommitReceipt, Fingerprint, NativeBackupCatalog};
+use starbank_fs::{
+	CommitIntent, CommitOutcome, CommitReceipt, Fingerprint, NativeBackupCatalog, StorageError,
+};
 use starbank_signature::SignatureStatus;
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use crate::backup;
 use crate::commands::{CommandError, DesktopEngine, OpenedBank, is_request};
+use crate::conflict::ConflictState;
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name, destination_context};
 use crate::settings::{AutomaticBackup, SettingsStore};
 
@@ -31,6 +34,7 @@ const MAX_REQUEST_ID_BYTES: usize = 128;
 pub(crate) struct DesktopSession {
 	pub(crate) editor: Engine,
 	pub(crate) selected: Option<SelectedBank>,
+	pub(crate) conflict: ConflictState,
 	pub(crate) backups: Option<NativeBackupCatalog>,
 	pub(crate) backup_selection: Option<backup::BackupSelection>,
 	discard: Option<DiscardPermit>,
@@ -86,6 +90,7 @@ impl DesktopSession {
 			&& reply_control(&reply).is_ok_and(|parsed| parsed.result.kind == CLOSE)
 		{
 			self.selected = None;
+			self.conflict.invalidate();
 			self.backup_selection = None;
 			self.backups = None;
 			self.discard = None;
@@ -258,7 +263,7 @@ fn prepare_save(
 	let path = match &destination {
 		Destination::Overwrite { .. } => {
 			trusted_fingerprint(selected)?;
-			starbank_fs::check_replace_scope(&selected.path).map_err(write_rejected)?;
+			starbank_fs::check_replace_scope(&selected.path).map_err(active_storage_rejected)?;
 			selected.path.clone()
 		}
 		Destination::Create(path) => path.clone(),
@@ -332,6 +337,7 @@ fn publish(
 		),
 	};
 	let committed = verify_write(&mut session, commit, overwrite)?;
+	session.conflict.invalidate();
 	let id = target.document_id.clone();
 	let revision = session
 		.editor
@@ -366,6 +372,9 @@ pub(crate) fn verify_write(
 ) -> Result<CommitReceipt, CommandError> {
 	match outcome {
 		CommitOutcome::CommittedVerified(receipt) => Ok(receipt),
+		CommitOutcome::RejectedUnchanged(error) if affects_active => {
+			Err(active_storage_rejected(error))
+		}
 		CommitOutcome::RejectedUnchanged(error) => Err(write_rejected(error)),
 		CommitOutcome::CommitUncertain(_) => {
 			if affects_active && let Some(selected) = &mut session.selected {
@@ -377,6 +386,16 @@ pub(crate) fn verify_write(
 				CommandError::NewFileUncertain
 			})
 		}
+	}
+}
+
+fn active_storage_rejected(error: StorageError) -> CommandError {
+	if matches!(error, StorageError::Conflict | StorageError::UnsafePath(_))
+		|| error.kind() == std::io::ErrorKind::NotFound
+	{
+		CommandError::ExternalBankChanged
+	} else {
+		write_rejected(error)
 	}
 }
 

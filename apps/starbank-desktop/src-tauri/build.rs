@@ -21,6 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"confirm_bank_navigation",
 			"save_active_bank",
 			"save_bank_as",
+			"compare_bank_conflict",
+			"reopen_bank_conflict",
 			"list_active_backups",
 			"active_backup_status",
 			"restore_active_bank",

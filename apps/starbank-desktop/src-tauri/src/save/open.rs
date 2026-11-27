@@ -3,6 +3,7 @@ use std::path::Path;
 use sc2bank::Limits;
 use serde::Deserialize;
 use serde_json::json;
+use starbank_fs::FileSnapshot;
 
 use crate::commands::{CommandError, OPEN_REQUEST, OpenedBank, is_request};
 use crate::selection::{self, destination_context};
@@ -53,6 +54,25 @@ impl DesktopSession {
 		});
 		let (name, observed) =
 			selection::read_bank(path, Limits::default()).map_err(CommandError::File)?;
+		self.open_observed(
+			request.schema_version,
+			&request.request_id,
+			path,
+			name,
+			&observed,
+			discard_current,
+		)
+	}
+
+	pub(crate) fn open_observed(
+		&mut self,
+		schema_version: u32,
+		request_id: &str,
+		path: &Path,
+		name: String,
+		observed: &FileSnapshot,
+		discard_current: bool,
+	) -> Result<OpenedBank, CommandError> {
 		let mut payload = json!({"discard_current":discard_current});
 		if let Some(context) = destination_context(path) {
 			payload["context"] = json!({
@@ -62,8 +82,8 @@ impl DesktopSession {
 			});
 		}
 		let control = json!({
-			"schema_version": request.schema_version,
-			"request_id": request.request_id,
+			"schema_version": schema_version,
+			"request_id": request_id,
 			"command": {"kind": OPEN_REQUEST, "payload": payload}
 		});
 		let reply = self
@@ -72,6 +92,7 @@ impl DesktopSession {
 		let parsed = reply_control(&reply)?;
 		if parsed.result.kind == SNAPSHOT {
 			let document_id = parsed.document_id.ok_or(CommandError::InvalidPacket)?;
+			self.conflict.invalidate();
 			self.backup_selection = None;
 			self.backups = None;
 			self.selected = Some(SelectedBank {

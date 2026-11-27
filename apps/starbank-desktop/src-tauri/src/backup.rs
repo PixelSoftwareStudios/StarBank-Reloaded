@@ -2,6 +2,7 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use starbank_backup::BackupError;
 use starbank_core::Revision;
 use starbank_editor::{NativeRestorePolicy, NativeRestoreReceipt, max_attachment_bytes};
 use starbank_fs::{
@@ -138,7 +139,17 @@ pub(crate) fn overwrite(
 	};
 	Ok(catalog
 		.overwrite(&source, expected, bytes, policy)
-		.map_err(write_rejected)?
+		.map_err(|failure| match failure {
+			starbank_fs::NativeBackupError::Policy(ref error)
+				if matches!(
+					**error,
+					BackupError::TargetChanged | BackupError::MissingFile
+				) =>
+			{
+				CommandError::ExternalBankChanged
+			}
+			other => write_rejected(other),
+		})?
 		.commit)
 }
 

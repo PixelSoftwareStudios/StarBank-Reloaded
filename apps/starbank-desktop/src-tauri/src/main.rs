@@ -8,6 +8,7 @@ mod backup_status;
 mod batch_backup;
 mod close_guard;
 mod commands;
+mod conflict;
 mod desktop;
 mod export;
 mod external_sign;

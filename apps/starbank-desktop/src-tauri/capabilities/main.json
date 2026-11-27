@@ -23,6 +23,8 @@
     "allow-confirm-bank-navigation",
     "allow-save-active-bank",
     "allow-save-bank-as",
+    "allow-compare-bank-conflict",
+    "allow-reopen-bank-conflict",
     "allow-list-active-backups",
     "allow-active-backup-status",
     "allow-restore-active-bank",
