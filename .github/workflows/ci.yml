@@ -225,7 +225,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -253,5 +253,9 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         run: ./apps/starbank-desktop/verification/windows-nsis.ps1
+      - name: Test the packaged desktop navigation policy
+        run: >-
+          cargo test --locked -p starbank-desktop --features custom-protocol --bin starbank-desktop
+          desktop::tests::distinguishes_interactive_webview_origins -- --exact
       - run: cargo clippy --locked -p starbank-desktop --features desktop --all-targets -- -D warnings
       - run: cargo test --locked -p starbank-desktop --features desktop
