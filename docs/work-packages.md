@@ -166,6 +166,7 @@ Depends on: 12,13,14,15.
 - [x] Build and launch the Tauri host on macOS and link the tested Linux arm64 executable.
 - [x] Verify the local unsigned macOS disk image and the Debian arm64 package and its install, launch and purge flow. [Distribution evidence](verification/DISTRIBUTION.md)
 - [x] Verify the unsigned Windows x64 NSIS installer, per-user Open With registration, and silent uninstall with a synthetic bank. [Hosted installer evidence](verification/DISTRIBUTION.md#windows-x64-nsis)
+- [x] Build and inspect unsigned macOS arm64 and Linux x64/arm64 packages in CI; verify four synthetic Windows settings/backup/recovery sentinels survive silent install/uninstall. [Package qualification](verification/DISTRIBUTION.md#continuous-headless-package-qualification)
 - [x] Qualify the dormant Windows running-instance transport with five headless native probes. [Windows transport evidence](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#hosted-native-qualification)
 - [x] Wire Windows launch delivery into the guarded app queue and verify it with a real pipe and a windowless Tauri runtime. [Native app integration](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#desktop-integration)
 - [ ] Verify signed packages, Windows Explorer Open With visibility and open flows, installed macOS open flows, and release licensing.
