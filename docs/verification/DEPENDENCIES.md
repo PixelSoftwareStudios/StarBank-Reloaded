@@ -55,6 +55,8 @@ The commands returned an empty Chrono tree, the four `serde_with` features above
 
 ## Reproduction and remaining gates
 
+The Linux native WebView CI check installs test-only `tauri-driver` 2.0.6 with `cargo install --version '=2.0.6' --locked` into a runner-temporary prefix. The published crate declares Rust 1.77.2 and `Apache-2.0 OR MIT`, and its source archive includes `Cargo.lock`. Its verified registry SHA-256 is `24dc39bd26a65361c1c8e067636bbff1d9dd7e2fc58ff874edfba33acab0e6d0`. Ubuntu 24.04 supplies `webkit2gtk-driver` and `xvfb` for x64 and arm64; Xvfb depends on `xauth`. The Node harness uses built-in APIs. This adds no application dependency, plugin, workspace lockfile change or test-only application IPC. Runtime qualification is pending the first hosted check. [Pinned driver](https://github.com/tauri-apps/tauri/tree/tauri-driver-v2.0.6/crates/tauri-driver) · [Registry package](https://static.crates.io/crates/tauri-driver/tauri-driver-2.0.6.crate) · [Ubuntu driver](https://packages.ubuntu.com/noble-updates/webkit2gtk-driver) · [Xvfb dependencies](https://packages.ubuntu.com/noble/xvfb)
+
 Use the pinned tools and a fresh RustSec database for a new audit. Record the database revision and lock hashes again when either changes.
 
 ```sh

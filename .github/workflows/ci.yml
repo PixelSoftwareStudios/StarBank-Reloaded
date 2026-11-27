@@ -287,7 +287,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libx11-dev
+            libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libx11-dev \
+            webkit2gtk-driver xvfb
       - run: rustup show
       - run: pnpm install --frozen-lockfile
       - name: Build the unsigned macOS app bundle
@@ -301,6 +302,18 @@ jobs:
         run: >-
           python3 apps/starbank-desktop/verification/verify_package.py
           target/debug/bundle "${{ runner.os }}" "${{ runner.arch }}"
+      - name: Install the pinned Linux WebView test driver
+        if: runner.os == 'Linux'
+        run: |
+          cargo install tauri-driver --version '=2.0.6' --locked --root "$RUNNER_TEMP/starbank-webdriver"
+          echo "$RUNNER_TEMP/starbank-webdriver/bin" >> "$GITHUB_PATH"
+      - name: Exercise the real Linux WebView headlessly
+        if: runner.os == 'Linux'
+        timeout-minutes: 3
+        run: >-
+          xvfb-run -a --server-args='-screen 0 1280x900x24'
+          node apps/starbank-desktop/verification/linux-native-webview.mjs
+          target/debug/starbank-desktop
       - name: Build the unsigned NSIS installer
         if: runner.os == 'Windows'
         run: pnpm --filter starbank-desktop exec tauri build --bundles nsis --no-sign --debug -- --locked
