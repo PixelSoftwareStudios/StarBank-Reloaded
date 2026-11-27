@@ -30,6 +30,10 @@ use windows_sys::Win32::{
 
 use crate::{FileSnapshot, Fingerprint, StorageError};
 
+mod identity;
+
+pub use identity::WindowsFileIdentity;
+
 const SPECIAL_ATTRIBUTES: u32 = FILE_ATTRIBUTE_DEVICE
 	| FILE_ATTRIBUTE_OFFLINE
 	| FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS

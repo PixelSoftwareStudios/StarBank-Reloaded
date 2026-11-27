@@ -5,6 +5,8 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use starbank_fs::WindowsFileIdentity as FrozenLeafIdentity;
 
 use crate::selection::BANK_EXTENSION;
 
@@ -65,14 +67,21 @@ impl BankAuthority {
 	}
 
 	pub(super) fn freeze(self) -> FrozenBankAuthority {
-		let identity = self
-			.validated_metadata()
-			.ok()
-			.and_then(|metadata| DirectoryIdentity::from_metadata(&metadata));
 		FrozenBankAuthority {
+			identity: self.frozen_leaf_identity(),
 			authority: self,
-			identity,
 		}
+	}
+
+	#[cfg(windows)]
+	fn frozen_leaf_identity(&self) -> Option<FrozenLeafIdentity> {
+		self.validate().ok()?;
+		FrozenLeafIdentity::read(&self.path).ok()
+	}
+
+	#[cfg(not(windows))]
+	fn frozen_leaf_identity(&self) -> Option<FrozenLeafIdentity> {
+		DirectoryIdentity::from_metadata(&self.validated_metadata().ok()?)
 	}
 
 	fn validated_metadata(&self) -> Result<fs::Metadata, InventoryError> {
@@ -90,10 +99,13 @@ impl BankAuthority {
 	}
 }
 
+#[cfg(not(windows))]
+type FrozenLeafIdentity = DirectoryIdentity;
+
 #[derive(Debug)]
 pub(crate) struct FrozenBankAuthority {
 	authority: BankAuthority,
-	identity: Option<DirectoryIdentity>,
+	identity: Option<FrozenLeafIdentity>,
 }
 
 impl FrozenBankAuthority {
@@ -103,13 +115,7 @@ impl FrozenBankAuthority {
 
 	pub(crate) fn validate(&self) -> Result<(), InventoryError> {
 		self.identity
-			.filter(|identity| {
-				self.authority
-					.validated_metadata()
-					.ok()
-					.and_then(|metadata| DirectoryIdentity::from_metadata(&metadata))
-					== Some(*identity)
-			})
+			.filter(|identity| self.authority.frozen_leaf_identity() == Some(*identity))
 			.map(|_| ())
 			.ok_or(InventoryError::StaleBank)
 	}

@@ -92,8 +92,22 @@ fn frozen_leaf_detects_a_different_file_at_the_same_path() -> io::Result<()> {
 		.authority
 		.validate()
 		.expect("same file identity after in-place edit");
-	fs::rename(&bank, root.join("Original.bin"))?;
+	let original = root.join("Original.bin");
+	fs::rename(&bank, &original)?;
 	fs::write(&bank, b"a different file")?;
+	#[cfg(windows)]
+	{
+		use std::os::windows::fs::FileTimesExt as _;
+
+		// Windows can preserve a creation time when the same name is reused.
+		// Force equal times so this test also runs with tunneling disabled.
+		let created = fs::metadata(&original)?.created()?;
+		fs::OpenOptions::new()
+			.write(true)
+			.open(&bank)?
+			.set_times(fs::FileTimes::new().set_created(created))?;
+		assert_eq!(fs::metadata(&bank)?.created()?, created);
+	}
 	assert!(matches!(
 		member.authority.validate(),
 		Err(InventoryError::StaleBank)
