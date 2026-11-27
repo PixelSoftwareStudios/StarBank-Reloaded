@@ -15,7 +15,6 @@ const pollInterval = 100;
 const failureItemLimit = 8;
 const failureTextLimit = 1_000;
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
-const selectAllKeys = "\uE009a\uE000";
 
 async function reservePort() {
   const socket = createServer();
@@ -152,7 +151,9 @@ async function reportFailureState(origin, session) {
           fields: Array.from(document.querySelectorAll('table input[type="text"]')).slice(0, itemLimit)
             .map((node) => ({label: node.getAttribute("aria-label"), value: node.value.slice(0, textLimit),
               readOnly: node.readOnly, invalid: node.getAttribute("aria-invalid")})),
-          queue: document.querySelector('aside[aria-label="File open requests"]')?.textContent.slice(0, textLimit)
+          queue: document.querySelector('aside[aria-label="File open requests"]')?.textContent.slice(0, textLimit),
+          focused: document.activeElement?.getAttribute("aria-label"),
+          documentFocused: document.hasFocus()
         };`,
         args: [failureItemLimit, failureTextLimit],
       },
@@ -241,8 +242,10 @@ async function verifyEditor(command, first, second) {
   );
 
   const field = await control(gold, null);
+  await command(`/element/${field}/click`, "POST", {});
+  await command(`/element/${field}/clear`, "POST", {});
   await command(`/element/${field}/value`, "POST", {
-    text: `${selectAllKeys}1,234`,
+    text: "1,234",
   });
   await waitFor("a staged Table edit and disabled queued Open", () =>
     evaluate(
