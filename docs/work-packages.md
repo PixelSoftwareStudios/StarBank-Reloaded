@@ -44,6 +44,7 @@ Depends on: 03.
 Depends on: 03,04.
 
 - [x] Implement stable IDs, exact numeric lexemes, atomic edits, structural edits, validated Raw replacement, history and opening-snapshot diff/revert in the shared engine.
+- [x] Check structured value drafts without changing the document, using the same Rust normalization as committed edits. [Validation tests](../crates/domain/starbank-editor/tests/value_validation.rs)
 - [ ] Implement and verify: REQ-EDIT-01, REQ-EDIT-02, REQ-EDIT-03, REQ-EDIT-04, REQ-EDIT-05, REQ-EDIT-06, REQ-EDIT-07.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -81,7 +82,9 @@ Depends on: 02.
 
 - [x] Implement bounded read-only metadata inspection for supported MPQ V1/V2/V4 layouts and test synthetic StormLib fixtures.
 - [x] Exercise verified archival copies and explicit capability fallback with synthetic MPQ fixtures. [Copy qualification](../crates/adapters/starbank-mpq/verification/MAP_EXPORT.md)
-- [ ] Qualify the authorized real SC2 corpus and repair writer.
+- [x] Verify add-only classic V1 output against original hash slots, block records and packed bytes. [Verifier tests](../crates/adapters/starbank-mpq/tests/v1_append.rs)
+- [x] Exercise opt-in macOS arm64 StormLib append and fuzz the pure verifier on synthetic fixtures. [Native append](../crates/adapters/starbank-mpq-stormlib/verification/NATIVE_APPEND.md) · [Fuzz run](../crates/adapters/starbank-mpq/fuzz/README.md)
+- [ ] Qualify authorized SC2 archives, exact original components and SC2 Editor repair and reopen.
 - [ ] Implement and verify: REQ-MPQ-01, REQ-MPQ-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
