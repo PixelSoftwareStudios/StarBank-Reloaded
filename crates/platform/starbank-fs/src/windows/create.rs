@@ -16,6 +16,8 @@ use windows_sys::Win32::{
 
 mod leaf;
 mod lease;
+#[cfg(test)]
+mod process_tests;
 mod scope;
 mod stage;
 #[cfg(test)]
@@ -47,12 +49,25 @@ fn try_create(
 	path: &Path,
 	bytes: &[u8],
 	max_bytes: usize,
-	mut checkpoint: impl FnMut(CommitPhase) -> Result<(), StorageError>,
+	checkpoint: impl FnMut(CommitPhase) -> Result<(), StorageError>,
 ) -> Result<CommitOutcome, StorageError> {
 	if bytes.len() > max_bytes {
 		return Err(StorageError::TooLarge { max_bytes });
 	}
 	let scope = Scope::open(path)?;
+	try_create_scoped(&scope, bytes, max_bytes, checkpoint)
+}
+
+fn try_create_scoped(
+	scope: &Scope,
+	bytes: &[u8],
+	max_bytes: usize,
+	mut checkpoint: impl FnMut(CommitPhase) -> Result<(), StorageError>,
+) -> Result<CommitOutcome, StorageError> {
+	if bytes.len() > max_bytes {
+		return Err(StorageError::TooLarge { max_bytes });
+	}
+	scope.ensure_bound()?;
 	let _lease = Lease::acquire(scope.directory.identity)?;
 	let request = RenameRequest::new(&scope.directory.parent, &scope.name)?;
 	// Qualify actual writable-parent flush before introducing even a private staging file.
@@ -76,11 +91,11 @@ fn try_create(
 		checkpoint(CommitPhase::Written)?;
 		security.verify(&stage.file)?;
 		flush(&stage.file, "sync pending file")?;
-		let observed = verify_stage(&scope, &stage, &security, digest, max_bytes)?;
+		let observed = verify_stage(scope, &stage, &security, digest, max_bytes)?;
 		scope.ensure_bound()?;
 		checkpoint(CommitPhase::Staged)?;
 		checkpoint(CommitPhase::BeforePublication)?;
-		if verify_stage(&scope, &stage, &security, digest, max_bytes)? != observed {
+		if verify_stage(scope, &stage, &security, digest, max_bytes)? != observed {
 			return Err(StorageError::Conflict);
 		}
 		scope.ensure_bound()?;
@@ -95,7 +110,7 @@ fn try_create(
 	match request.publish(&stage.file) {
 		Publication::Collision => {
 			let collision = (|| {
-				let own = verify_stage(&scope, &stage, &security, digest, max_bytes)?;
+				let own = verify_stage(scope, &stage, &security, digest, max_bytes)?;
 				if own != observed {
 					return Err(StorageError::Conflict);
 				}

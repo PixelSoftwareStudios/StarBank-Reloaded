@@ -17,6 +17,7 @@ const MAX_BYTES: usize = 1024;
 fn local_ntfs_create_candidate_transactions() -> Result<(), Box<dyn std::error::Error>> {
 	let outer = tempfile::TempDir::new()?;
 	let root = prepare_reduced_fixture(&outer)?;
+	let process_root = root.clone();
 	with_reduced_token(move || {
 		verified_publication(&root)?;
 		prepublication_failures_dispose_only_the_stage(&root)?;
@@ -28,6 +29,7 @@ fn local_ntfs_create_candidate_transactions() -> Result<(), Box<dyn std::error::
 		bounds_and_lease_refuse_without_staging(&root)?;
 		Ok(())
 	})?;
+	super::process_tests::qualify_process_cuts(&process_root)?;
 	Ok(())
 }
 

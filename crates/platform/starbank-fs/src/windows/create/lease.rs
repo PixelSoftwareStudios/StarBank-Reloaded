@@ -13,6 +13,9 @@ use windows_sys::Win32::{
 	System::Threading::{CreateMutexExW, MUTEX_MODIFY_STATE, ReleaseMutex, WaitForSingleObject},
 };
 
+#[cfg(test)]
+use windows_sys::Win32::System::Threading::OpenMutexW;
+
 const LEASE_PREFIX: &str = "Global\\starbank-create-v1-";
 
 pub(super) struct Lease {
@@ -23,12 +26,7 @@ pub(super) struct Lease {
 
 impl Lease {
 	pub(super) fn acquire(identity: Identity) -> Result<Self, StorageError> {
-		let key = format!(
-			"{LEASE_PREFIX}{:016x}-{}",
-			identity.volume,
-			hex::encode(identity.file_id)
-		);
-		let name: Vec<u16> = key.encode_utf16().chain([0]).collect();
+		let name = mutex_name(identity);
 		// SAFETY: NUL-terminated stable name, no inherited handle, no initial ownership.
 		// Global mutex creation does not require SeCreateGlobalPrivilege (unlike mappings
 		// and symbolic links). The default token DACL is retained; denied access fails closed.
@@ -62,11 +60,9 @@ impl Lease {
 					_thread: PhantomData,
 				};
 				drop(lease);
-				Err(busy(
-					"a previous Windows writer stopped while holding the directory lease",
-				))
+				Err(busy(Contention::Abandoned))
 			}
-			WAIT_TIMEOUT => Err(busy("another Windows writer holds the directory lease")),
+			WAIT_TIMEOUT => Err(busy(Contention::Busy)),
 			WAIT_FAILED => Err(StorageError::io(
 				"acquire Windows directory lease",
 				io::Error::last_os_error(),
@@ -87,9 +83,50 @@ impl Drop for Lease {
 	}
 }
 
-fn busy(message: &'static str) -> StorageError {
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Contention {
+	Busy,
+	Abandoned,
+}
+impl std::fmt::Display for Contention {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(match self {
+			Self::Busy => "another Windows writer holds the directory lease",
+			Self::Abandoned => {
+				"a previous Windows writer stopped while holding the directory lease"
+			}
+		})
+	}
+}
+impl std::error::Error for Contention {}
+fn busy(reason: Contention) -> StorageError {
 	StorageError::io(
 		"acquire Windows directory lease",
-		io::Error::new(io::ErrorKind::ResourceBusy, message),
+		io::Error::new(io::ErrorKind::ResourceBusy, reason),
 	)
+}
+fn mutex_name(identity: Identity) -> Vec<u16> {
+	format!(
+		"{LEASE_PREFIX}{:016x}-{}",
+		identity.volume,
+		hex::encode(identity.file_id)
+	)
+	.encode_utf16()
+	.chain([0])
+	.collect()
+}
+#[cfg(test)]
+pub(super) fn keep_existing_alive(identity: Identity) -> Result<OwnedHandle, StorageError> {
+	let name = mutex_name(identity);
+	// SAFETY: open only the existing mutex with synchronize access. This handle never
+	// waits or owns it; keeping it live preserves abandoned state across process death.
+	let raw = unsafe { OpenMutexW(SYNCHRONIZE, 0, name.as_ptr()) };
+	if raw.is_null() {
+		return Err(StorageError::io(
+			"retain existing directory lease",
+			io::Error::last_os_error(),
+		));
+	}
+	// SAFETY: successful OpenMutexW transfers one owned handle.
+	Ok(unsafe { OwnedHandle::from_raw_handle(raw) })
 }
