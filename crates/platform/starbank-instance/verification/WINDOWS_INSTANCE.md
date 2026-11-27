@@ -1,6 +1,6 @@
 # Windows running-instance qualification
 
-WP-16 and REQ-DIST-01. The component provides a headless Windows-only transport for launch paths. The desktop does not activate the transport. Qualification of a signed installed Explorer open remains a separate step.
+WP-16 and REQ-DIST-01. The Windows desktop uses this bounded transport to forward launch paths into its guarded pending-open queue. Qualification of a signed installed Explorer open remains a separate step.
 
 ## Boundary
 
@@ -24,9 +24,15 @@ On November 27, 2026, all five ignored qualification tests passed in 4.324 secon
 - When the receiver read the request and dropped the connection before acknowledging, the sender reported `DeliveryUncertain` without retrying. Cancelling a pending native read also released the endpoint for a new primary.
 - The admission test held the synthetic queue lock beyond the actual connection deadline. The queue stayed empty and the sender reported `DeliveryUncertain`.
 
-The tests used fresh synthetic pipe endpoints and path strings. The desktop still leaves this transport dormant. Denial from a distinct logon requires a separately provisioned Windows session. Installed Explorer cold and running opens, foreground focus, and active-editor interaction remain open.
+The tests used fresh synthetic pipe endpoints and path strings. Denial from a distinct logon requires a separately provisioned Windows session. Installed Explorer cold and running opens, foreground focus, and active-editor interaction remain open.
 
-The later endpoint-retention guard awaits a native run. Its added assertion checks that the endpoint remains claimed after the listener stops and becomes available when the guard and client close.
+At `933feec`, all 11 hosted jobs passed. The extended cancellation case verified that the endpoint remains claimed after the listener stops and becomes available when the retained guard and client close. All five native transport cases passed again. [Guard qualification](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46003783639/job/140521733177)
+
+## Desktop integration
+
+The desktop resolves launch paths against the sender's working directory and preserves their UTF-16 units. A secondary exits after acknowledgement and reports refusals or uncertain delivery without retrying. The primary retains endpoint ownership until actual application exit, including if its listener fails. Admission uses the existing nonblocking, deadline-checked queue; opening a queued bank still uses the normal draft and revision guards. The listener starts before the webview is built so cold webview initialization does not hold up queue admission. Focus requests are coalesced and dispatched to the main thread.
+
+Local macOS validation passed all 112 desktop tests and strict Clippy. Windows x64 MSVC checked the complete desktop and all test targets with strict Clippy. The ordinary Windows desktop suite includes a windowless Tauri MockRuntime test using the real pipe, production admission callback and serialized queue command, then verifies listener cancellation and endpoint release. Its native execution is pending the integration run. No webview, application window, Explorer or native message dialog is launched by that test. [Desktop adapter](../../../../apps/starbank-desktop/src-tauri/src/windows_launch.rs)
 
 ## Local verification
 

@@ -57,7 +57,7 @@ starbank-reloaded/
 │   ├── domain/starbank-profiles/    # declarative game-specific interpretation
 │   ├── domain/starbank-backup/      # verified backup/restore catalog policy
 │   ├── platform/starbank-fs/        # actual filesystem commit/metadata/watch boundary
-│   ├── platform/starbank-instance/  # Windows launch IPC; dormant pending qualification
+│   ├── platform/starbank-instance/  # Windows instance ownership and bounded launch IPC
 │   ├── discovery/starbank-paths/    # root/bank paths, OS integration
 │   ├── discovery/starbank-map-index/ # bounded scanning and metadata association
 │   ├── adapters/starbank-mpq/       # narrowly scoped archive capability boundary
@@ -69,7 +69,7 @@ starbank-reloaded/
 
 `sc2bank` should be independently usable, with a small published API; if separate publication is desired, its dependency boundary must stay clean (do not require app-specific runtime). A separately maintained MPQ implementation is outside this product; use existing libraries. Do not create a crate merely to wrap a trivial function. No standalone `*-types` or codec catch-all. `starbank-core` is lowest-level: typed IDs, bounded sizes, common invariant/errors; no UI, async runtime, MPQ, platform or higher-layer dependencies. A distinct `starbank-fs` is justified by external effects and recovery obligations; backup policy depends on a narrow storage trait/adapter, not vice versa. Use dev-only testkit, avoid production cycles.
 
-`starbank-instance` isolates Windows pipe ownership, logon access checks, bounded launch framing and acknowledgement from the editor and filesystem writer. Its codec and transport forbid unsafe code; synchronous native security calls stay in one audited file. The independently testable component is not activated by Tauri until its native qualification passes. It carries paths into a caller-owned queue and never reads or writes banks. [Qualification boundary](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md)
+`starbank-instance` isolates Windows pipe ownership, logon access checks, bounded launch framing and acknowledgement from the editor and filesystem writer. Its codec and transport forbid unsafe code; synchronous native security calls stay in one audited file. The Windows desktop claims its endpoint before creating a window and forwards paths into the guarded pending-open queue. The transport never reads or writes banks. [Qualification boundary](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md)
 
 ## Suggested file organization
 
