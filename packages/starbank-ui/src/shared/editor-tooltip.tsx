@@ -1,5 +1,5 @@
-import { Tooltip } from "@heroui/react/tooltip";
-import type { ComponentProps, ReactNode } from "react";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import type { ComponentProps, ReactElement } from "react";
 
 const EDITOR_TOOLTIP_DELAY_MS = 400;
 
@@ -14,18 +14,26 @@ export function EditorTooltip({
   placement = "top",
   disabled,
   children,
-}: TooltipOptions & { children: ReactNode }) {
+}: TooltipOptions & { children: ReactElement }) {
+  if (disabled) return children;
   return (
-    <Tooltip
-      delay={EDITOR_TOOLTIP_DELAY_MS}
-      closeDelay={0}
-      isDisabled={disabled}
+    <Tooltip.Provider
+      delayDuration={EDITOR_TOOLTIP_DELAY_MS}
+      disableHoverableContent
     >
-      {children}
-      <Tooltip.Content className="editor-tooltip" placement={placement}>
-        {help}
-      </Tooltip.Content>
-    </Tooltip>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content
+            className="editor-tooltip"
+            side={placement}
+            sideOffset={5}
+          >
+            {help}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   );
 }
 
@@ -37,11 +45,7 @@ export function EditorHelpButton({
 }: TooltipOptions & ComponentProps<"button">) {
   return (
     <EditorTooltip help={help} placement={placement} disabled={disabled}>
-      <Tooltip.Trigger<"button">
-        {...props}
-        disabled={disabled}
-        render={(trigger) => <button type="button" {...trigger} />}
-      />
+      <button type="button" {...props} disabled={disabled} />
     </EditorTooltip>
   );
 }

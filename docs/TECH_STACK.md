@@ -5,9 +5,9 @@ Rust/Tauri migration accepted. Select exact dependency releases after checking o
 | Layer | Choice |
 |---|---|
 | Native | [Tauri 2](https://v2.tauri.app/), native dialog, clipboard, opener/reveal, file-association support verified for chosen release; minimal scoped plugins |
-| UI | React, TypeScript, Vite, Tailwind CSS 4, [HeroUI](https://www.heroui.com/) as main library, Lucide, pnpm, Biome. Verify HeroUI major compatibility with Tailwind 4 and React; use selective imports. No shadcn by default; evaluate isolated component only with explicit gap/approval. |
+| UI | React, TypeScript, Vite, Tailwind CSS 4, Radix Dropdown Menu, Tabs and Tooltip at the same versions as Euclid, plus Lucide, pnpm and Biome. |
 | State/validation | Zustand for UI projections/drafts; Valibot (not Zod) for runtime input/config/DTO shapes; Rust authoritative for document rules. |
-| Table | Evaluate HeroUI table/selection/virtualization first; add TanStack Table only for demonstrated gaps, TanStack Virtual if needed. `react-resizable-panels` candidate, CSS otherwise. |
+| Table | Native table semantics and windowed rows. Add a table or splitter dependency only for a demonstrated gap. |
 | Numeric | [react-number-format](https://github.com/s-yadav/react-number-format) string-based integration, no floatValue reliance |
 | Raw | CodeMirror 6 + XML language package (verify APIs), lazy load; no Monaco or embedded second webview unless justified |
 | Core | `quick-xml` (lossless/event-based spike), `sha1`, `hex`, `serde`, `serde_json`, `thiserror`, `tracing`; YAML profile parser only maintained audited crate (legacy YAML import); avoid unnecessary regex/serde DOM duplication |
@@ -19,14 +19,14 @@ Rust/Tauri migration accepted. Select exact dependency releases after checking o
 | CLI | clap, serde JSON output; no service daemon |
 | Verification | cargo-nextest, rstest, proptest, insta, cargo-fuzz, criterion, Miri, Loom/Shuttle, Kani, TLA+/TLC, Lean/hax/Aeneas as scoped; Vitest, Playwright, actual native UI/filesystem tests |
 
-No automatic updater, analytics/telemetry, authentication, cloud sync, database server, embedded HTTP server or runtime map scripting. Cache file format can be versioned JSON initially; SQLite only if measured scale justifies it, not a requirement. Test framework memory and dependency size rather than assert HeroUI or Tauri is automatically lighter than Fyne. Browser static hosting via Cloudflare Pages candidate; no uploaded user banks.
+No automatic updater, analytics/telemetry, authentication, cloud sync, database server, embedded HTTP server or runtime map scripting. Cache file format can be versioned JSON initially; SQLite only if measured scale justifies it, not a requirement. Measure application memory, responsiveness and bundle size. Browser static hosting via Cloudflare Pages candidate; no uploaded user banks.
 
 ## Resolved frontend
 
-Both apps use the same React, TypeScript, Vite, Tailwind 4, HeroUI, Lucide, Valibot and CodeMirror frontend. The private workspace packages are `starbank-ui`, `starbank-editor`, `starbank-engine-client` and `starbank-platform`. Their exact dependencies are recorded in the pnpm lockfile.
+Both apps use the same React, TypeScript, Vite, Tailwind 4, Radix, Lucide, Valibot and CodeMirror frontend. The private workspace packages are `starbank-ui`, `starbank-editor`, `starbank-engine-client` and `starbank-platform`. Their exact dependencies are recorded in the pnpm lockfile.
 
 `starbank-ui` groups the app shell, editor, inventory and settings by feature. Its Tailwind theme maps utilities to the runtime color and control tokens used by both apps. The Valibot schemas in `starbank-engine-client` check engine replies before the UI uses them. `starbank-editor` owns view selection and pending drafts in a per-document Zustand store.
 
 `starbank-editor` uses Zustand 5.1.0 to hold the active view and pending drafts per open document. Bank values and revisions remain authoritative in the Rust engine. React Number Format 5.4.5 groups ordinary numeric strings for display. A linear formatter retains the existing grouping for padded or long lexemes. Edit normalization and validation preserve exact digit strings. [Editor package](../packages/starbank-editor/package.json) · [Zustand store API](https://zustand.docs.pmnd.rs/reference/apis/create-store) · [React Number Format string API](https://s-yadav.github.io/react-number-format/docs/numeric_format/#numericformatter-numstring-string-props-numericformatprops--string)
 
-HeroUI's pinned Table uses React Aria table primitives. The shared bank editor uses native table elements and windowed rows to keep exact text inputs, focus and stable-ID bulk selections. The measured 10,000-value synthetic workflow exercised keyboard navigation and bulk edits across row windows. [Table implementation](../packages/starbank-ui/src/editor/table-editor.tsx) · [Verification](verification/IMPLEMENTATION.md)
+The shared bank editor uses native table elements and windowed rows to keep exact text inputs, focus and stable-ID bulk selections. The measured 10,000-value synthetic workflow exercised keyboard navigation and bulk edits across row windows. [Table implementation](../packages/starbank-ui/src/editor/table-editor.tsx) · [Verification](verification/IMPLEMENTATION.md)

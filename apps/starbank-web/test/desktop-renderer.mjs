@@ -313,6 +313,7 @@ async function verifyRevert(page) {
     .getByRole("navigation", { name: "Bank sections" })
     .getByRole("button", { name: "Player", exact: true });
   const more = button(page, "More save options");
+  const menu = page.getByRole("menu", { name: "Save options" });
   const revert = page.getByRole("menuitem", {
     name: "Revert to Last Save",
     exact: true,
@@ -335,8 +336,8 @@ async function verifyRevert(page) {
       if (approve) await dialog.accept();
       else await dialog.dismiss();
     });
-    await revert.click();
-    await decision;
+    await Promise.all([decision, revert.press("Enter")]);
+    await menu.waitFor({ state: "hidden" });
     if (!approve) assert.equal(await goldField(page).inputValue(), "002");
   }
   await page

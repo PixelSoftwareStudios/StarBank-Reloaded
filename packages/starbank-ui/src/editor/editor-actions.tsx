@@ -1,5 +1,4 @@
-import { Dropdown } from "@heroui/react/dropdown";
-import { Separator } from "@heroui/react/separator";
+import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Settings, Wrench } from "lucide-react";
 import { type DragEvent, Fragment, type Ref, useRef } from "react";
 import type {
@@ -41,7 +40,7 @@ export function ToolsMenuTrigger({
         className="editor-button"
         aria-label="Tools"
         aria-describedby={descriptionId}
-        isDisabled={disabled}
+        disabled={disabled}
       >
         <Wrench aria-hidden="true" className="settings-icon" />
       </Dropdown.Trigger>
@@ -299,7 +298,7 @@ export function EditorActions({
             {primary.label}
           </EditorHelpButton>
           {groupedMenu.length > 0 && (
-            <Dropdown>
+            <Dropdown.Root modal={false}>
               <EditorTooltip
                 help="Choose how to save or copy the open bank"
                 disabled={disabled}
@@ -307,35 +306,38 @@ export function EditorActions({
                 <Dropdown.Trigger
                   className="editor-button editor-primary editor-save-menu"
                   aria-label="More save options"
-                  isDisabled={disabled}
+                  disabled={disabled}
                 >
                   <ChevronDown aria-hidden="true" />
                 </Dropdown.Trigger>
               </EditorTooltip>
-              <Dropdown.Popover
-                placement="top end"
-                className="editor-action-popover"
-              >
-                <Dropdown.Menu aria-label="Save options">
+              <Dropdown.Portal>
+                <Dropdown.Content
+                  side="top"
+                  align="end"
+                  sideOffset={5}
+                  className="editor-action-popover"
+                  aria-label="Save options"
+                >
                   {groupedMenu.map(({ group, items }, index) => (
                     <Fragment key={group}>
                       {index > 0 && (
-                        <Separator className="editor-menu-divider" />
+                        <Dropdown.Separator className="editor-menu-divider" />
                       )}
                       {items.map(({ id, label, action }) => (
                         <Dropdown.Item
-                          id={id}
                           key={id}
-                          onAction={() => run(() => action(target))}
+                          className="editor-menu-item"
+                          onSelect={() => run(() => action(target))}
                         >
                           {label}
                         </Dropdown.Item>
                       ))}
                     </Fragment>
                   ))}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
+                </Dropdown.Content>
+              </Dropdown.Portal>
+            </Dropdown.Root>
           )}
         </div>
       )}

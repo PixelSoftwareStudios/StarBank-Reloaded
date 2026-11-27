@@ -258,60 +258,71 @@ export function BatchBackupTools({
   return (
     <>
       <span className="batch-backup-tools">
-        <Dropdown>
+        <Dropdown.Root modal={false}>
           <ToolsMenuTrigger
             ref={trigger}
             descriptionId={blockedMessage ? availabilityId : undefined}
             disabled={dialogOpen}
           />
-          <Dropdown.Popover
-            placement="bottom end"
-            className="editor-action-popover batch-backup-menu"
-          >
-            {blockedMessage && (
-              <p className="batch-backup-unavailable">{blockedMessage}</p>
-            )}
-            <Dropdown.Menu
+          <Dropdown.Portal>
+            <Dropdown.Content
+              side="bottom"
+              align="end"
+              sideOffset={5}
               aria-label="Bank tools"
-              disabledKeys={[
-                "map-repair",
-                ...(!onResignExternal ? ["resign"] : []),
-                ...(!ready ? ["all"] : []),
-                ...(!selectedMap ? ["map"] : []),
-              ]}
-              onAction={(key) => {
-                if (key === "resign") onResignExternal?.();
-                if (key === "all")
-                  choose({ kind: "all" }, "Back up all bank files");
-                if (key === "map" && selectedMap)
-                  choose(
-                    { kind: "map", id: selectedMap.id },
-                    `Back up ${selectedMap.name}`,
-                  );
-              }}
+              className="editor-action-popover batch-backup-menu"
             >
-              <Dropdown.Item id="map-repair">
+              {blockedMessage && (
+                <p className="batch-backup-unavailable">{blockedMessage}</p>
+              )}
+              <Dropdown.Item className="editor-menu-item" disabled>
                 Unprotect external map file…
               </Dropdown.Item>
-              <Dropdown.Item id="resign">Re-sign external bank…</Dropdown.Item>
-              <Dropdown.Item id="all">Back up all bank files</Dropdown.Item>
-              <Dropdown.Item id="map">Back up selected map</Dropdown.Item>
-            </Dropdown.Menu>
-            <p className="batch-backup-unavailable">
-              Map repair is unavailable until archive writes are qualified.
-            </p>
-            {externalSigningUnavailable && (
+              <Dropdown.Item
+                className="editor-menu-item"
+                disabled={!onResignExternal}
+                onSelect={() => onResignExternal?.()}
+              >
+                Re-sign external bank…
+              </Dropdown.Item>
+              <Dropdown.Item
+                className="editor-menu-item"
+                disabled={!ready}
+                onSelect={() =>
+                  choose({ kind: "all" }, "Back up all bank files")
+                }
+              >
+                Back up all bank files
+              </Dropdown.Item>
+              <Dropdown.Item
+                className="editor-menu-item"
+                disabled={!selectedMap}
+                onSelect={() => {
+                  if (selectedMap)
+                    choose(
+                      { kind: "map", id: selectedMap.id },
+                      `Back up ${selectedMap.name}`,
+                    );
+                }}
+              >
+                Back up selected map
+              </Dropdown.Item>
               <p className="batch-backup-unavailable">
-                {externalSigningUnavailable}
+                Map repair is unavailable until archive writes are qualified.
               </p>
-            )}
-            {ready && !selectedMap && (
-              <p className="batch-backup-unavailable">
-                Select a map to back up its bank files.
-              </p>
-            )}
-          </Dropdown.Popover>
-        </Dropdown>
+              {externalSigningUnavailable && (
+                <p className="batch-backup-unavailable">
+                  {externalSigningUnavailable}
+                </p>
+              )}
+              {ready && !selectedMap && (
+                <p className="batch-backup-unavailable">
+                  Select a map to back up its bank files.
+                </p>
+              )}
+            </Dropdown.Content>
+          </Dropdown.Portal>
+        </Dropdown.Root>
         {blockedMessage && (
           <span className="sr-only" id={availabilityId}>
             {blockedMessage}

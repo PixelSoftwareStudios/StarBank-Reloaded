@@ -5,7 +5,7 @@ Accepted = explicit direction or established standard. Proposed = recommendation
 | ADR | Status | Decision |
 |---|---|---|
 | 001 | Accepted | Archive Go snapshot under original; Rust workspace, Tauri desktop, shared web/WASM, CLI. No Go runtime requirement. |
-| 002 | Accepted | React/TS/Vite/Tailwind 4/HeroUI/Valibot/Lucide; no Zod/shadcn default. Evaluate HeroUI table before introducing TanStack Table. |
+| 002 | Accepted | React, TypeScript, Vite, Tailwind 4, Radix, Valibot, Zustand and Lucide. Use native table semantics and windowed rows for the bank editor. |
 | 003 | Accepted | Preserve approved compact UI and exact labels/removed features. No unrelated layout changes. |
 | 004 | Accepted | Native/WASM authoritative Rust sessions and versioned control messages with exact decimal-string revisions. Use a separate binary payload path for file contents. [Contract](../design/ENGINE_CONTRACT.md) |
 | 005 | Proposed | Lossless XML/source model with nested values, stable IDs; no flat lossy deserialization or locale signing. |

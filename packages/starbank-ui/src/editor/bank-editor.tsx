@@ -1,4 +1,4 @@
-import { Tabs } from "@heroui/react/tabs";
+import * as Tabs from "@radix-ui/react-tabs";
 import {
   lazy,
   type ReactNode,
@@ -320,45 +320,39 @@ export function BankEditor({
         )}
       </header>
 
-      <Tabs
+      <Tabs.Root
         className="editor-views"
-        selectedKey={selectedView}
-        keyboardActivation={rawDraft ? "manual" : "automatic"}
-        onSelectionChange={(key) => {
+        value={selectedView}
+        activationMode={rawDraft ? "manual" : "automatic"}
+        onValueChange={(key) => {
           if (key === "simple" || key === "table" || key === "raw")
             selectView(key);
         }}
-        variant="secondary"
       >
-        <Tabs.ListContainer>
-          <Tabs.List aria-label="Bank views">
-            {profile && (
-              <Tabs.Tab id="simple">
-                Simple View
-                <Tabs.Indicator />
-              </Tabs.Tab>
-            )}
-            <Tabs.Tab id="table">
-              Table View
-              <Tabs.Indicator />
-            </Tabs.Tab>
-            <Tabs.Tab id="raw">
-              Raw View
-              <Tabs.Indicator />
-            </Tabs.Tab>
-          </Tabs.List>
-        </Tabs.ListContainer>
+        <Tabs.List aria-label="Bank views" className="editor-tab-list">
+          {profile && (
+            <Tabs.Trigger className="editor-tab" value="simple">
+              Simple View
+            </Tabs.Trigger>
+          )}
+          <Tabs.Trigger className="editor-tab" value="table">
+            Table View
+          </Tabs.Trigger>
+          <Tabs.Trigger className="editor-tab" value="raw">
+            Raw View
+          </Tabs.Trigger>
+        </Tabs.List>
         {profile && (
-          <Tabs.Panel id="simple" className="editor-view">
+          <Tabs.Content value="simple" className="editor-view">
             <SimpleEditor
               profile={profile}
               draft={profileDraft}
               disabled={busy || Boolean(draft) || staleProfile}
               onChange={stageProfile}
             />
-          </Tabs.Panel>
+          </Tabs.Content>
         )}
-        <Tabs.Panel id="table" className="editor-view">
+        <Tabs.Content value="table" className="editor-view">
           <TableEditor
             sections={document.sections}
             values={tableDraft?.values}
@@ -393,8 +387,8 @@ export function BankEditor({
               })
             }
           />
-        </Tabs.Panel>
-        <Tabs.Panel id="raw" className="editor-view">
+        </Tabs.Content>
+        <Tabs.Content value="raw" className="editor-view">
           <Suspense fallback={<p role="status">Loading XML editor…</p>}>
             <RawEditor
               key={document.revision}
@@ -417,8 +411,8 @@ export function BankEditor({
               }}
             />
           </Suspense>
-        </Tabs.Panel>
-      </Tabs>
+        </Tabs.Content>
+      </Tabs.Root>
 
       {rawSwitch && (
         <RawDraftDialog

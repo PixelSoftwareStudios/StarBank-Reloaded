@@ -14,7 +14,7 @@ Bound input sizes, recursion, expanded data, workers, queues, history/cache. Gra
 
 ## Dependencies and security
 
-Prefer std and focused mature libraries with clear licenses, maintenance and tested platform support. Check actual source API, deprecation, features, release activity, MSRV, build targets, transitive graph and license. Prefer permissive/Blue Oak compatible where feasible; legal provenance review mandatory. Do not rely on earlier fabricated dependency recommendations. No unnecessary shadcn/Zod alongside HeroUI/Valibot, no full web framework or backend server. Scope IPC, local path access, capabilities, archive/ XML parsing bounds; no telemetry or secrets in logs. No game process attachment or execution of untrusted map scripts. Safe storage with typed commit outcomes and conflict checks. Never silently mutate unexpected files.
+Prefer std and focused mature libraries with clear licenses, maintenance and tested platform support. Check actual source API, deprecation, features, release activity, MSRV, build targets, transitive graph and license. Prefer permissive/Blue Oak compatible where feasible; legal provenance review mandatory. Do not rely on earlier fabricated dependency recommendations. Use the shared Radix primitives and Valibot schemas. The editor runs without a backend server. Scope IPC, local path access, capabilities, archive/ XML parsing bounds; no telemetry or secrets in logs. No game process attachment or execution of untrusted map scripts. Safe storage with typed commit outcomes and conflict checks. Never silently mutate unexpected files.
 
 ## Agent workflow
 

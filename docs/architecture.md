@@ -43,7 +43,7 @@ starbank-reloaded/
 │   ├── starbank-web/                # Vite static shell
 │   └── starbank-cli/                # Cargo workspace member
 ├── packages/
-│   ├── starbank-ui/                # shared HeroUI components and design tokens
+│   ├── starbank-ui/                # shared editor, Radix primitives and Tailwind tokens
 │   ├── starbank-editor/            # editor state and presentation models
 │   ├── starbank-engine-client/     # typed command client, DTOs, Valibot
 │   └── starbank-platform/          # desktop/browser capabilities and IO adapters
@@ -99,4 +99,4 @@ Performance: no eager XML for every bank; load metadata only. Use cached sorted 
 
 ## Decisions and dependencies
 
-Refer to `docs/TECH_STACK.md` and ADR register. HeroUI major/API version chosen in bootstrap spike; keep exact package versions pinned after verifying React/Tailwind 4 compatibility. Native MPQ backend selected by actual compatibility results, not documented feature count; browser archive support optional. Use Tauri's system webview, not a bundled Chromium or sidecar HTTP service. Native and browser adapters communicate through the same versioned DTO schema. Provide capability flags instead of assuming all platform APIs exist.
+Refer to `docs/TECH_STACK.md` and ADR register. Radix primitives keep the keyboard and focus behavior shared between the Vite and Tauri hosts. Exact versions are pinned in the workspace lockfile. Native MPQ backend selected by actual compatibility results, not documented feature count; browser archive support optional. Use Tauri's system webview, not a bundled Chromium or sidecar HTTP service. Native and browser adapters communicate through the same versioned DTO schema. Provide capability flags instead of assuming all platform APIs exist.

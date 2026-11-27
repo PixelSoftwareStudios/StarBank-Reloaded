@@ -19,13 +19,14 @@
     "@codemirror/search": "6.7.3",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.44.0",
-    "@heroui/react": "3.2.8",
-    "@heroui/styles": "3.2.8",
     "@lezer/highlight": "1.2.5",
+    "@radix-ui/react-dropdown-menu": "2.2.1",
+    "@radix-ui/react-tabs": "1.2.1",
+    "@radix-ui/react-tooltip": "1.4.1",
+    "lucide-react": "1.80.0",
     "starbank-editor": "workspace:*",
     "starbank-engine-client": "workspace:*",
-    "starbank-platform": "workspace:*",
-    "lucide-react": "1.80.0"
+    "starbank-platform": "workspace:*"
   },
   "peerDependencies": {
     "react": "catalog:",

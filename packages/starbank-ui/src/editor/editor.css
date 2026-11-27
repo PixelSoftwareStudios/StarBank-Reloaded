@@ -126,28 +126,29 @@
   min-width: 0;
 }
 
-.editor-views .tabs__list-container {
-  border-color: var(--shell-divider);
+.editor-tab-list {
+  display: flex;
+  overflow: auto;
+  border-block-end: 1px solid var(--shell-divider);
 }
 
-.editor-views .tabs__list {
-  min-width: 0;
-}
-
-.editor-views .tabs__tab {
-  width: auto;
+.editor-tab {
   min-block-size: var(--control-height);
+  border-block-end: 2px solid transparent;
+  padding-inline: 1rem;
   white-space: nowrap;
   color: var(--shell-muted);
 }
 
-.editor-views .tabs__tab[data-selected="true"] {
+.editor-tab[data-state="active"] {
+  border-block-end-color: var(--map-focus);
   font-weight: 600;
   color: var(--shell-fg);
 }
 
-.editor-views .tabs__indicator {
-  background: var(--map-focus);
+.editor-tab:focus-visible {
+  outline: 2px solid var(--map-focus);
+  outline-offset: -2px;
 }
 
 .editor-view {
@@ -451,26 +452,52 @@
   margin-inline: auto;
 }
 
-.editor-action-popover {
-  background: var(--map-pane-bg);
+.editor-action-popover,
+.editor-tooltip {
+  z-index: 20;
+  border: 1px solid var(--shell-divider);
+  border-radius: var(--control-radius);
   color: var(--shell-fg);
-  border-color: var(--shell-divider);
+  background: var(--map-pane-bg);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 18%);
+}
+
+.editor-action-popover {
+  min-inline-size: 10rem;
+  max-inline-size: calc(100vw - 1rem);
+  max-block-size: var(--radix-dropdown-menu-content-available-height);
+  overflow: auto;
+  padding: 0.25rem;
 }
 
 .editor-tooltip {
-  color: var(--shell-fg);
-  background: var(--map-pane-bg);
+  max-inline-size: 18rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
-  word-break: normal;
 }
 
 .editor-menu-divider {
+  block-size: 1px;
   margin-block: 0.25rem;
   background: var(--shell-divider);
 }
 
-.editor-action-popover .menu-item:where([data-hovered], [data-focused]) {
+.editor-menu-item {
+  outline: none;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: default;
+}
+
+.editor-menu-item[data-highlighted] {
   background: var(--map-hover-bg);
+}
+
+.editor-menu-item[data-disabled] {
+  color: var(--shell-muted);
+  opacity: 0.7;
 }
 
 .editor-table-actions {

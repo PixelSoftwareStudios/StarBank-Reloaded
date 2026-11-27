@@ -26,16 +26,24 @@ export async function verifySaveMenu(page) {
   await trigger.press("ArrowDown");
   await copy.waitFor();
   assert.equal(await menu.getByRole("menuitem").count(), 1);
-  const popover = menu.locator("..");
-  assert.equal(await popover.getAttribute("data-placement"), "top");
+  const triggerBounds = await trigger.boundingBox();
+  const menuBounds = await menu.boundingBox();
+  assert(triggerBounds && menuBounds);
+  assert(
+    menuBounds.y + menuBounds.height <= triggerBounds.y + 1,
+    "The save menu should open above its trigger",
+  );
   await page.keyboard.press("Escape");
   await menu.waitFor({ state: "hidden" });
-  assert.equal(
-    await trigger.evaluate((button) => document.activeElement === button),
-    true,
+  await page.waitForFunction(() =>
+    document.activeElement?.matches('button[aria-label="More save options"]'),
   );
-  await trigger.press("Shift+Tab");
-  await page.keyboard.press("Tab");
+  await page.locator(".document-editor h1").evaluate((heading) => {
+    heading.setAttribute("tabindex", "-1");
+    heading.focus();
+    heading.removeAttribute("tabindex");
+  });
+  await trigger.focus();
   await help.waitFor();
 
   await trigger.click();

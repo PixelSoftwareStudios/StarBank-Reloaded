@@ -1,4 +1,4 @@
-export { Dropdown } from "@heroui/react/dropdown";
+export * as Dropdown from "@radix-ui/react-dropdown-menu";
 export {
   type BankEditorController,
   type BankEditorDocument,
