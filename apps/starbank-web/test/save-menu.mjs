@@ -48,9 +48,7 @@ export async function verifySaveMenu(page) {
 
   await trigger.click();
   await menu.waitFor();
-  const title = await page.locator(".document-editor h1").boundingBox();
-  assert(title, "The rectangle outside the save menu must be visible");
-  await page.mouse.click(title.x + title.width / 2, title.y + title.height / 2);
+  await page.locator(".document-editor h1").click();
   await menu.waitFor({ state: "hidden" });
 
   await trigger.press("ArrowDown");

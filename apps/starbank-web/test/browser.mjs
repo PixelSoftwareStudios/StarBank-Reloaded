@@ -337,6 +337,65 @@ async function verifySimpleView(page, chooseBank) {
   await tab.waitFor({ state: "detached" });
 }
 
+async function verifyRawViewPosition(page) {
+  const comments = Array.from(
+    { length: 200 },
+    (_, index) => `<!-- Comment ${index} -->`,
+  ).join("\n");
+  await bankPicker(page)(
+    "Raw view position.SC2Bank",
+    `<Bank>\n${comments}\n</Bank>`,
+  );
+  const rawTab = page.getByRole("tab", { name: "Raw View" });
+  const tableTab = page.getByRole("tab", { name: "Table View" });
+  const raw = page.locator(".cm-content");
+  const scroller = page.locator(".cm-scroller");
+  assert.equal(
+    await raw.count(),
+    0,
+    "Raw editor should mount only when opened",
+  );
+  await rawTab.click();
+  await raw.waitFor();
+  await scroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight / 2;
+  });
+  await page.waitForFunction(
+    () => document.querySelector(".cm-scroller")?.scrollTop > 100,
+  );
+  await raw.getByText("<!-- Comment 100 -->", { exact: true }).click();
+  await raw.press("Shift+ArrowLeft");
+  const selection = await page.evaluate(() =>
+    window.getSelection()?.toString(),
+  );
+  assert.equal(selection?.length, 1, "Raw XML has a selected character");
+  const scrollTop = await scroller.evaluate((element) => element.scrollTop);
+
+  await tableTab.click();
+  assert.equal(await tableTab.getAttribute("aria-selected"), "true");
+  await raw.waitFor({ state: "hidden" });
+  assert.equal(
+    await page.getByRole("tabpanel", { name: "Raw View" }).count(),
+    0,
+    "The inactive Raw view must be hidden from accessibility navigation",
+  );
+  await rawTab.click();
+  await raw.waitFor();
+  const returnedScrollTop = await scroller.evaluate(
+    (element) => element.scrollTop,
+  );
+  assert(
+    Math.abs(returnedScrollTop - scrollTop) <= 8,
+    `The Raw viewport moved from ${scrollTop} to ${returnedScrollTop}`,
+  );
+  await raw.focus();
+  assert.equal(
+    await page.evaluate(() => window.getSelection()?.toString()),
+    selection,
+    "The Raw selection should survive a clean round trip",
+  );
+}
+
 async function verify(name) {
   const browser = await playwright[name].launch({ timeout: 15_000 });
   const server = await startServer();
@@ -391,6 +450,15 @@ async function verify(name) {
       );
     } finally {
       await windowedPage.close();
+    }
+
+    const rawPositionPage = await context.newPage();
+    try {
+      await rawPositionPage.setViewportSize({ width: 850, height: 500 });
+      await rawPositionPage.goto(server.url);
+      await verifyRawViewPosition(rawPositionPage);
+    } finally {
+      await rawPositionPage.close();
     }
 
     const page = await context.newPage();

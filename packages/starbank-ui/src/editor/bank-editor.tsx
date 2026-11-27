@@ -116,6 +116,8 @@ export function BankEditor({
     message: string;
   }>();
   const rawEditor = useRef<RawEditorHandle>(null);
+  const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
+  const [rawRestart, setRawRestart] = useState(false);
   const target = { id: document.id, revision: document.revision };
   const tableDraft = draft?.kind === "table" ? draft : undefined;
   const rawDraft = draft?.kind === "raw" ? draft : undefined;
@@ -244,9 +246,19 @@ export function BankEditor({
     }
   }
 
+  function discardDraft() {
+    setDraft(undefined);
+    clearNotice();
+    if (rawDraft) {
+      setRetainedRawRevision(undefined);
+      setRawRestart((previous) => !previous);
+    }
+  }
+
   function selectView(nextView: "simple" | "table" | "raw") {
     if (selectedView === "raw" && nextView !== "raw" && rawDraft) {
       if (busy) return;
+      setRetainedRawRevision(undefined);
       if (stale || !onReplaceXml) {
         setRawSwitch({
           nextView,
@@ -258,10 +270,15 @@ export function BankEditor({
         applyRaw(nextView);
       }
     } else {
+      if (selectedView === "raw" && nextView !== "raw")
+        setRetainedRawRevision(document.revision);
       setView(nextView);
     }
   }
 
+  const rawVisible = selectedView === "raw";
+  const keepRawMounted =
+    rawVisible || retainedRawRevision === document.revision;
   const status = busy
     ? "Working…"
     : notice || controller.status || profileStatus(profileController?.current);
@@ -388,14 +405,20 @@ export function BankEditor({
             }
           />
         </Tabs.Content>
-        <Tabs.Content value="raw" className="editor-view">
+        <Tabs.Content
+          value="raw"
+          className="editor-view"
+          forceMount={keepRawMounted ? true : undefined}
+          hidden={!rawVisible}
+        >
           <Suspense fallback={<p role="status">Loading XML editor…</p>}>
             <RawEditor
-              key={document.revision}
+              key={`${document.revision}:${rawRestart}`}
               ref={rawEditor}
               value={rawDraft?.text ?? document.xml}
               wrap={settings?.wrapRaw}
               readOnly={
+                !rawVisible ||
                 !onReplaceXml ||
                 busy ||
                 stale ||
@@ -420,8 +443,7 @@ export function BankEditor({
           repairable={Boolean(onReplaceXml) && !stale}
           onDecision={(decision) => {
             if (decision === "discard") {
-              setDraft(undefined);
-              clearNotice();
+              discardDraft();
               setView(rawSwitch.nextView);
             }
             setRawSwitch(undefined);
@@ -506,10 +528,7 @@ export function BankEditor({
             className="editor-button"
             type="button"
             disabled={busy}
-            onClick={() => {
-              setDraft(undefined);
-              clearNotice();
-            }}
+            onClick={discardDraft}
           >
             Discard draft
           </button>
