@@ -9,6 +9,7 @@ use starbank_fs::{CommitIntent, CommitOutcome, Fingerprint};
 use starbank_signature::{SigningContext, resign, verify_signature};
 use tauri::{Manager as _, State, WebviewWindow};
 
+use crate::recovery::{RecoveryOperation, WriteContext, uncertain_result};
 use crate::{
 	commands::{CommandError, DesktopEngine},
 	export::can_export_bank,
@@ -120,11 +121,30 @@ impl SourceRegistry {
 			CommitOutcome::RejectedUnchanged(error) => {
 				Err(CommandError::WriteRejected(error.to_string()))
 			}
-			CommitOutcome::CommitUncertain(_) => {
-				self.source = None;
-				Err(CommandError::WriteUncertain)
-			}
+			CommitOutcome::CommitUncertain(issue) => Err(self.uncertain_export(
+				destination,
+				Some(issue.recovery().path()),
+				issue.error(),
+			)),
 		}
+	}
+
+	fn uncertain_export(
+		&mut self,
+		destination: &Path,
+		artifact: Option<&Path>,
+		reason: &dyn std::fmt::Display,
+	) -> CommandError {
+		self.source = None;
+		uncertain_result(
+			WriteContext {
+				operation: RecoveryOperation::ExternalSignedCopy,
+				destination,
+				backup: None,
+			},
+			artifact,
+			reason,
+		)
 	}
 }
 

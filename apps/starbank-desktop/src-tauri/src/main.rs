@@ -15,6 +15,7 @@ mod external_sign;
 mod frame;
 mod inventory;
 mod open_requests;
+mod recovery;
 mod resign;
 mod reveal;
 mod save;

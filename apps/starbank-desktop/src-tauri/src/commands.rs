@@ -10,7 +10,7 @@ use tauri::{
 	ipc::{InvokeBody, Request, Response},
 };
 
-use crate::{frame, save::DesktopSession, selection};
+use crate::{frame, recovery::RecoveryReceipt, save::DesktopSession, selection};
 
 #[derive(Default)]
 pub(crate) struct DesktopEngine {
@@ -27,13 +27,12 @@ pub(crate) enum CommandError {
 	OpenRequiresPicker,
 	Unavailable,
 	WriteRejected(String),
-	WriteUncertain,
 	ActiveWriteRejected(String),
 	ExternalBankChanged,
 	ConflictReviewChanged,
 	CannotCompareBank(String),
 	ActiveWriteUncertain,
-	NewFileUncertain,
+	RecoveryRequired(Box<RecoveryReceipt>),
 	SavedNeedsReopen,
 	File(selection::OpenError),
 }

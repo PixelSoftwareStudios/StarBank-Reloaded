@@ -212,7 +212,15 @@ fn a_create_new_conflict_does_not_request_active_file_reopening() {
 		let blocked = crate::save::verify_write(
 			&mut session,
 			CommitOutcome::RejectedUnchanged(StorageError::Conflict),
-			active,
+			crate::recovery::WriteContext {
+				operation: if active {
+					crate::recovery::RecoveryOperation::SaveOverwrite
+				} else {
+					crate::recovery::RecoveryOperation::SaveAs
+				},
+				destination: std::path::Path::new("synthetic.SC2Bank"),
+				backup: None,
+			},
 		);
 		if active {
 			assert!(matches!(blocked, Err(CommandError::ExternalBankChanged)));

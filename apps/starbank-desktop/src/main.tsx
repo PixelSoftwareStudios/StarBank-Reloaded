@@ -72,6 +72,11 @@ import {
 import { useDesktopSettings } from "./use-desktop-settings";
 import { openInventoryBank, useInventory } from "./use-inventory";
 import { useNativeCloseGuard } from "./use-native-close-guard";
+import {
+  parseWriteRecoveryError,
+  type WriteRecoveryEvidence,
+} from "./write-recovery";
+import { WriteRecoveryDetails } from "./write-recovery-details";
 import "starbank-ui/styles.css";
 
 declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
@@ -114,6 +119,8 @@ function DesktopApp() {
   const [hasDraft, setHasDraft] = useState(false);
   const currentDraft = useRef(false);
   const [nativeNotice, setNativeNotice] = useState<string>();
+  const [writeRecovery, setWriteRecovery] = useState<WriteRecoveryEvidence>();
+  const [writeRecoveryVisible, setWriteRecoveryVisible] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState<string>();
   const [backupGeneration, setBackupGeneration] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -169,6 +176,23 @@ function DesktopApp() {
   function requestId() {
     nextRequest.current += 1;
     return `desktop-${nextRequest.current}`;
+  }
+
+  function messageFor(error: unknown): string {
+    const evidence = parseWriteRecoveryError(error);
+    if (evidence) {
+      setWriteRecovery(evidence);
+      setWriteRecoveryVisible(true);
+      setBackupGeneration((value) => value + 1);
+      if (
+        evidence.kind === "invalid_receipt" ||
+        evidence.receipt.affectsActive
+      ) {
+        setOverwriteAvailable(false);
+      }
+      return "The bank operation needs review. Inspect write recovery details before retrying.";
+    }
+    return formatNativeMessage(error);
   }
 
   async function exclusive<Result>(
@@ -515,6 +539,8 @@ function DesktopApp() {
       }
       acceptedOpen.current = null;
       setOpenRecovery(undefined);
+      setWriteRecovery(undefined);
+      setWriteRecoveryVisible(false);
       setProfile(undefined);
       setOverwriteAvailable(opening.canOverwrite);
       setSelectedBankId(opening.bankId);
@@ -1001,6 +1027,9 @@ function DesktopApp() {
         breadcrumbAvailable
         tools={
           <BatchBackupTools
+            onReviewWriteRecovery={
+              writeRecovery ? () => setWriteRecoveryVisible(true) : undefined
+            }
             onResignExternal={
               exportAvailable && !busy && !closeGuard.pending
                 ? () => {
@@ -1057,6 +1086,12 @@ function DesktopApp() {
       {backupPrompt ? (
         <BackupPicker {...backupPrompt} messageFor={messageFor} />
       ) : null}
+      {writeRecovery && writeRecoveryVisible && (
+        <WriteRecoveryDetails
+          evidence={writeRecovery}
+          close={() => setWriteRecoveryVisible(false)}
+        />
+      )}
     </>
   );
 }
@@ -1117,7 +1152,7 @@ function displaySections(snapshot: EngineSnapshot) {
   }));
 }
 
-function messageFor(error: unknown): string {
+function formatNativeMessage(error: unknown): string {
   switch (error) {
     case "external_bank_changed":
       return "The bank changed on disk.";

@@ -7,7 +7,8 @@ use starbank_editor::{
 	Engine, NativeSaveReceipt, PROTOCOL_VERSION, WireReply, max_attachment_bytes,
 };
 use starbank_fs::{
-	CommitIntent, CommitOutcome, CommitReceipt, Fingerprint, NativeBackupCatalog, StorageError,
+	CommitIntent, CommitOutcome, CommitReceipt, Fingerprint, NativeBackupCatalog,
+	NativeBackupEffect, StorageError,
 };
 use starbank_signature::SignatureStatus;
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
@@ -15,6 +16,7 @@ use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 use crate::backup;
 use crate::commands::{CommandError, DesktopEngine, OpenedBank, is_request};
 use crate::conflict::ConflictState;
+use crate::recovery::{RecoveryOperation, WriteContext, uncertain_write};
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name, destination_context};
 use crate::settings::{AutomaticBackup, SettingsStore};
 
@@ -313,7 +315,7 @@ fn publish(
 		.validate_native_active_save(&prepared.receipt)
 		.map_err(write_rejected)?;
 	let overwrite = matches!(prepared.destination, Destination::Overwrite { .. });
-	let commit = match prepared.destination {
+	let effect = match prepared.destination {
 		Destination::Overwrite { with_backup } => {
 			let expected = trusted_fingerprint(selected)?.clone();
 			if selected.path != prepared.path {
@@ -329,14 +331,26 @@ fn publish(
 				prepared.automatic_backup,
 			)?
 		}
-		Destination::Create(_) => starbank_fs::commit(
-			&prepared.path,
-			prepared.receipt.bytes(),
-			CommitIntent::CreateNew,
-			max_attachment_bytes(),
-		),
+		Destination::Create(_) => NativeBackupEffect {
+			backup: None,
+			commit: starbank_fs::commit(
+				&prepared.path,
+				prepared.receipt.bytes(),
+				CommitIntent::CreateNew,
+				max_attachment_bytes(),
+			),
+		},
 	};
-	let committed = verify_write(&mut session, commit, overwrite)?;
+	let context = WriteContext {
+		operation: if overwrite {
+			RecoveryOperation::SaveOverwrite
+		} else {
+			RecoveryOperation::SaveAs
+		},
+		destination: &prepared.path,
+		backup: effect.backup.as_ref(),
+	};
+	let committed = verify_write(&mut session, effect.commit, context)?;
 	session.conflict.invalidate();
 	let id = target.document_id.clone();
 	let revision = session
@@ -368,24 +382,20 @@ pub(crate) fn trusted_fingerprint(selected: &SelectedBank) -> Result<&Fingerprin
 pub(crate) fn verify_write(
 	session: &mut DesktopSession,
 	outcome: CommitOutcome,
-	affects_active: bool,
+	context: WriteContext<'_>,
 ) -> Result<CommitReceipt, CommandError> {
 	match outcome {
 		CommitOutcome::CommittedVerified(receipt) => Ok(receipt),
-		CommitOutcome::RejectedUnchanged(error) if affects_active => {
+		CommitOutcome::RejectedUnchanged(error) if context.operation.affects_active() => {
 			Err(active_storage_rejected(error))
 		}
 		CommitOutcome::RejectedUnchanged(error) => Err(write_rejected(error)),
-		CommitOutcome::CommitUncertain(_) => {
-			if affects_active && let Some(selected) = &mut session.selected {
-				selected.fingerprint = None;
-			}
-			Err(if affects_active {
-				CommandError::ActiveWriteUncertain
-			} else {
-				CommandError::NewFileUncertain
-			})
-		}
+		CommitOutcome::CommitUncertain(issue) => Err(uncertain_write(
+			session,
+			context,
+			Some(issue.recovery().path()),
+			issue.error(),
+		)),
 	}
 }
 

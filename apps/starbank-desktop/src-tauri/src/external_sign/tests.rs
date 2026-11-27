@@ -131,3 +131,53 @@ fn signing_context_follows_canonical_destination_and_requires_intent_elsewhere()
 	);
 	Ok(())
 }
+
+#[test]
+fn uncertain_signed_copy_consumes_the_foreign_source_and_preserves_recovery_evidence()
+-> io::Result<()> {
+	let folder = tempfile::tempdir()?;
+	let root = folder.path().canonicalize()?;
+	let source = write_fixture(&root, "External.SC2Bank")?;
+	let original = fs::read(&source)?;
+	let mut registry = SourceRegistry::default();
+	let selected = registry
+		.select(MAIN, source.clone())
+		.expect("selected source");
+	let destination = root.join("Signed Copy.SC2Bank");
+	let artifact = root.join(".starbank-pending-signed-copy");
+	let error = registry.uncertain_export(
+		&destination,
+		Some(&artifact),
+		&starbank_fs::StorageError::Conflict,
+	);
+	let encoded = serde_json::to_value(error).expect("native error serializes");
+	let receipt = &encoded["recovery_required"];
+	assert_eq!(receipt["operation"], "external_signed_copy");
+	assert_eq!(receipt["affectsActive"], false);
+	assert_eq!(
+		receipt["destination"]["display"],
+		destination.to_string_lossy().as_ref()
+	);
+	assert_eq!(receipt["recovery"]["kind"], "recorded");
+	assert_eq!(
+		receipt["recovery"]["path"]["display"],
+		artifact.to_string_lossy().as_ref()
+	);
+	assert_eq!(receipt["backup"]["kind"], "not_created");
+	assert!(registry.for_owner(MAIN, &selected.id).is_err());
+	assert!(registry.for_owner(OTHER_WINDOW, &selected.id).is_err());
+	assert!(matches!(
+		registry.publish(MAIN, &selected.id, &destination, Some(manual("Stats"))),
+		Err(CommandError::ActiveWriteRejected(_))
+	));
+	assert_eq!(fs::read(source)?, original);
+	assert!(
+		!destination.exists(),
+		"failure mapping must not replay the export"
+	);
+	assert!(
+		!artifact.exists(),
+		"the receipt records a location without probing or creating it"
+	);
+	Ok(())
+}

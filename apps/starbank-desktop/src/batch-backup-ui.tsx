@@ -42,6 +42,7 @@ interface BatchBackupToolsProps {
   availability: BackupAvailability;
   initialPlacement?: BackupPlacement;
   onResignExternal?: () => void;
+  onReviewWriteRecovery?: () => void;
   externalSigningUnavailable?: string;
   onStart: (request: BatchBackupRequest) => Promise<BatchBackupReport | null>;
   onCancel: () => Promise<void>;
@@ -177,6 +178,7 @@ export function BatchBackupTools({
   availability,
   initialPlacement = "managed",
   onResignExternal,
+  onReviewWriteRecovery,
   externalSigningUnavailable,
   onStart,
   onCancel,
@@ -333,6 +335,14 @@ export function BatchBackupTools({
               >
                 Back up selected map
               </Dropdown.Item>
+              {onReviewWriteRecovery && (
+                <Dropdown.Item
+                  className={menuItemClasses}
+                  onSelect={onReviewWriteRecovery}
+                >
+                  Review write recovery…
+                </Dropdown.Item>
+              )}
               <p className="px-2 py-[0.3rem] text-[0.8125rem] text-muted">
                 Map repair is unavailable until archive writes are qualified.
               </p>

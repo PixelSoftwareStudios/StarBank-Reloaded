@@ -4,6 +4,7 @@ use sc2bank::{Limits, parse};
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use super::{SelectedBackup, fresh_catalog, take_backup};
+use crate::recovery::RecoveryOperation;
 use crate::{
 	commands::{CommandError, DesktopEngine},
 	export::{can_export_bank, commit_new_copy},
@@ -75,7 +76,7 @@ fn save_copy(backup: &SelectedBackup, destination: &Path) -> Result<String, Comm
 		.map_err(|error| CommandError::WriteRejected(error.to_string()))?;
 	parse(snapshot.bytes(), Limits::default())
 		.map_err(|error| CommandError::WriteRejected(error.to_string()))?;
-	commit_new_copy(destination, snapshot.bytes())?;
+	commit_new_copy(destination, snapshot.bytes(), RecoveryOperation::BackupCopy)?;
 	Ok(name)
 }
 

@@ -8,6 +8,7 @@ use starbank_signature::SignatureStatus;
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use super::{backup_selection, catalog, fresh_catalog};
+use crate::recovery::{RecoveryOperation, WriteContext, backup_failure};
 use crate::{
 	backup_location::backup_folder,
 	commands::{CommandError, DesktopEngine, OpenedBank},
@@ -237,8 +238,25 @@ fn publish_restore(
 	managed.authorize(catalog);
 	let effect = catalog
 		.restore(prepared.storage, BackupPlacement::Managed(managed.path()))
-		.map_err(write_rejected)?;
-	let committed = verify_write(&mut session, effect.commit, true)?;
+		.map_err(|failure| {
+			backup_failure(
+				WriteContext {
+					operation: RecoveryOperation::Restore,
+					destination: &prepared.path,
+					backup: None,
+				},
+				failure,
+			)
+		})?;
+	let committed = verify_write(
+		&mut session,
+		effect.commit,
+		WriteContext {
+			operation: RecoveryOperation::Restore,
+			destination: &prepared.path,
+			backup: effect.backup.as_ref(),
+		},
+	)?;
 	let outcome = session
 		.editor
 		.acknowledge_verified_native_active_restore(prepared.editor)

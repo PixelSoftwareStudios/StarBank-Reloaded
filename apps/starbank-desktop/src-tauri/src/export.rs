@@ -6,6 +6,7 @@ use starbank_fs::{CommitIntent, CommitOutcome};
 use tauri::{AppHandle, Manager as _, State, WebviewWindow};
 
 use crate::commands::{self, CommandError, DesktopEngine};
+use crate::recovery::{RecoveryOperation, WriteContext, uncertain_result};
 use crate::selection::{BANK_EXTENSION, BANK_FILTER, bank_name};
 
 const PREPARE_REQUEST: &str = "prepare";
@@ -153,7 +154,7 @@ fn publish(
 	let mut engine = state.engine.lock().map_err(|_| CommandError::Unavailable)?;
 	let reply = engine.dispatch(control, None);
 	if let Some(bytes) = reply.bytes {
-		commit_new_copy(path, &bytes)?;
+		commit_new_copy(path, &bytes, RecoveryOperation::ExportCopy)?;
 	}
 	Ok(ExportReply {
 		name,
@@ -161,13 +162,25 @@ fn publish(
 	})
 }
 
-pub(crate) fn commit_new_copy(path: &Path, bytes: &[u8]) -> Result<(), CommandError> {
+pub(crate) fn commit_new_copy(
+	path: &Path,
+	bytes: &[u8],
+	operation: RecoveryOperation,
+) -> Result<(), CommandError> {
 	match starbank_fs::commit(path, bytes, CommitIntent::CreateNew, max_attachment_bytes()) {
 		CommitOutcome::CommittedVerified(_) => Ok(()),
 		CommitOutcome::RejectedUnchanged(error) => {
 			Err(CommandError::WriteRejected(error.to_string()))
 		}
-		CommitOutcome::CommitUncertain(_) => Err(CommandError::WriteUncertain),
+		CommitOutcome::CommitUncertain(issue) => Err(uncertain_result(
+			WriteContext {
+				operation,
+				destination: path,
+				backup: None,
+			},
+			Some(issue.recovery().path()),
+			issue.error(),
+		)),
 	}
 }
 

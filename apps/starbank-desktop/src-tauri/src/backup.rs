@@ -2,15 +2,15 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 
 use serde::Serialize;
-use starbank_backup::BackupError;
 use starbank_core::Revision;
 use starbank_editor::max_attachment_bytes;
 use starbank_fs::{
-	BackupHealth, BackupPlacement, BackupRecord, BackupVerification, CommitOutcome, Fingerprint,
-	NativeBackupCatalog, NativeBackupPolicy, backup_source,
+	BackupHealth, BackupPlacement, BackupRecord, BackupVerification, Fingerprint,
+	NativeBackupCatalog, NativeBackupEffect, NativeBackupPolicy, backup_source,
 };
 use tauri::{AppHandle, Manager as _, WebviewWindow};
 
+use crate::recovery::{RecoveryOperation, WriteContext, backup_failure};
 use crate::save::{ActiveTarget, DesktopSession, trusted_fingerprint, write_rejected};
 use crate::settings::AutomaticBackup;
 use crate::{
@@ -127,7 +127,7 @@ pub(crate) fn overwrite(
 	bytes: &[u8],
 	with_backup: bool,
 	automatic: AutomaticBackup,
-) -> Result<CommitOutcome, CommandError> {
+) -> Result<NativeBackupEffect, CommandError> {
 	let source = backup_source(path).map_err(write_rejected)?;
 	let catalog = catalog(session)?;
 	catalog.set_managed_directory(None);
@@ -146,20 +146,18 @@ pub(crate) fn overwrite(
 			}
 		}
 	};
-	Ok(catalog
+	catalog
 		.overwrite(&source, expected, bytes, policy)
-		.map_err(|failure| match failure {
-			starbank_fs::NativeBackupError::Policy(ref error)
-				if matches!(
-					**error,
-					BackupError::TargetChanged | BackupError::MissingFile
-				) =>
-			{
-				CommandError::ExternalBankChanged
-			}
-			other => write_rejected(other),
-		})?
-		.commit)
+		.map_err(|failure| {
+			backup_failure(
+				WriteContext {
+					operation: RecoveryOperation::SaveOverwrite,
+					destination: path,
+					backup: None,
+				},
+				failure,
+			)
+		})
 }
 
 #[tauri::command]

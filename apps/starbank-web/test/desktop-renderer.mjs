@@ -148,6 +148,7 @@ function createBridge(engine, canOverwrite) {
   let failNextEditProjection = false;
   let failNextOpenProjection = false;
   let restoreNextBackup = false;
+  let nextWriteRecovery;
   let failedOpenTarget;
   let failedProjectionRevision;
   const wireRequests = [];
@@ -263,6 +264,11 @@ function createBridge(engine, canOverwrite) {
       };
     }
     calls.push({ command, args });
+    if (nextWriteRecovery?.command === command) {
+      const receipt = nextWriteRecovery.receipt;
+      nextWriteRecovery = undefined;
+      return { error: { recovery_required: receipt } };
+    }
     switch (command) {
       case "read_settings":
         return {
@@ -432,6 +438,10 @@ function createBridge(engine, canOverwrite) {
     },
     acceptNextRestore() {
       restoreNextBackup = true;
+    },
+    failNextWrite(command, receipt) {
+      assert.equal(nextWriteRecovery, undefined);
+      nextWriteRecovery = { command, receipt };
     },
     wireRequests,
     corruptBackupList() {
@@ -841,6 +851,229 @@ async function verifyAcceptedBackupRestore(page, bridge, name) {
   assert.deepEqual(bridge.callsFor("save_active_bank"), saves);
 }
 
+async function verifyWriteRecovery(page, bridge) {
+  const destination = {
+    display: "/synthetic/banks/Recovery Fixture.SC2Bank",
+    truncated: false,
+    lossy: false,
+  };
+  const recoveryPath = {
+    display: "/synthetic/banks/Recovery\uFFFD\r\nFixture.pending",
+    truncated: true,
+    lossy: true,
+  };
+  const backupPath = {
+    ...destination,
+    display: "/synthetic/backups/Recovery Fixture.SC2Bank.bak",
+  };
+  const uncertain = {
+    operation: "save_overwrite",
+    outcome: "commit_uncertain",
+    affectsActive: true,
+    destination,
+    recovery: { kind: "recorded", path: recoveryPath },
+    backup: { kind: "verified", path: backupPath },
+    reason: "Synthetic write verification failure.",
+    reasonTruncated: true,
+  };
+  const dialog = page.getByRole("dialog", {
+    name: "Write recovery details",
+    exact: true,
+  });
+  const activeSave = button(page, "Save");
+  const saveCopy = button(page, "Save As…");
+  const dirty = page
+    .getByRole("status")
+    .filter({ hasText: "Unsaved changes in 1 section" });
+  const tools = button(page, "Tools");
+  const review = page.getByRole("menuitem", {
+    name: "Review write recovery…",
+    exact: true,
+  });
+  const activeWritesBefore = bridge.callsFor("save_active_bank").length;
+
+  async function closeDetails() {
+    await button(dialog, "Close").click();
+    await dialog.waitFor({ state: "hidden" });
+  }
+
+  async function failWrite(command, receipt, trigger) {
+    const before = bridge.callsFor(command).length;
+    const current = bridge.wireRequests.findLast(
+      ({ command }) => command.kind === "raw_text",
+    );
+    const wireCount = bridge.wireRequests.length;
+    bridge.failNextWrite(command, receipt);
+    await trigger();
+    await dialog.waitFor();
+    const calls = bridge.callsFor(command);
+    assert.equal(calls.length, before + 1);
+    const request = calls.at(-1);
+    const target = request.target
+      ? {
+          document_id: request.target.documentId,
+          expected_revision: request.target.revision,
+        }
+      : JSON.parse(request.control);
+    assert.equal(target.document_id, current.document_id);
+    assert.equal(target.expected_revision, current.expected_revision);
+    assert.equal(bridge.wireRequests.length, wireCount);
+  }
+
+  async function checkPath(name, path) {
+    const field = dialog.getByRole("textbox", { name, exact: true });
+    assert.equal(await field.evaluate((input) => input.readOnly), true);
+    assert.equal(
+      await field.inputValue(),
+      path.display.replaceAll("\r\n", "\n"),
+    );
+    const copied = await field.evaluate((input) => {
+      input.select();
+      const clipboardData = new DataTransfer();
+      const event = new ClipboardEvent("copy", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData,
+      });
+      input.dispatchEvent(event);
+      return {
+        prevented: event.defaultPrevented,
+        text: clipboardData.getData("text/plain"),
+      };
+    });
+    assert.deepEqual(copied, { prevented: true, text: path.display });
+  }
+
+  await editGold(page, "009");
+  await failWrite(
+    "save_active_bank",
+    {
+      ...uncertain,
+      outcome: "live_unchanged",
+      affectsActive: false,
+      backup: { kind: "unverified", path: backupPath },
+    },
+    () => activeSave.click(),
+  );
+  await dialog.getByText(/destination was left unchanged/i).waitFor();
+  await checkPath("Unverified backup location", backupPath);
+  assert.equal(
+    await dialog
+      .getByRole("textbox", { name: "Verified backup location", exact: true })
+      .count(),
+    0,
+  );
+  await closeDetails();
+  assert.equal(await activeSave.isEnabled(), true);
+  assert.equal(await goldField(page).inputValue(), "009");
+  await dirty.waitFor();
+
+  await failWrite(
+    "export_bank_copy",
+    {
+      ...uncertain,
+      operation: "export_copy",
+      affectsActive: false,
+      recovery: { kind: "unknown" },
+      backup: { kind: "not_created" },
+    },
+    async () => {
+      await button(page, "More save options").click();
+      await page
+        .getByRole("menuitem", { name: "Export copy…", exact: true })
+        .click();
+    },
+  );
+  await dialog.getByText("Export copy", { exact: false }).waitFor();
+  await dialog
+    .getByText(/source bank was left unchanged|open bank was left unchanged/i)
+    .waitFor();
+  await dialog
+    .getByText("No recovery location was recorded.", { exact: true })
+    .waitFor();
+  await dialog
+    .getByText("No backup was created during the operation.", { exact: true })
+    .waitFor();
+  await closeDetails();
+  assert.equal(await activeSave.isEnabled(), true);
+  assert.equal(await goldField(page).inputValue(), "009");
+  await dirty.waitFor();
+
+  await failWrite("save_active_bank", uncertain, () => activeSave.click());
+  await dialog
+    .getByText(/could not verify this write.*before trying to overwrite it/i)
+    .waitFor();
+  await dialog.getByText(/recorded during the operation/i).waitFor();
+  await checkPath("Destination path", destination);
+  await checkPath("Recorded recovery location", recoveryPath);
+  await checkPath("Verified backup location", backupPath);
+  await dialog
+    .getByText("The recorded path was shortened.", { exact: true })
+    .waitFor();
+  await dialog
+    .getByText("Some path characters could not be represented.", {
+      exact: true,
+    })
+    .waitFor();
+  await dialog
+    .getByText("The reported reason was shortened.", { exact: true })
+    .waitFor();
+  await dialog.getByText(uncertain.reason, { exact: true }).waitFor();
+  await closeDetails();
+  assert.equal(await activeSave.count(), 0);
+  assert.equal(await saveCopy.isEnabled(), true);
+  assert.equal(await goldField(page).inputValue(), "009");
+  await dirty.waitFor();
+
+  await tools.click();
+  await review.click();
+  await dialog.waitFor();
+  await checkPath("Recorded recovery location", recoveryPath);
+  await closeDetails();
+  assert.equal(
+    bridge.callsFor("save_active_bank").length,
+    activeWritesBefore + 2,
+  );
+
+  bridge.choose("discard");
+  const nextOpen = bridge.callsFor("open_bank").length + 1;
+  await button(page, "Open Bank…").click();
+  await page
+    .getByRole("heading", {
+      name: `Replacement-${nextOpen}.SC2Bank`,
+      exact: true,
+    })
+    .waitFor();
+  assert.equal(await goldField(page).inputValue(), "001");
+  assert.equal(await activeSave.isEnabled(), true);
+  await tools.click();
+  await page.getByRole("menu").waitFor();
+  assert.equal(await review.count(), 0);
+  await page.keyboard.press("Escape");
+
+  await editGold(page, "010");
+  const untrusted = "Synthetic malformed receipt path and reason";
+  await failWrite(
+    "save_active_bank",
+    { ...uncertain, affectsActive: false, reason: untrusted },
+    () => activeSave.click(),
+  );
+  await dialog
+    .getByText(/could not read the write recovery receipt/i)
+    .waitFor();
+  assert.equal(await dialog.getByRole("textbox").count(), 0);
+  assert.equal(await dialog.getByText(untrusted, { exact: true }).count(), 0);
+  await closeDetails();
+  assert.equal(await activeSave.count(), 0);
+  assert.equal(await saveCopy.isEnabled(), true);
+  assert.equal(await goldField(page).inputValue(), "010");
+  await dirty.waitFor();
+  assert.equal(
+    bridge.callsFor("save_active_bank").length,
+    activeWritesBefore + 3,
+  );
+}
+
 async function verifyMalformedBackupList(page, bridge) {
   await editGold(page, "004");
   bridge.corruptBackupList();
@@ -1004,11 +1237,12 @@ async function verifyRenderer(browser, canOverwrite, openRecovery = false) {
       const currentName = "Replacement-2.SC2Bank";
       await verifyAcceptedConflictReopen(page, bridge, currentName);
       await verifyAcceptedBackupRestore(page, bridge, currentName);
+      await verifyWriteRecovery(page, bridge);
       assert.deepEqual(bridge.unexpected, []);
       assert.deepEqual(errors, []);
       assert.deepEqual(rejected, []);
       console.log(
-        `Chromium ${browser.version()} desktop renderer passed accepted-open recovery.`,
+        `Chromium ${browser.version()} desktop renderer passed accepted-open recovery and write recovery receipts.`,
       );
       return;
     }

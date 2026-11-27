@@ -1,0 +1,25 @@
+{
+  "recovery_required": {
+    "operation": "save_as",
+    "outcome": "commit_uncertain",
+    "affectsActive": false,
+    "destination": {
+      "display": "/fixture/Copy.SC2Bank",
+      "truncated": false,
+      "lossy": false
+    },
+    "recovery": {
+      "kind": "recorded",
+      "path": {
+        "display": "/fixture/.stage",
+        "truncated": false,
+        "lossy": false
+      }
+    },
+    "backup": {
+      "kind": "not_created"
+    },
+    "reason": "Synthetic publication could not be verified.",
+    "reasonTruncated": false
+  }
+}
