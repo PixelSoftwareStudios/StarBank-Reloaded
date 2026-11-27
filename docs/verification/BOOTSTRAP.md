@@ -6,7 +6,7 @@ Rust 1.100.0 is available. The workspace pins edition 2024, resolver 3, hard tab
 
 `starbank-core` owns checked revisions and canonical decimal transport. On macOS 14.7.2 arm64, formatting, Clippy with warnings denied, Cargo tests, nextest and rustdoc all passed for the bootstrap crate. Its three tests cover values beyond JavaScript's exact integer range, rejection of malformed or overflowing input and counter exhaustion. See the [shared engine boundary](../design/ENGINE_CONTRACT.md) for the larger contract.
 
-The Rust workflow checks source layout and runs Linux, macOS and Windows native jobs plus an explicit list of portable crates for wasm32. The source checker and CI configuration passed local checks, including actionlint, eight native nextest cases and the core wasm32 build. Windows MSVC compile checks ran on macOS. Hosted CI and Windows execution remain pending.
+The Rust workflow checks source layout and runs Linux, macOS and Windows native jobs plus an explicit list of portable crates for wasm32. The source checker and CI configuration passed local checks, including actionlint, eight native nextest cases and the core wasm32 build. Windows MSVC compile checks ran on macOS. Later hosted CI at `4143952` passed the source and wasm32 checks and reported two Windows job failures. [Hosted workflow evidence](IMPLEMENTATION.md#hosted-ci-at-4143952)
 
 ## Frontend bootstrap
 

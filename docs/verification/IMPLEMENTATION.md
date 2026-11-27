@@ -2,6 +2,12 @@
 
 Some measurements below refer to revisions from before the history rewrite. [Historical evidence and revision availability](VERIFICATION_REGISTER.md#historical-evidence)
 
+## Hosted CI at `4143952`
+
+The November 27, 2026 push run at `4143952` completed with eight successful jobs and two failures. Source checks, wasm32, frontend, Rust native on Linux x64 and arm64 and macOS arm64, and native desktop on Linux x64 and macOS arm64 all passed. These results cover the pushed revision and its workflow. [Workflow run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45984131228)
+
+On Windows x64, the desktop job passed the unsigned NSIS build, silent install and uninstall harness, and desktop Clippy. Its native test step reported 65 passed and one failure because `frozen_leaf_detects_a_different_file_at_the_same_path` did not observe the expected stale-bank result. The Rust native job passed 221 default tests, with two skipped. Its separate exclusive handle-relative NTFS publication probe failed when the collision case returned Win32 error 87 where the test expected an already-exists error. Windows native write qualification remains open. [Desktop job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45984131228/job/140455268670) · [Rust native job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45984131228/job/140455268612) · [Installer evidence](DISTRIBUTION.md#windows-x64-nsis)
+
 ## WP-03 bank XML
 
 `sc2bank` parses bounded XML 1.0 in UTF-8 and BOM-marked UTF-16LE and UTF-16BE. It keeps original source bytes, ordered section/key/value occurrences and unknown markup. Export without changes returns the original bytes. Edits to recognized existing value attributes replace their original byte ranges, escape the inserted values and revalidate the result. Unsupported encodings, DTDs, invalid references, ambiguous edits and exceeded limits return typed errors.

@@ -156,7 +156,8 @@ Depends on: 12,13,14,15.
 
 - [x] Build and launch the Tauri host on macOS and link the tested Linux arm64 executable.
 - [x] Verify the local unsigned macOS disk image and the Debian arm64 package and its install, launch and purge flow. [Distribution evidence](verification/DISTRIBUTION.md)
-- [ ] Verify signed packages, Windows Explorer registration and uninstall, installed macOS open flows, and release licensing.
+- [x] Verify the unsigned Windows x64 NSIS installer, per-user Open With registration, and silent uninstall with a synthetic bank. [Hosted installer evidence](verification/DISTRIBUTION.md#windows-x64-nsis)
+- [ ] Verify signed packages, Windows Explorer Open With visibility and open flows, installed macOS open flows, and release licensing.
 - [ ] Implement and verify: REQ-DIST-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
