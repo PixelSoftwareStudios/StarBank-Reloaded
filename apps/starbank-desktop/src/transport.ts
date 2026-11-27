@@ -2,8 +2,8 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   type EngineSigningContext,
   signatureStatus,
-} from "starbank-engine-client/signing-protocol";
-import { MAX_BACKUP_RETENTION } from "starbank-platform/settings";
+} from "starbank-ui/engine/signing-protocol";
+import { MAX_BACKUP_RETENTION } from "starbank-ui/settings-model";
 import * as v from "valibot";
 import type { BatchBackupRequest } from "./batch-backup-ui";
 

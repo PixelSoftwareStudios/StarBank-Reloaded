@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { defaultSettings } from "starbank-platform/settings";
 import { AppShell, type BankEditorDocument, type EditorRow } from "starbank-ui";
+import { defaultSettings } from "starbank-ui/settings-model";
 import { describe, expect, it } from "vitest";
 
 const gold: EditorRow = {

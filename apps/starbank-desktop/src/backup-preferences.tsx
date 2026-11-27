@@ -4,7 +4,7 @@ import {
   type BackupPreferences,
   decodeBackupPreferences,
   MAX_BACKUP_RETENTION,
-} from "starbank-platform/settings";
+} from "starbank-ui/settings-model";
 
 const ISSUE_MESSAGES = {
   unavailable: "Managed backup settings are unavailable.",

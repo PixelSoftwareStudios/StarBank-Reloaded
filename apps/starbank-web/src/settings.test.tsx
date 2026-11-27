@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { SettingsPage } from "starbank-ui/settings";
 import {
   authorizeLegacyRoot,
   BROWSER_SETTINGS_KEY,
@@ -9,8 +10,7 @@ import {
   recoverBrowserSettings,
   type SettingsStorage,
   writeBrowserSettings,
-} from "starbank-platform/settings";
-import { SettingsPage } from "starbank-ui/settings";
+} from "starbank-ui/settings-model";
 import { describe, expect, test } from "vitest";
 
 function mockStorage(initial?: string) {

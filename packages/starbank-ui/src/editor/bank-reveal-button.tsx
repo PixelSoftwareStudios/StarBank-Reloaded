@@ -1,7 +1,7 @@
 import { FolderOpen } from "lucide-react";
-import type { EditorAction, EditorTarget } from "starbank-editor";
 import { EditorHelpButton } from "../shared/editor-tooltip";
 import type { RunEditorAction } from "./editor-actions";
+import type { EditorAction, EditorTarget } from "./index";
 
 export function BankRevealButton({
   reveal,

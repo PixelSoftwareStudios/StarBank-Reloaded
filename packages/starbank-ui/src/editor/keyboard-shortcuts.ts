@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useEffectEvent } from "react";
-import type { EditorAction, EditorTarget } from "starbank-editor";
 import type { RunEditorAction } from "./editor-actions";
+import type { EditorAction, EditorTarget } from "./index";
 
 export const SAVE_SHORTCUT = "Control+S Meta+S";
 export const UNDO_SHORTCUT = "Control+Z Meta+Z";

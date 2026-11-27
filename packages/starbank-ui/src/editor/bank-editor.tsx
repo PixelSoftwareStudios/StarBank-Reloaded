@@ -10,20 +10,9 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  type BankEditorController,
-  type BankEditorDocument,
-  type EditorActionResult,
-  type EditorDraft,
-  type EditorProfileField,
-  type EditorProfileInput,
-  type EditorRow,
-  profileStatus,
-  useEditorState,
-} from "starbank-editor";
-import type { EngineDiff } from "starbank-engine-client/protocol";
-import type { AppSettings } from "starbank-platform/settings";
+import type { EngineDiff } from "../engine/protocol";
 import { type MapContext, MapContextDetails } from "../inventory/map-context";
+import type { AppSettings } from "../settings/settings";
 import { BankBreadcrumbs } from "./bank-breadcrumbs";
 import { BankRevealButton } from "./bank-reveal-button";
 import { DraftSwitchDialog, type DraftSwitchKind } from "./draft-switch-dialog";
@@ -34,6 +23,17 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
+import {
+  type BankEditorController,
+  type BankEditorDocument,
+  type EditorActionResult,
+  type EditorDraft,
+  type EditorProfileField,
+  type EditorProfileInput,
+  type EditorRow,
+  profileStatus,
+  useEditorState,
+} from "./index";
 import type { RawEditorHandle } from "./raw-editor";
 import { ProfilePicker, SimpleEditor } from "./simple-editor";
 import {

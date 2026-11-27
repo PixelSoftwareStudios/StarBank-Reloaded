@@ -1,5 +1,4 @@
 import { type ReactNode, useRef, useState } from "react";
-import type { BankEditorController } from "starbank-editor";
 import { type MapContext, MapContextDetails } from "../inventory/map-context";
 import { BankEditor, type EditorSettings } from "./bank-editor";
 import {
@@ -8,6 +7,7 @@ import {
   type RunEditorAction,
   SettingsButton,
 } from "./editor-actions";
+import type { BankEditorController } from "./index";
 
 export function EditorPane({
   name,

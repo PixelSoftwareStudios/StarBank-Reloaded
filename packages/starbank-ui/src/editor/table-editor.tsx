@@ -1,10 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
-import {
-  type EditorRow,
-  type EditorSection,
-  groupNumberLexeme,
-} from "starbank-editor";
+import { type EditorRow, type EditorSection, groupNumberLexeme } from "./index";
 import { type TableRowProjection, WindowedTable } from "./windowed-table";
 
 const WINDOW_THRESHOLD = 150;

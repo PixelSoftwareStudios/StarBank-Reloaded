@@ -1,11 +1,11 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 import {
   AccountScopePicker,
   type AccountScopeSelection,
   InventoryActions,
 } from "../inventory/inventory-browser";
 import type { MapInventory } from "../inventory/map-sidebar";
+import { type AppSettings, MAP_PANE_WIDTH } from "./settings";
 import {
   SettingsPlatformDetails,
   type SettingsPlatformInfo,

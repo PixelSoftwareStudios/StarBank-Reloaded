@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import type { BankDownload } from "starbank-ui/browser";
 import {
   bankFilenameStem,
   type EngineSigningContext,
-} from "starbank-engine-client/protocol";
-import type { BankDownload } from "starbank-platform/browser";
+} from "starbank-ui/engine/protocol";
 
 interface DownloadPreparation {
   readonly download: BankDownload;

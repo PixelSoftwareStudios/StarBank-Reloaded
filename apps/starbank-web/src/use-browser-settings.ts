@@ -8,7 +8,7 @@ import {
   type SettingsIssue,
   type SettingsLoadResult,
   writeBrowserSettings,
-} from "starbank-platform/settings";
+} from "starbank-ui/settings-model";
 
 type PreferenceKey = Exclude<keyof AppSettings, "version">;
 

@@ -3,7 +3,7 @@ import type {
   EngineDiff,
   EngineOccurrenceDiff,
   EngineRevertTarget,
-} from "starbank-engine-client/protocol";
+} from "../engine/protocol";
 import { EditorDialog } from "./editor-dialog";
 
 const CHANGE_PAGE_SIZE = 100;

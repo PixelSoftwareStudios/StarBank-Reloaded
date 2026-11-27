@@ -218,12 +218,6 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
-      starbank-engine-client:
-        specifier: workspace:*
-        version: link:../../packages/starbank-engine-client
-      starbank-platform:
-        specifier: workspace:*
-        version: link:../../packages/starbank-platform
       starbank-ui:
         specifier: workspace:*
         version: link:../../packages/starbank-ui
@@ -267,12 +261,6 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
-      starbank-engine-client:
-        specifier: workspace:*
-        version: link:../../packages/starbank-engine-client
-      starbank-platform:
-        specifier: workspace:*
-        version: link:../../packages/starbank-platform
       starbank-ui:
         specifier: workspace:*
         version: link:../../packages/starbank-ui
@@ -307,48 +295,6 @@ importers:
       vitest:
         specifier: 5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
-
-  packages/starbank-editor:
-    dependencies:
-      react:
-        specifier: 'catalog:'
-        version: 19.3.1
-      react-number-format:
-        specifier: 5.4.5
-        version: 5.4.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      starbank-engine-client:
-        specifier: workspace:*
-        version: link:../starbank-engine-client
-      zustand:
-        specifier: 5.1.0
-        version: 5.1.0(@types/react@19.3.3)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
-    devDependencies:
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.3.3
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-
-  packages/starbank-engine-client:
-    dependencies:
-      valibot:
-        specifier: 1.5.0
-        version: 1.5.0(typescript@7.0.2)
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-
-  packages/starbank-platform:
-    dependencies:
-      valibot:
-        specifier: 1.5.0
-        version: 1.5.0(typescript@7.0.2)
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
 
   packages/starbank-ui:
     dependencies:
@@ -391,18 +337,18 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
-      starbank-editor:
-        specifier: workspace:*
-        version: link:../starbank-editor
-      starbank-engine-client:
-        specifier: workspace:*
-        version: link:../starbank-engine-client
-      starbank-platform:
-        specifier: workspace:*
-        version: link:../starbank-platform
+      react-number-format:
+        specifier: 5.4.5
+        version: 5.4.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@7.0.2)
+      zustand:
+        specifier: 5.1.0
+        version: 5.1.0(@types/react@19.3.3)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
       '@types/react':
         specifier: 'catalog:'

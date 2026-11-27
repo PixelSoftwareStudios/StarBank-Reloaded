@@ -3,7 +3,7 @@ import type {
   EngineRevertTarget,
   EngineStructureChange,
   EngineValueValidationIssue,
-} from "starbank-engine-client/protocol";
+} from "../engine/protocol";
 import type { EditorProfileController } from "./simple-profile-model";
 
 export interface EditorTarget {

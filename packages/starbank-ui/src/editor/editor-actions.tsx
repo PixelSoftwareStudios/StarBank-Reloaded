@@ -1,13 +1,13 @@
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Settings, Wrench } from "lucide-react";
 import { type DragEvent, Fragment, type Ref, useRef } from "react";
+import { EditorHelpButton, EditorTooltip } from "../shared/editor-tooltip";
 import type {
   BankEditorController,
   EditorAction,
   EditorActionResult,
   EditorTarget,
-} from "starbank-editor";
-import { EditorHelpButton, EditorTooltip } from "../shared/editor-tooltip";
+} from "./index";
 import {
   REDO_SHORTCUT,
   SAVE_SHORTCUT,

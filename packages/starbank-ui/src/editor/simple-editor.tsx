@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import type { RunEditorAction } from "./editor-actions";
 import type {
   EditorProfileController,
   EditorProfileDraft,
@@ -6,8 +7,7 @@ import type {
   EditorProfileInput,
   EditorTarget,
   MatchedEditorProfile,
-} from "starbank-editor";
-import type { RunEditorAction } from "./editor-actions";
+} from "./index";
 
 export function ProfilePicker({
   controller,

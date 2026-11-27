@@ -1,18 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { EngineTransportError } from "starbank-engine-client";
-import type {
-  EngineProfile,
-  EngineSigningContext,
-} from "starbank-engine-client/protocol";
-import {
-  decodeBankFileXml,
-  encodeBankFileXml,
-} from "starbank-platform/bank-encoding";
-import {
-  prepareBankDownload,
-  prepareOpeningBankBackup,
-  writeBankClipboard,
-} from "starbank-platform/browser";
 import {
   AppShell,
   type BankEditorController,
@@ -23,6 +9,20 @@ import {
   preloadSettingsPage,
   type SettingsPlatformInfo,
 } from "starbank-ui";
+import {
+  decodeBankFileXml,
+  encodeBankFileXml,
+} from "starbank-ui/bank-encoding";
+import {
+  prepareBankDownload,
+  prepareOpeningBankBackup,
+  writeBankClipboard,
+} from "starbank-ui/browser";
+import { EngineTransportError } from "starbank-ui/engine";
+import type {
+  EngineProfile,
+  EngineSigningContext,
+} from "starbank-ui/engine/protocol";
 import {
   type BankEditCommand,
   type BrowserBankDocument,

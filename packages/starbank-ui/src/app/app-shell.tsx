@@ -8,9 +8,8 @@ import {
   useRef,
   useState,
 } from "react";
-import type { BankEditorController } from "starbank-editor";
-import { type AppSettings, MAP_PANE_WIDTH } from "starbank-platform/settings";
 import { EditorPane } from "../editor/editor-pane";
+import type { BankEditorController } from "../editor/index";
 import {
   type BankListItem,
   useBankAccountScope,
@@ -21,6 +20,7 @@ import {
   type MapOptions,
   MapSidebar,
 } from "../inventory/map-sidebar";
+import { type AppSettings, MAP_PANE_WIDTH } from "../settings/settings";
 import type { ChangeSetting } from "../settings/settings-page";
 import type { SettingsPlatformInfo } from "../settings/settings-platform";
 import { SidebarSplitter } from "./sidebar-splitter";

@@ -2,19 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
-  EngineCommand,
-  EngineDiff,
-  EngineProfile,
-  EngineReply,
-  EngineSnapshot,
-} from "starbank-engine-client/protocol";
-import {
-  decodeEngineReply,
-  engineRequest,
-  profileLoadForFile,
-} from "starbank-engine-client/protocol";
-import { decodeBankFileXml } from "starbank-platform/bank-encoding";
-import type {
   BankEditorController,
   BankEditorDocument,
   EditorActionResult,
@@ -23,6 +10,19 @@ import type {
   SettingsPlatformInfo,
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
+import { decodeBankFileXml } from "starbank-ui/bank-encoding";
+import type {
+  EngineCommand,
+  EngineDiff,
+  EngineProfile,
+  EngineReply,
+  EngineSnapshot,
+} from "starbank-ui/engine/protocol";
+import {
+  decodeEngineReply,
+  engineRequest,
+  profileLoadForFile,
+} from "starbank-ui/engine/protocol";
 import {
   type BackupAction,
   BackupPicker,

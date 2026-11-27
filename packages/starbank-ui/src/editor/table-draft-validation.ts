@@ -3,7 +3,7 @@ import type {
   BankEditorController,
   EditorTarget,
   EditorValueEdit,
-} from "starbank-editor";
+} from "./index";
 
 const VALIDATION_DELAY_MS = 150;
 

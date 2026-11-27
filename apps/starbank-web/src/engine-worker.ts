@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { serveEngineWorker } from "starbank-engine-client/worker";
+import { serveEngineWorker } from "starbank-ui/engine/worker";
 import initialize, { WasmBankEngine } from "./generated/starbank_wasm.js";
 
 declare const self: DedicatedWorkerGlobalScope;

@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import {
   decodeBankFileXml,
   encodeBankFileXml,
-} from "starbank-platform/bank-encoding";
+} from "starbank-ui/bank-encoding";
 import { describe, expect, test } from "vitest";
 
 const text =

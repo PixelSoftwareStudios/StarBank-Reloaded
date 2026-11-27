@@ -1,4 +1,7 @@
 export * as Dropdown from "@radix-ui/react-dropdown-menu";
+export { AppShell, preloadSettingsPage } from "./app/app-shell";
+export { preloadEditorTools, preloadRawEditor } from "./editor/bank-editor";
+export { ToolsMenuTrigger } from "./editor/editor-actions";
 export type {
   BankEditorController,
   BankEditorDocument,
@@ -8,10 +11,7 @@ export type {
   EditorSection,
   EditorTarget,
   EditorValueEdit,
-} from "starbank-editor";
-export { AppShell, preloadSettingsPage } from "./app/app-shell";
-export { preloadEditorTools, preloadRawEditor } from "./editor/bank-editor";
-export { ToolsMenuTrigger } from "./editor/editor-actions";
+} from "./editor/index";
 export type { BankBackupPresence } from "./inventory/inventory-browser";
 export {
   filterMaps,

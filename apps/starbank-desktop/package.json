@@ -14,8 +14,6 @@
     "@tauri-apps/api": "2.12.5",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "starbank-engine-client": "workspace:*",
-    "starbank-platform": "workspace:*",
     "starbank-ui": "workspace:*",
     "tailwindcss": "catalog:",
     "valibot": "1.5.0"

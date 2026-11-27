@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from "react";
-import type { EditorDraft } from "starbank-editor";
+import type { EditorDraft } from "./index";
 
 export type DraftSwitchKind = EditorDraft["kind"] | "simple";
 

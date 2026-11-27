@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { EditorRow } from "starbank-editor";
+import type { EditorRow } from "./index";
 
 const OVERSCAN_ROWS = 8;
 const INITIAL_PAGE_ROWS = 20;

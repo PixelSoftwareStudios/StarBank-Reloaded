@@ -1,11 +1,11 @@
 import { type FormEvent, useId, useState } from "react";
-import type { EditorRow, EditorSection } from "starbank-editor";
 import {
   type EngineStructureChange,
   type EngineStructuredValueKind,
   STRUCTURED_VALUE_KINDS,
-} from "starbank-engine-client/protocol";
+} from "../engine/protocol";
 import { EditorDialog } from "./editor-dialog";
+import type { EditorRow, EditorSection } from "./index";
 
 type Operation = EngineStructureChange["kind"];
 type Scope = "bank" | "section" | "key" | "value";

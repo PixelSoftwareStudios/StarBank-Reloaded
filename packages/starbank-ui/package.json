@@ -7,7 +7,15 @@
     "./settings": "./src/settings/settings-page.tsx",
     "./settings-retention": "./src/settings/settings-retention.tsx",
     "./settings.css": "./src/settings/settings-page.css",
-    "./styles.css": "./src/styles/styles.css"
+    "./styles.css": "./src/styles/styles.css",
+    "./editor": "./src/editor/index.ts",
+    "./engine": "./src/engine/client.ts",
+    "./engine/protocol": "./src/engine/protocol.ts",
+    "./engine/worker": "./src/engine/worker.ts",
+    "./engine/signing-protocol": "./src/engine/signing-protocol.ts",
+    "./settings-model": "./src/settings/settings.ts",
+    "./browser": "./src/platform/browser.ts",
+    "./bank-encoding": "./src/platform/bank-encoding.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -24,9 +32,9 @@
     "@radix-ui/react-tabs": "1.2.1",
     "@radix-ui/react-tooltip": "1.4.1",
     "lucide-react": "1.80.0",
-    "starbank-editor": "workspace:*",
-    "starbank-engine-client": "workspace:*",
-    "starbank-platform": "workspace:*"
+    "react-number-format": "5.4.5",
+    "zustand": "5.1.0",
+    "valibot": "1.5.0"
   },
   "peerDependencies": {
     "react": "catalog:",

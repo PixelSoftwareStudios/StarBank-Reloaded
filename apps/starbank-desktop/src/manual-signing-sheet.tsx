@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type {
   EngineSignatureStatus,
   EngineSigningContext,
-} from "starbank-engine-client/protocol";
+} from "starbank-ui/engine/protocol";
 
 type CheckedSignature = Exclude<EngineSignatureStatus, "missing_context">;
 

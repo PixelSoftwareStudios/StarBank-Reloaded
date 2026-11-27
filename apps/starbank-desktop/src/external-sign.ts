@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { EngineSigningContext } from "starbank-engine-client/protocol";
 import type { EditorActionResult } from "starbank-ui";
+import type { EngineSigningContext } from "starbank-ui/engine/protocol";
 import type { ManualSigningPrompt } from "./manual-signing-sheet";
 import {
   checkExternalBankSignature,

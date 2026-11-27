@@ -12,8 +12,6 @@
     "test:desktop-renderer": "node test/desktop-renderer.mjs"
   },
   "dependencies": {
-    "starbank-engine-client": "workspace:*",
-    "starbank-platform": "workspace:*",
     "starbank-ui": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
