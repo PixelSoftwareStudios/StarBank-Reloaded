@@ -25,6 +25,8 @@ Output creation is exclusive. The two in-place commands require `--in-place` and
 
 Adjacent snapshots use a UTC timestamp and a collision suffix when needed. The JSON sidecar stores the original basename, canonical signing context when known, timestamp, reason, byte length and digest. Restore requires the matching recorded sidecar and the current live-bank SHA-256. Listed snapshots start unverified in each invocation until checked.
 
+In-place writes and restores check that native storage supports replacing the live bank before creating an adjacent backup. A dry-run can preview the bytes even when the target is read-only.
+
 Native file reads and exclusive output creation are available on macOS and Linux. In-place replacement is currently limited to supported local APFS storage. The Windows adapter supports local read-only snapshots and discovery. Windows writes require a qualified replacement backend.
 
 ## Map metadata

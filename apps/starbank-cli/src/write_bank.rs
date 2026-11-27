@@ -5,7 +5,7 @@ use serde::Serialize;
 use starbank_editor::{ExportSigning, Session};
 use starbank_fs::{
 	BackupPlacement, CommitIntent, CommitOutcome, Fingerprint, NativeBackupPolicy, backup_source,
-	commit,
+	check_replace_scope, commit,
 };
 
 use crate::{
@@ -190,6 +190,7 @@ fn publish(
 	})?;
 	if let Some(preference) = target.overwrite {
 		let source = backup_source(path)?;
+		check_replace_scope(path)?;
 		let policy = match preference {
 			BackupPreference::Automatic => {
 				NativeBackupPolicy::FirstInSession(BackupPlacement::Adjacent)

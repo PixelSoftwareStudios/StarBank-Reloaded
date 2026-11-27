@@ -4,7 +4,7 @@ use sc2bank::{Limits, parse};
 use serde::Serialize;
 use starbank_fs::{
 	BackupHealth, BackupPlacement, BackupReasonCode, BackupRecord, BackupVerification, BankSource,
-	CommitOutcome, backup_source as bank_source, read_snapshot,
+	CommitOutcome, backup_source as bank_source, check_replace_scope, read_snapshot,
 };
 
 use crate::{
@@ -122,6 +122,7 @@ fn restore(
 	let status = if dry_run {
 		Status::Success
 	} else {
+		check_replace_scope(source.path())?;
 		let outcome = catalog.restore(prepared, BackupPlacement::Adjacent)?;
 		let reversal = outcome.backup.map(|backup| backup.path().to_owned());
 		report.reversal_backup = reversal.as_ref().map(display);
