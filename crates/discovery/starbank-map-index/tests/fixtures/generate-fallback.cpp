@@ -3,7 +3,8 @@
 #include <iostream>
 #include <string>
 
-bool create_fixture(const std::string &path, const char *script, const char *alternate, const char *header) {
+bool create_fixture(const std::string &path, const char *script, const char *alternate, const char *header,
+                    bool compressed = true) {
     HANDLE archive = nullptr;
     SFILE_CREATE_MPQ options{};
     options.cbSize = sizeof(options);
@@ -14,20 +15,26 @@ bool create_fixture(const std::string &path, const char *script, const char *alt
     if (!SFileCreateArchive2(path.c_str(), &options, &archive)) {
         return false;
     }
-    const bool written = SFileAddFileEx(archive, script, "MapScript.galaxy", MPQ_FILE_COMPRESS,
-        MPQ_COMPRESSION_BZIP2, MPQ_COMPRESSION_BZIP2) &&
+    const DWORD flags = compressed ? MPQ_FILE_COMPRESS : 0;
+    const DWORD codec = compressed ? MPQ_COMPRESSION_BZIP2 : 0;
+    const bool written = SFileAddFileEx(archive, script, "MapScript.galaxy", flags, codec, codec) &&
         (alternate == nullptr || SFileAddFileEx(archive, alternate, "Base.SC2Data\\MapScript.galaxy", 0, 0, 0)) &&
-        SFileAddFileEx(archive, header, "DocumentHeader", 0, 0, 0);
+        (header == nullptr || SFileAddFileEx(archive, header, "DocumentHeader", 0, 0, 0));
     return SFileCloseArchive(archive) && written;
 }
 
 int main(int argc, char **argv) {
-    if (argc != 5) {
+    if (argc != 5 && argc != 8) {
         return 1;
     }
     const std::string output = argv[4];
     if (!create_fixture(output + "/fallback-script.s2ma", argv[1], argv[2], argv[3]) ||
-        !create_fixture(output + "/fallback-header.s2ma", argv[1], nullptr, argv[3])) {
+        !create_fixture(output + "/fallback-header.s2ma", argv[1], nullptr, argv[3]) ||
+        (argc == 8 &&
+         (!create_fixture(output + "/invalid-script-with-alternate.s2ma", argv[5], argv[2], argv[3], false) ||
+          !create_fixture(output + "/invalid-script-with-header.s2ma", argv[5], nullptr, argv[3], false) ||
+          !create_fixture(output + "/script-reference-limit.s2ma", argv[6], nullptr, argv[3], false) ||
+          !create_fixture(output + "/reference-limit-with-alternate.s2ma", argv[6], argv[7], nullptr, false)))) {
         std::cerr << "fixture creation failed: " << SErrGetLastError() << '\n';
         return 2;
     }

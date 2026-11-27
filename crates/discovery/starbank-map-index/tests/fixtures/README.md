@@ -10,10 +10,14 @@ No game files or player data were used.
 
 ## Metadata fallback fixtures
 
-Both archives contain a synthetic bzip2-compressed primary Galaxy script. The MPQ adapter reports this compression as unsupported. The first archive supplies a readable alternate script and a title in `DocumentHeader`. The second supplies only the document title as a fallback.
+The archives exercise two independent errors before trying the alternate Galaxy script or `DocumentHeader`. The adapter rejects unsupported bzip2 compression, and the metadata parser reports invalid text or excess bank references. Recovered fields remain visible with the original warning.
 
 - `fallback-script.s2ma` has an alternate author, title and declared bank. SHA-256 `2e69d6f3d73c6bcd278a77c624adefa838fbdd3eac7bd2460744e1a3f5a0398c`.
 - `fallback-header.s2ma` has a binary title record and no alternate script. SHA-256 `69cf0c86670c76014425a6bbd7c65005bd6e77db8cb80051104f2171a2d72f9d`.
+- `invalid-script-with-alternate.s2ma` has a stored primary script containing invalid UTF-8 and a readable alternate. SHA-256 `940329d740b140d16d55d4a5415f76b0e04139b4c899637947eb37fbfade1421`.
+- `invalid-script-with-header.s2ma` has the invalid primary and the binary title only. SHA-256 `42c3e5a610573b4e785d062fb91a6f37a65cb228f2bd4dd9a52fe5ec9e08e93f`.
+- `script-reference-limit.s2ma` has readable title and author headings with 513 distinct bank references. SHA-256 `eb619969fb3f92fe7825bdaf727ace0fce7d4b332b83fde1e857da288a03feec`.
+- `reference-limit-with-alternate.s2ma` keeps those primary headings, has a references-only alternate, and has no document header. SHA-256 `4cb317b1362456068450962d38a31b73bc3a23f1109a6f1c838210e6bd5591cd`.
 
 Build the pinned StormLib v9.40 library as in the [adapter fixture instructions](../../../../adapters/starbank-mpq/tests/fixtures/README.md). Set `$fixture_dir` to this fixture directory and run the following in a local temporary working directory.
 
@@ -28,8 +32,13 @@ primary += '// Repeated synthetic text for bzip compression.\n' * 120
 alternate = '// Name: Alternate Référence\n// Author: Fixture Reader\nBankLoad("FromAlternate", 1);\n'
 Path("primary.galaxy").write_bytes(primary.encode("utf-8"))
 Path("alternate.galaxy").write_bytes(alternate.encode("utf-8"))
+bounded = '// Name: Bounded fixture headings\n// Author: Synthetic Studio\n'
+bounded += ''.join(f'BankLoad("Fixture{index}", 1);\n' for index in range(513))
+Path("bounded.galaxy").write_bytes(bounded.encode("utf-8"))
+Path("references-only.galaxy").write_bytes(b'BankLoad("RecoveredBank", 1);\n')
+Path("invalid.galaxy").write_bytes(b"// Name: Undecodable\n\xff\n")
 Path("header.bin").write_bytes(b"DocInfo/Name.....\0Header fallback\x01\0")
 PY
 mkdir generated
-./generate-fallback primary.galaxy alternate.galaxy header.bin generated
+./generate-fallback primary.galaxy alternate.galaxy header.bin generated invalid.galaxy bounded.galaxy references-only.galaxy
 ```

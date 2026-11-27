@@ -10,14 +10,12 @@ use std::{
 	thread,
 };
 
-use cap_std::fs::File;
-use starbank_mpq::{MetadataArchive, MetadataEntry, MpqError};
+use starbank_mpq::MpqError;
 
 use crate::{
-	CacheState, MapIndex, MapMetadata, MapRecord, MapTitleSource, MetadataError,
-	PreparedCacheUpdate,
+	CacheState, MapIndex, MapMetadata, MapRecord, MetadataError, PreparedCacheUpdate,
+	archive_metadata::{ArchiveMetadata, read_archive},
 	cache::{Cache, CachePolicy, Fingerprint, load_cache},
-	parse_metadata,
 	paths::{ArchiveWork, enumerate},
 };
 
@@ -430,51 +428,6 @@ fn process_one(
 		return Err(IndexIssueKind::ArchiveChanged);
 	}
 	Ok((metadata, false))
-}
-
-struct ArchiveMetadata {
-	metadata: MapMetadata,
-	warnings: Vec<IndexIssueKind>,
-}
-
-fn read_archive(file: &mut File) -> Result<ArchiveMetadata, IndexIssueKind> {
-	let mut archive = MetadataArchive::open(file).map_err(IndexIssueKind::Archive)?;
-	let mut warnings = Vec::new();
-	let script = match read_optional_member(&mut archive, MetadataEntry::MapScript, &mut warnings)?
-	{
-		Some(script) => Some(script),
-		None => read_optional_member(&mut archive, MetadataEntry::BaseMapScript, &mut warnings)?,
-	};
-	let mut metadata = parse_metadata(script.as_deref(), None).map_err(IndexIssueKind::Metadata)?;
-	if metadata
-		.title
-		.as_deref()
-		.is_none_or(|title| title.contains(['?', '\u{fffd}']))
-		&& let Some(header) =
-			read_optional_member(&mut archive, MetadataEntry::DocumentHeader, &mut warnings)?
-		&& let Some(title) = parse_metadata(None, Some(&header))
-			.map_err(IndexIssueKind::Metadata)?
-			.title
-	{
-		metadata.title = Some(title);
-		metadata.title_source = Some(MapTitleSource::DocumentHeader);
-	}
-	Ok(ArchiveMetadata { metadata, warnings })
-}
-
-fn read_optional_member(
-	archive: &mut MetadataArchive<&mut File>,
-	entry: MetadataEntry,
-	warnings: &mut Vec<IndexIssueKind>,
-) -> Result<Option<Vec<u8>>, IndexIssueKind> {
-	match archive.read(entry) {
-		Ok(bytes) => Ok(bytes),
-		Err(error @ MpqError::UnsupportedEntry(_)) => {
-			warnings.push(IndexIssueKind::Archive(error));
-			Ok(None)
-		}
-		Err(error) => Err(IndexIssueKind::Archive(error)),
-	}
 }
 
 fn metadata_size(path: &Path, metadata: &MapMetadata) -> usize {

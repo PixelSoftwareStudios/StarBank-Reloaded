@@ -8,14 +8,11 @@ use starbank_map_index::{
 	CacheState, Cancellation, IndexIssueKind, IndexLimit, IndexLimits, IndexRequest,
 	MapTitleSource, MetadataError, ScanError, parse_metadata, scan_maps,
 };
-use starbank_mpq::{MetadataEntry, MpqError};
 use starbank_paths::{BankInventory, ScanLimits, inventory_banks, is_valid_bank_path};
 
 const ALPHA: &[u8] = include_bytes!("fixtures/alpha.s2ma");
 const RIVAL: &[u8] = include_bytes!("fixtures/rival.s2ma");
 const EMPTY: &[u8] = include_bytes!("fixtures/empty.s2ma");
-const FALLBACK_SCRIPT: &[u8] = include_bytes!("fixtures/fallback-script.s2ma");
-const FALLBACK_HEADER: &[u8] = include_bytes!("fixtures/fallback-header.s2ma");
 
 fn bank(root: &Path, relative: &str) -> std::io::Result<PathBuf> {
 	let file = root.join(relative);
@@ -144,89 +141,6 @@ fn archives_keep_collisions_and_unmatched_banks_with_account_scope()
 			.count(),
 		3
 	);
-	Ok(())
-}
-
-#[test]
-fn unsupported_primary_members_keep_warnings_and_use_readable_fallbacks()
--> Result<(), Box<dyn std::error::Error>> {
-	let temp = tempfile::tempdir()?;
-	let root = temp.path().canonicalize()?;
-	let maps = root.join("maps");
-	fs::create_dir(&maps)?;
-	let script = maps.join("alternate.s2ma");
-	let header = maps.join("header.s2ma");
-	let clean = maps.join("clean.s2ma");
-	let malformed = maps.join("short.s2ma");
-	fs::write(&script, FALLBACK_SCRIPT)?;
-	fs::write(&header, FALLBACK_HEADER)?;
-	fs::write(&clean, ALPHA)?;
-	fs::write(&malformed, &ALPHA[..20])?;
-
-	let cache = root.join("metadata.json");
-	let request = IndexRequest {
-		roots: &[maps],
-		cache_path: Some(&cache),
-		generation: 23,
-		limits: IndexLimits::default(),
-	};
-	let mut updates = Vec::new();
-	let first = scan_maps(request, &Cancellation::default(), |update| {
-		updates.push((
-			update.generation,
-			update.completed,
-			update.total,
-			update.record.is_some(),
-		));
-	})?;
-	let second = scan_maps(request, &Cancellation::default(), |_| {})?;
-	assert_eq!(first.index.maps(), second.index.maps());
-	assert_eq!(second.cache_hits, 1);
-	assert_eq!(updates.len(), 4);
-	assert_eq!(updates.iter().filter(|update| update.3).count(), 3);
-	assert!(updates.iter().all(|update| update.0 == 23 && update.2 == 4));
-
-	for report in [first, second] {
-		let records = report.index.maps();
-		assert_eq!(records.len(), 3);
-		assert_eq!(report.issues.len(), 3);
-		for fallback in [&script, &header] {
-			assert!(report.issues.iter().any(|issue| issue.path == *fallback
-				&& matches!(
-					issue.kind,
-					IndexIssueKind::Archive(MpqError::UnsupportedEntry(MetadataEntry::MapScript))
-				)));
-		}
-		assert!(report.issues.iter().any(|issue| issue.path == malformed
-			&& matches!(
-				issue.kind,
-				IndexIssueKind::Archive(MpqError::InvalidArchive(_))
-			)));
-		let alternate = &records
-			.iter()
-			.find(|map| map.archive == script)
-			.ok_or("alternate map missing")?
-			.metadata;
-		assert_eq!(alternate.title.as_deref(), Some("Alternate Référence"));
-		assert_eq!(alternate.title_source, Some(MapTitleSource::Script));
-		assert_eq!(alternate.author.as_deref(), Some("Fixture Reader"));
-		assert_eq!(alternate.bank_names, ["fromalternate"]);
-		assert!(alternate.has_script);
-
-		let header_only = &records
-			.iter()
-			.find(|map| map.archive == header)
-			.ok_or("header-only map missing")?
-			.metadata;
-		assert_eq!(header_only.title.as_deref(), Some("Header fallback"));
-		assert_eq!(
-			header_only.title_source,
-			Some(MapTitleSource::DocumentHeader)
-		);
-		assert!(header_only.author.is_none());
-		assert_eq!(header_only.bank_names, Vec::<String>::new());
-		assert!(!header_only.has_script);
-	}
 	Ok(())
 }
 

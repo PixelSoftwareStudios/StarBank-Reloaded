@@ -1,6 +1,7 @@
 //! Native, read-only StarCraft II map metadata and bank association.
 #![forbid(unsafe_code)]
 
+mod archive_metadata;
 mod association;
 mod cache;
 mod header;

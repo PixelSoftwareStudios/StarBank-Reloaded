@@ -32,7 +32,7 @@ pub struct MapMetadata {
 	pub author: Option<String>,
 	/// Normalized declared bank names, deduplicated and sorted.
 	pub bank_names: Vec<String>,
-	/// Whether a script entry was supplied.
+	/// Whether a script entry could be decoded as text.
 	pub has_script: bool,
 }
 
@@ -110,19 +110,16 @@ pub fn parse_metadata(
 	if header_bytes.is_some_and(|bytes| bytes.len() > MAX_HEADER_BYTES) {
 		return Err(MetadataError::HeaderTooLarge);
 	}
-	let mut metadata = MapMetadata {
-		has_script: script_bytes.is_some(),
-		..MapMetadata::default()
+	let mut metadata = match script_bytes {
+		Some(bytes) => {
+			let (metadata, bank_names) = parse_script(bytes)?;
+			MapMetadata {
+				bank_names: bank_names?,
+				..metadata
+			}
+		}
+		None => MapMetadata::default(),
 	};
-	if let Some(bytes) = script_bytes {
-		let source = str::from_utf8(bytes.strip_prefix(UTF8_BOM).unwrap_or(bytes))
-			.map_err(|_| MetadataError::ScriptEncoding)?;
-		let (title, author) = script::headings(source);
-		metadata.title = title.map(str::to_owned);
-		metadata.title_source = title.map(|_| MapTitleSource::Script);
-		metadata.author = author.map(str::to_owned);
-		metadata.bank_names = script::bank_names(source)?;
-	}
 	if metadata
 		.title
 		.as_deref()
@@ -133,6 +130,25 @@ pub fn parse_metadata(
 		metadata.title_source = Some(MapTitleSource::DocumentHeader);
 	}
 	Ok(metadata)
+}
+
+pub(crate) fn parse_script(
+	bytes: &[u8],
+) -> Result<(MapMetadata, Result<Vec<String>, MetadataError>), MetadataError> {
+	if bytes.len() > MAX_SCRIPT_BYTES {
+		return Err(MetadataError::ScriptTooLarge);
+	}
+	let source = str::from_utf8(bytes.strip_prefix(UTF8_BOM).unwrap_or(bytes))
+		.map_err(|_| MetadataError::ScriptEncoding)?;
+	let (title, author) = script::headings(source);
+	let metadata = MapMetadata {
+		title: title.map(str::to_owned),
+		title_source: title.map(|_| MapTitleSource::Script),
+		author: author.map(str::to_owned),
+		has_script: true,
+		..MapMetadata::default()
+	};
+	Ok((metadata, script::bank_names(source)))
 }
 
 pub(crate) fn display_text(value: &str) -> Option<&str> {
