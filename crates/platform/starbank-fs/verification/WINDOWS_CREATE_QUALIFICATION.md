@@ -63,6 +63,16 @@ The opt-in NTFS test also checks read-back while the original restrictive stage 
 
 Pinned Windows x64 MSVC all-target Clippy, formatting and the repository source gate passed locally. Native execution is pending. The test does not change the production reader's sharing policy or enable Windows writes.
 
+## Hosted private-stage and held-readback result
+
+Run `46018191073` at `19b95dc` passed the expanded NTFS probe on native Windows, plus all 244 default tests and five transport probes. Held read-back retained the same 38-byte payload and digest; ordinary-reader, competing-write and competing-delete opens each returned Win32 sharing violation 32. The inherited control had two ACEs and scoped control `0x8004`. The private stage retained its explicit TokenUser owner, token primary group, owner-only DACL, scoped control `0x9004` and archive attribute `0x20` before writing and through publication. The token was elevated, so ordinary-user and distinct-user qualifications remain open. [Native Windows result](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46018191073/job/140570653318)
+
+## Flush capability probe
+
+A separate synthetic NTFS fixture now measures `FlushFileBuffers` and normal `NtFlushBuffersFileEx` calls before and after exclusive rename. It records requested access/options/sharing, observed granted access and mode, direct native status and immediate Win32 errors. Both file APIs must succeed. Directory access-denied results are reported explicitly; other unexpected results fail the probe for review. A separately opened writable directory is matched to the held scope before use. The fixture retains collision, file-ID, digest and name-binding checks. [Flush probe](../src/windows/rename_qualification/flush_qualification.rs)
+
+The stage helper already performs `sync_all` before these measured calls, so they establish additional call acceptance rather than an independent writeback experiment. The existing token-elevation evidence remains relevant; an elevated hosted token cannot prove ordinary-user behavior. No volume handles or privilege changes are requested. These observations do not establish namespace or power-loss durability. Local Windows-target strict Clippy, pinned formatting and the source gate passed; native execution is pending.
+
 ## Native acceptance
 
 | Fixture | Expected observation |

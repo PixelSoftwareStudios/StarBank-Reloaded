@@ -27,6 +27,7 @@ use windows_sys::{
 
 use super::{DirectoryScope, Identity, NO_REPARSE_OR_RECALL, Observation, read_snapshot};
 
+mod flush_qualification;
 mod readback_qualification;
 mod security_qualification;
 
@@ -201,6 +202,7 @@ fn local_ntfs_handle_relative_create_only_publication() -> Result<(), Box<dyn st
 	assert_absent(&staged);
 	readback_qualification::qualify_held_stage_readback(&root)?;
 	security_qualification::qualify_private_stage(&root)?;
+	flush_qualification::qualify_flush_capabilities(&root)?;
 	Ok(())
 }
 
