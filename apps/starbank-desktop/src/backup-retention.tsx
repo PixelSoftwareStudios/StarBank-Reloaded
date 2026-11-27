@@ -1,9 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
 import {
   type RetentionReview,
   SettingsRetentionReview,
 } from "starbank-ui/settings-retention";
-import type { ActiveBankTarget } from "./transport";
+import { type ActiveBankTarget, readBackupRetentionReview } from "./transport";
 
 const REVIEW_ERRORS = {
   keep_all: "The retention setting is Keep all.",
@@ -21,7 +20,7 @@ async function reviewBackupRetention(
   target: ActiveBankTarget,
 ): Promise<RetentionReview> {
   try {
-    return await invoke<RetentionReview>("review_backup_retention", { target });
+    return await readBackupRetentionReview(target);
   } catch (error) {
     const reason =
       typeof error === "string" && Object.hasOwn(REVIEW_ERRORS, error)

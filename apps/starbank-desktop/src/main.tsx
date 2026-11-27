@@ -35,7 +35,7 @@ import {
 import { BackupRetentionReview } from "./backup-retention";
 import { useActiveBackupStatus } from "./backup-status";
 import { BankConflictDialog, type BankConflictPrompt } from "./bank-conflict";
-import { type BatchBackupReport, BatchBackupTools } from "./batch-backup-ui";
+import { BatchBackupTools } from "./batch-backup-ui";
 import { resignExternalBank } from "./external-sign";
 import {
   type ManualSigningPrompt,
@@ -49,6 +49,7 @@ import {
   canRevealBank,
   compareBankConflict,
   confirmBankNavigation,
+  createBatchBackup,
   decodeBankXml,
   dispatchBank,
   encodeBankXml,
@@ -739,13 +740,7 @@ function DesktopApp() {
             }
             onStart={(request) =>
               exclusive(async () => {
-                const report = await invoke<BatchBackupReport | null>(
-                  "create_batch_backup",
-                  {
-                    scope: request.scope,
-                    placement: request.placement,
-                  },
-                );
+                const report = await createBatchBackup(request);
                 if (report?.created) setBackupGeneration((value) => value + 1);
                 return report;
               })

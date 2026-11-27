@@ -3,7 +3,9 @@ import {
   type EngineSigningContext,
   signatureStatus,
 } from "starbank-engine-client/signing-protocol";
+import { MAX_BACKUP_RETENTION } from "starbank-platform/settings";
 import * as v from "valibot";
+import type { BatchBackupRequest } from "./batch-backup-ui";
 
 const HEADER_BYTES = 5;
 const CONTROL_ONLY = 0;
@@ -472,4 +474,86 @@ export async function confirmWindowClose(report: CloseReport) {
     }).catch(() => {});
     throw error;
   }
+}
+
+const batchBackupReport = v.pipe(
+  v.object({
+    entries: v.array(
+      v.object({
+        bankId: v.string(),
+        name: v.string(),
+        outcome: v.picklist([
+          "created",
+          "source_unavailable",
+          "rejected",
+          "needs_review",
+          "cancelled",
+          "inventory_changed",
+        ]),
+        backupName: v.nullable(v.string()),
+      }),
+    ),
+    created: count,
+    failed: count,
+    skipped: count,
+  }),
+  v.check((report) => {
+    const totals = { created: 0, failed: 0, skipped: 0 };
+    for (const { outcome } of report.entries) {
+      switch (outcome) {
+        case "created":
+          totals.created += 1;
+          break;
+        case "cancelled":
+        case "inventory_changed":
+          totals.skipped += 1;
+          break;
+        default:
+          totals.failed += 1;
+      }
+    }
+    return (
+      report.created === totals.created &&
+      report.failed === totals.failed &&
+      report.skipped === totals.skipped
+    );
+  }),
+);
+const backupRetentionReview = v.pipe(
+  v.object({
+    keepNewest: v.pipe(count, v.minValue(1), v.maxValue(MAX_BACKUP_RETENTION)),
+    verifiedCount: count,
+    retainedCount: count,
+    olderCount: count,
+    missingCount: count,
+    unverifiedCount: count,
+    rejectedMetadata: count,
+    older: v.array(
+      v.object({
+        name: v.string(),
+        timestampUtc: v.string(),
+        byteLength: count,
+      }),
+    ),
+  }),
+  v.check(
+    (report) =>
+      report.retainedCount ===
+        Math.min(report.keepNewest, report.verifiedCount) &&
+      report.verifiedCount - report.retainedCount === report.olderCount &&
+      report.older.length <= report.olderCount,
+  ),
+);
+
+export function createBatchBackup(request: BatchBackupRequest) {
+  return invokeChecked(v.nullable(batchBackupReport), "create_batch_backup", {
+    scope: request.scope,
+    placement: request.placement,
+  });
+}
+
+export function readBackupRetentionReview(target: ActiveBankTarget) {
+  return invokeChecked(backupRetentionReview, "review_backup_retention", {
+    target,
+  });
 }
