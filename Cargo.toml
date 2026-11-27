@@ -4,6 +4,7 @@ members = [
     "apps/starbank-desktop/src-tauri",
     "crates/adapters/starbank-mpq",
     "crates/adapters/starbank-mpq/fuzz",
+    "crates/adapters/starbank-mpq-stormlib",
     "crates/bindings/starbank-wasm",
     "crates/discovery/starbank-map-index",
     "crates/discovery/starbank-paths",
