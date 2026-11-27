@@ -18,7 +18,8 @@ Depends on: 01.
 - [x] Integrate Rust and frontend CI, the local source gate and the frontend bootstrap.
 - [x] Pass the hosted source, wasm32 and frontend checks and the Linux and macOS jobs at `4143952`. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-4143952)
 - [x] Run the pinned local Rust and frontend advisory checks and collect installed frontend dependency license inventories. [Dependency checks](verification/DEPENDENCIES.md)
-- [ ] Resolve the Windows CI failures and verify the newer hosted matrix and advisory gates. Complete production dependency and capability qualification for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01.
+- [x] Pass all 11 hosted CI jobs at `e4385da`, including the Linux arm64 desktop leg, both advisory checks and the previously failing Windows probes. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-e4385da)
+- [ ] Complete production dependency and capability qualification for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01. Verify later revisions in their own hosted runs.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
 ## WP-03 — Lossless format engine
@@ -68,7 +69,8 @@ Depends on: 04,05.
 - [x] Implement checked preparation, exclusive creation, verified local APFS replacement, backup snapshots and reversible restore policy.
 - [x] Verify the APFS save, backup and restore paths with a synthetic bank. Exercise process termination and retained bytes around replacement. [Native storage evidence](../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
 - [x] Exercise staging space exhaustion on disposable APFS and Linux tmpfs fixtures. Verify refusal before publication and preservation of existing bank bytes. [Storage fault evidence](../crates/platform/starbank-fs/verification/NATIVE_STORAGE.md)
-- [ ] Qualify Windows NTFS create-only and replacement separately. Windows storage remains read-only. Qualify Linux replacement with hidden metadata and physical power-loss recovery. [Windows create probe](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md) · [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
+- [x] Verify sibling and distinct-root create-only rename and collision refusal in the hosted Windows local NTFS probe. [Probe evidence](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md#hosted-ntfs-probe)
+- [ ] Qualify production Windows NTFS create-only and replacement separately. Windows storage remains read-only. Qualify Linux replacement with hidden metadata and physical power-loss recovery. [Windows create probe](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md) · [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 

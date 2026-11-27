@@ -35,7 +35,13 @@ Run this opt-in test on an actual Windows host under an ordinary user with a cas
 cargo test --locked -p starbank-fs --lib local_ntfs_handle_relative_create_only_publication -- --ignored --nocapture
 ```
 
-The probe covers the rename and read-back boundary. The synthetic stage inherits directory security. Private staging DACLs, the namespace durability available to an unprivileged process, externally changing directory scope, checkpoint termination, and production failure classification still require qualification. The `windows-2025` CI job selects the probe explicitly through nextest and fails if no test matches. Native execution of the `NtSetInformationFile` revision remains pending.
+The `windows-2025` CI job selects the probe explicitly through nextest and fails if no test matches.
+
+## Hosted NTFS probe
+
+On November 27, 2026, run `45997318578` at `e4385da` passed the `NtSetInformationFile(FileRenameInformation)` probe on Windows Server 2025 x64 build 10.0.26100 with runner image `windows-2025-vs2026 20261123.321.1`. The distinct-root control on one local NTFS volume and the final sibling publication each returned `STATUS_SUCCESS` (`0x00000000`). Exact-name and case-alias competitors each returned `STATUS_OBJECT_NAME_COLLISION` (`0xc0000035`) with their identities and contents preserved. Both successful publications retained the stage file ID and the synthetic 38-byte payload SHA-256 `ea59fad9139058244a0f8cd3c6c1b8a51152bb72ca32254134280b64d5a74ee1` at the destination, with the old stage name absent. [Hosted Windows Rust job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45997318578/job/140499862286)
+
+This result qualifies the sibling and distinct-root rename and read-back probe on the tested runner. The stage inherits directory security. Private staging DACLs, unprivileged namespace durability, late directory changes, checkpoint termination and production failure classification remain open. Windows storage remains read-only.
 
 ## Native acceptance
 
