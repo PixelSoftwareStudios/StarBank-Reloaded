@@ -19,9 +19,12 @@ import {
   writeBankClipboard,
 } from "starbank-ui/browser";
 import { EngineTransportError } from "starbank-ui/engine";
-import type {
-  EngineProfile,
-  EngineSigningContext,
+import {
+  type EngineProfile,
+  type EngineSigningContext,
+  type EngineTarget,
+  revisionAtLeast,
+  SnapshotRefreshRequired,
 } from "starbank-ui/engine/protocol";
 import {
   type BankEditCommand,
@@ -48,6 +51,17 @@ export function StarBankWeb() {
   const validationInProgress = useRef<Promise<unknown>>(null);
   const currentDocument = useRef<BrowserBankDocument>(null);
   const [document, setDocument] = useState<BrowserBankDocument>();
+  const [refreshRequest, setRefreshRequest] = useState<{
+    displayed: EditorTarget;
+    observed: EngineTarget | null;
+  }>();
+  const pendingRefresh =
+    refreshRequest?.displayed.id === document?.id &&
+    refreshRequest?.displayed.revision === document?.revision
+      ? refreshRequest
+      : undefined;
+  const refreshTarget = pendingRefresh?.observed;
+  const snapshotUnavailable = refreshTarget === null;
   const [openedFile, setOpenedFile] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState<EngineProfile>();
@@ -56,6 +70,7 @@ export function StarBankWeb() {
   const [hasDraft, setHasDraft] = useState(false);
   const [exportTarget, setExportTarget] = useState<EditorTarget>();
   const showExport =
+    (pendingRefresh === undefined || snapshotUnavailable) &&
     exportTarget?.id === document?.id &&
     exportTarget?.revision === document?.revision &&
     exportTarget !== undefined;
@@ -123,6 +138,31 @@ export function StarBankWeb() {
   function publishDocument(next: BrowserBankDocument) {
     currentDocument.current = next;
     setDocument(next);
+    setRefreshRequest(undefined);
+  }
+
+  function rememberRefresh(error: unknown): unknown {
+    const displayed = currentDocument.current;
+    if (!displayed) return error;
+    const scoped =
+      error instanceof SnapshotRefreshRequired &&
+      error.target.document_id === displayed.id &&
+      revisionAtLeast(error.target.expected_revision, displayed.revision)
+        ? error
+        : undefined;
+    const engineStopped =
+      (scoped && isUnavailableEngine(scoped.cause)) ||
+      (pendingRefresh !== undefined && isUnavailableEngine(error));
+    if (scoped || engineStopped) {
+      setExportTarget(undefined);
+      setRefreshRequest({
+        displayed: { id: displayed.id, revision: displayed.revision },
+        observed: engineStopped ? null : (scoped?.target ?? null),
+      });
+    }
+    return engineStopped
+      ? new Error("The bank engine stopped. Any draft is kept for review.")
+      : error;
   }
 
   async function runBankAction<Result>(
@@ -137,6 +177,8 @@ export function StarBankWeb() {
       const validation = validationInProgress.current;
       if (validation) await validation.catch(() => {});
       return await action();
+    } catch (error) {
+      throw rememberRefresh(error);
     } finally {
       actionInProgress.current = false;
       setBusy(false);
@@ -151,6 +193,7 @@ export function StarBankWeb() {
           message: "Apply or discard your draft before opening another bank.",
         };
       }
+      if (refreshTarget) throw new SnapshotRefreshRequired(refreshTarget);
       const discardCurrent = document?.dirty ?? false;
       if (discardCurrent) {
         const proceed = await new Promise<boolean>((resolve) => {
@@ -171,6 +214,22 @@ export function StarBankWeb() {
     busy,
     status,
     onDraftChange: setHasDraft,
+    snapshotUnavailable,
+    onRefreshSnapshot: refreshTarget
+      ? async (target) => {
+          const result = await updateDocument(target, ({ name }) =>
+            bankSession().refresh(name, refreshTarget),
+          );
+          return { ...result, message: result.message ?? "Editor refreshed." };
+        }
+      : undefined,
+    onRecoveryCopy: snapshotUnavailable
+      ? async (target) => {
+          activeDocument(target);
+          setExportTarget(target);
+          return { ok: true };
+        }
+      : undefined,
     onOpenFile: maxBankBytes === undefined ? undefined : openBank,
     onValidateValues: async (target, edits) => {
       if (actionInProgress.current || validationInProgress.current)
@@ -180,6 +239,8 @@ export function StarBankWeb() {
       validationInProgress.current = validation;
       try {
         return await validation;
+      } catch (error) {
+        throw rememberRefresh(error);
       } finally {
         validationInProgress.current = null;
       }
@@ -197,14 +258,8 @@ export function StarBankWeb() {
         return { ok: true, diff };
       }),
     onReplaceXml: (target, xml) =>
-      runBankAction(async () =>
-        publish(
-          await bankSession().replaceXml(
-            activeDocument(target).name,
-            target,
-            xml,
-          ),
-        ),
+      updateDocument(target, ({ name }) =>
+        bankSession().replaceXml(name, target, xml),
       ),
     profile: {
       current: profile ?? { status: "unloaded" },
@@ -267,7 +322,8 @@ export function StarBankWeb() {
     if (profile !== undefined && profile.status !== "unloaded") {
       try {
         setProfile(await bankSession().profile(next));
-      } catch {
+      } catch (error) {
+        if (error instanceof SnapshotRefreshRequired) throw error;
         setProfile(undefined);
         message = "Bank updated. Reload the profile to refresh Simple View.";
       }
@@ -281,11 +337,18 @@ export function StarBankWeb() {
   }
 
   function apply(target: EditorTarget, command: BankEditCommand) {
-    return runBankAction(async () =>
-      publish(
-        await bankSession().edit(activeDocument(target).name, target, command),
-      ),
+    return updateDocument(target, ({ name }) =>
+      bankSession().edit(name, target, command),
     );
+  }
+
+  function updateDocument(
+    target: EditorTarget,
+    load: (document: BrowserBankDocument) => Promise<BrowserBankDocument>,
+  ) {
+    return runBankAction(async () => {
+      return publish(await load(activeDocument(target)));
+    });
   }
 
   function navigate(kind: "undo" | "redo" | "reset"): EditorAction {
@@ -324,19 +387,7 @@ export function StarBankWeb() {
       };
     } catch (error) {
       if (!isUnavailableEngine(error)) throw error;
-      if (context) {
-        throw new Error(
-          "The bank engine stopped. Clear Re-sign this copy to prepare a recovery download.",
-        );
-      }
-      return {
-        download: prepareBankDownload(
-          encodeBankFileXml(document.xml, document.sourceEncoding),
-          name,
-        ),
-        message:
-          "The bank engine stopped. This recovery copy contains the last accepted revision. Its signature has not been re-verified.",
-      };
+      return recoveryCopy(document, name, context);
     }
   }
 
@@ -359,7 +410,11 @@ export function StarBankWeb() {
               openedFile={openedFile}
               hasDraft={hasDraft}
               switchingBlocked={
-                busy || hasDraft || showExport || copyPreview !== undefined
+                busy ||
+                hasDraft ||
+                pendingRefresh !== undefined ||
+                showExport ||
+                copyPreview !== undefined
               }
               open={openBank}
             />
@@ -369,12 +424,21 @@ export function StarBankWeb() {
       {showExport && document && !pendingOpen && (
         <ExportDialog
           name={document.name}
-          initialSign={preferences.settings.autoResignOnSave}
-          prepare={(name, context) =>
-            runBankAction(() => exportCopy(exportTarget, name, context))
+          signingAvailable={!snapshotUnavailable}
+          initialSign={
+            !snapshotUnavailable && preferences.settings.autoResignOnSave
           }
-          prepareBackup={() =>
-            runBankAction(() => exportOpeningBackup(exportTarget))
+          prepare={(name, context) =>
+            runBankAction(async () =>
+              snapshotUnavailable
+                ? recoveryCopy(activeDocument(exportTarget), name, context)
+                : exportCopy(exportTarget, name, context),
+            )
+          }
+          prepareBackup={
+            snapshotUnavailable
+              ? undefined
+              : () => runBankAction(() => exportOpeningBackup(exportTarget))
           }
           dismiss={() => setExportTarget(undefined)}
         />
@@ -385,7 +449,11 @@ export function StarBankWeb() {
           <ExportDialog
             name={document.name.replace(/\.xml$/i, ".SC2Bank")}
             initialSign={preferences.settings.autoResignOnSave}
-            prepare={(name, context) => exportCopy(document, name, context)}
+            prepare={(name, context) =>
+              exportCopy(document, name, context).catch((error) => {
+                throw rememberRefresh(error);
+              })
+            }
             continueAfterDownload={() => finishSwitch(true)}
             dismiss={() => finishSwitch(false)}
           />
@@ -405,6 +473,26 @@ export function StarBankWeb() {
       )}
     </>
   );
+}
+
+function recoveryCopy(
+  document: BrowserBankDocument,
+  name: string,
+  context?: EngineSigningContext,
+) {
+  if (context) {
+    throw new Error(
+      "The bank engine stopped. Clear Re-sign this copy to prepare a recovery download.",
+    );
+  }
+  return {
+    download: prepareBankDownload(
+      encodeBankFileXml(document.xml, document.sourceEncoding),
+      name,
+    ),
+    message:
+      "The bank engine stopped. This recovery copy contains the last accepted revision. It excludes drafts and revisions the editor could not display. Its signature has not been re-verified.",
+  };
 }
 
 function isUnavailableEngine(error: unknown): boolean {

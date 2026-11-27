@@ -71,6 +71,7 @@ export interface BankEditorController {
   busy?: boolean;
   status?: string;
   backupStatus?: string;
+  snapshotUnavailable?: boolean;
   onOpen?: () => Promise<EditorActionResult>;
   onReveal?: EditorAction;
   onOpenFile?: (file: File) => Promise<EditorActionResult>;
@@ -87,6 +88,8 @@ export interface BankEditorController {
     xml: string,
   ) => Promise<EditorMutationResult>;
   onDraftChange?: (hasDraft: boolean) => void;
+  onRefreshSnapshot?: EditorAction;
+  onRecoveryCopy?: EditorAction;
   onStructure?: (
     target: EditorTarget,
     change: EngineStructureChange,

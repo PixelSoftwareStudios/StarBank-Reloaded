@@ -19,6 +19,7 @@ interface DownloadPreparation {
 export function ExportDialog({
   name,
   initialSign = false,
+  signingAvailable = true,
   prepare,
   prepareBackup,
   continueAfterDownload,
@@ -26,6 +27,7 @@ export function ExportDialog({
 }: {
   name: string;
   initialSign?: boolean;
+  signingAvailable?: boolean;
   prepare: (
     name: string,
     context?: EngineSigningContext,
@@ -72,7 +74,10 @@ export function ExportDialog({
   async function prepareEditedCopy(): Promise<DownloadPreparation> {
     const stem = bankFilenameStem(filename);
     if (!stem) throw new Error("Choose a filename ending in .SC2Bank.");
-    const context = sign ? { author, player, bank_name: stem } : undefined;
+    const context =
+      signingAvailable && sign
+        ? { author, player, bank_name: stem }
+        : undefined;
     return prepare(filename, context);
   }
 
@@ -138,15 +143,17 @@ export function ExportDialog({
                 required
               />
             </label>
-            <label className="flex items-center gap-[0.35rem]">
-              <input
-                type="checkbox"
-                checked={sign}
-                onChange={(event) => setSign(event.target.checked)}
-              />
-              Re-sign this copy
-            </label>
-            {sign && (
+            {signingAvailable && (
+              <label className="flex items-center gap-[0.35rem]">
+                <input
+                  type="checkbox"
+                  checked={sign}
+                  onChange={(event) => setSign(event.target.checked)}
+                />
+                Re-sign this copy
+              </label>
+            )}
+            {signingAvailable && sign && (
               <>
                 <label className={fieldLabelClasses}>
                   Map author handle

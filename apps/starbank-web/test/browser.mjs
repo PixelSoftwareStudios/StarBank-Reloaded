@@ -9,6 +9,7 @@ import {
   verifyLocalImports,
 } from "./local-bank-library.mjs";
 import { verifySaveMenu } from "./save-menu.mjs";
+import { verifySnapshotRefresh } from "./snapshot-refresh.mjs";
 import { verifyWindowedTable } from "./windowed-table.mjs";
 
 const playwright = await import(
@@ -563,6 +564,7 @@ async function verify(name) {
       name === "firefox"
         ? { width: 390, height: 640 }
         : { width: 850, height: 500 };
+    await verifySnapshotRefresh(browser, server.url, bankPicker, viewport);
     const tableDraftPage = await context.newPage();
     try {
       await tableDraftPage.setViewportSize(viewport);

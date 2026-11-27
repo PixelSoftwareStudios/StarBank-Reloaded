@@ -90,6 +90,24 @@ const RawEditor = lazy(preloadRawEditor);
 const StructureEditor = lazy(preloadStructureEditor);
 const EditorDiff = lazy(preloadEditorDiff);
 
+function labelDraftFields(
+  sections: BankEditorDocument["sections"],
+  values: ReadonlyMap<string, string>,
+) {
+  const labels = new Map<string, { section: string; field: string }>();
+  for (const section of sections) {
+    for (const row of section.rows) {
+      if (values.has(row.id)) {
+        labels.set(row.id, {
+          section: section.name,
+          field: row.childName ? `${row.name} · ${row.childName}` : row.name,
+        });
+      }
+    }
+  }
+  return labels;
+}
+
 export function BankEditor({
   controller,
   document,
@@ -149,6 +167,10 @@ export function BankEditor({
   const rawEditor = useRef<RawEditorHandle>(null);
   const [retainedRawRevision, setRetainedRawRevision] = useState<string>();
   const [rawRestart, setRawRestart] = useState(false);
+  const [draftLabels, setDraftLabels] = useState<{
+    revision: string;
+    fields: ReturnType<typeof labelDraftFields>;
+  }>();
   const target = { id: document.id, revision: document.revision };
   const mounted = useRef(false);
   useLayoutEffect(() => {
@@ -165,10 +187,14 @@ export function BankEditor({
     onValidateValues,
     onReplaceXml,
     onDraftChange,
+    onRefreshSnapshot,
     onStructure,
     onDiff,
     onRevert,
   } = controller;
+  const snapshotNeedsRefresh =
+    onRefreshSnapshot !== undefined || controller.snapshotUnavailable === true;
+  const editsBlocked = busy || snapshotNeedsRefresh;
   const hasValidator = onValidateValues !== undefined;
   const tableEdits = useMemo(
     () =>
@@ -189,7 +215,7 @@ export function BankEditor({
   const validation = useTableDraftValidation(
     validationRequest,
     onValidateValues,
-    busy,
+    editsBlocked,
   );
   const validationPending = validation?.kind === "pending";
   const tableIssues =
@@ -200,9 +226,9 @@ export function BankEditor({
     nextView: EditorView;
   }>();
   const hasDraft = draft !== undefined || profileDraft !== undefined;
-  const pending = busy || hasDraft;
+  const pending = editsBlocked || hasDraft;
   const outputDisabled =
-    busy ||
+    editsBlocked ||
     Boolean(profileDraft) ||
     stale ||
     (tableDraft !== undefined && (!onEditValues || hasInvalidTableEdits)) ||
@@ -218,7 +244,8 @@ export function BankEditor({
       profileDraft.profile_id !== profile?.profile_id);
 
   function stageProfile(field: EditorProfileField, input: EditorProfileInput) {
-    if (!profile || busy || draft || staleProfile || field.read_only) return;
+    if (!profile || editsBlocked || draft || staleProfile || field.read_only)
+      return;
     const original = input.kind === "checked" ? field.checked : field.value;
     setProfileDraft(
       input.value === original
@@ -238,7 +265,7 @@ export function BankEditor({
       !profileController ||
       !profileDraft ||
       staleProfile ||
-      busy
+      editsBlocked
     )
       return;
     const proposed = profileDraft;
@@ -268,7 +295,7 @@ export function BankEditor({
       !preview ||
       !profileController ||
       staleProfile ||
-      busy
+      editsBlocked
     )
       return;
     run(
@@ -355,7 +382,7 @@ export function BankEditor({
   }
 
   function apply() {
-    if (busy || stale) return;
+    if (editsBlocked || stale) return;
     if (rawDraft && onReplaceXml)
       submitDraft("raw", () => onReplaceXml(target, rawDraft.text));
     else if (tableDraft) applyTable();
@@ -399,7 +426,20 @@ export function BankEditor({
     }
   }
 
+  function refreshEditor() {
+    if (!onRefreshSnapshot) return;
+    const current = getDraft();
+    if (current?.kind === "table" && current.revision === document.revision) {
+      setDraftLabels({
+        revision: current.revision,
+        fields: labelDraftFields(document.sections, current.values),
+      });
+    }
+    run(() => onRefreshSnapshot(target));
+  }
+
   function selectView(nextView: EditorView) {
+    if (snapshotNeedsRefresh) return;
     if (nextView === selectedView || (hasDraft && busy)) return;
     const staleMessage = "The bank changed while you were editing this draft.";
     if (simpleVisible && profileDraft) {
@@ -468,6 +508,33 @@ export function BankEditor({
     Boolean(document.breadcrumbs?.length) &&
     settings?.showBreadcrumbs !== false;
   const title = mapContext?.map.name ?? document.name;
+  const tableReview = useMemo(() => {
+    if (
+      !tableDraft ||
+      !tableEdits ||
+      !(stale || controller.snapshotUnavailable)
+    )
+      return undefined;
+    const labels =
+      draftLabels?.revision === tableDraft.revision
+        ? draftLabels.fields
+        : labelDraftFields(document.sections, tableDraft.values);
+    return JSON.stringify(
+      tableEdits.map(({ id, value }) => ({
+        ...(labels.get(id) ?? { id }),
+        value,
+      })),
+      null,
+      2,
+    );
+  }, [
+    controller.snapshotUnavailable,
+    document.sections,
+    draftLabels,
+    stale,
+    tableDraft,
+    tableEdits,
+  ]);
 
   return (
     <div
@@ -565,7 +632,7 @@ export function BankEditor({
             <SimpleEditor
               profile={profile}
               draft={profileDraft}
-              disabled={busy || Boolean(draft) || staleProfile}
+              disabled={editsBlocked || Boolean(draft) || staleProfile}
               onChange={stageProfile}
             />
           </Tabs.Content>
@@ -580,14 +647,14 @@ export function BankEditor({
           <TableEditor
             ref={tableEditor}
             sections={document.sections}
-            values={tableDraft?.values}
+            values={stale ? undefined : tableDraft?.values}
             issues={tableIssues}
             validationError={
               validation?.kind === "failed" ? validation.message : undefined
             }
             canEdit={
               Boolean(onEditValues) &&
-              !busy &&
+              !editsBlocked &&
               !stale &&
               !rawDraft &&
               !profileDraft
@@ -631,7 +698,7 @@ export function BankEditor({
               readOnly={
                 !rawVisible ||
                 !onReplaceXml ||
-                busy ||
+                editsBlocked ||
                 stale ||
                 tableDraft !== undefined ||
                 profileDraft !== undefined
@@ -702,7 +769,7 @@ export function BankEditor({
           <StructureEditor
             sections={document.sections}
             initialSection={structure.sectionId}
-            busy={busy}
+            busy={editsBlocked}
             notice={notice}
             onApply={(change) =>
               run(
@@ -716,7 +783,7 @@ export function BankEditor({
         {diff?.revision === document.revision && (
           <EditorDiff
             diff={diff.value}
-            busy={busy}
+            busy={editsBlocked}
             notice={notice}
             onRevert={
               onRevert &&
@@ -750,7 +817,7 @@ export function BankEditor({
             <button
               className={buttonClasses("primary")}
               type="button"
-              disabled={busy || staleProfile}
+              disabled={editsBlocked || staleProfile}
               onClick={profileDraft.preview ? applyProfile : previewProfile}
             >
               {profileDraft.preview ? "Apply preview" : "Preview edits"}
@@ -780,12 +847,24 @@ export function BankEditor({
             className={buttonClasses("primary")}
             type="button"
             disabled={
-              busy || stale || hasInvalidTableEdits || validationPending
+              editsBlocked || stale || hasInvalidTableEdits || validationPending
             }
             onClick={apply}
           >
             {draft.kind === "raw" ? "Apply XML" : "Apply edits"}
           </button>
+          {tableReview && (
+            <details className="min-w-0 basis-full">
+              <summary className="cursor-pointer">Review Table draft</summary>
+              <textarea
+                aria-label="Original Table draft"
+                className="mt-2 w-full rounded-control border border-control-edge bg-field p-2 font-mono"
+                readOnly
+                rows={4}
+                value={tableReview}
+              />
+            </details>
+          )}
         </div>
       )}
 
@@ -813,6 +892,29 @@ export function BankEditor({
             </span>
           )}
         </div>
+        {onRefreshSnapshot && (
+          <button
+            className={buttonClasses()}
+            type="button"
+            disabled={busy}
+            onClick={refreshEditor}
+          >
+            Refresh editor
+          </button>
+        )}
+        {controller.onRecoveryCopy && (
+          <button
+            className={buttonClasses()}
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const copy = controller.onRecoveryCopy;
+              if (copy) run(() => copy(target));
+            }}
+          >
+            Download recovery copy…
+          </button>
+        )}
         <EditorActions
           controller={controller}
           target={target}

@@ -16,8 +16,11 @@ import {
   type EngineTarget,
   type EngineValueEdit,
   type EngineValueValidationIssue,
+  engineReplyError,
   engineRequest,
   profileLoadForFile,
+  revisionAtLeast,
+  SnapshotRefreshRequired,
 } from "starbank-ui/engine/protocol";
 
 const xmlDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -80,6 +83,10 @@ export class BrowserBankSession {
 
   close(): void {
     this.client.close();
+  }
+
+  refresh(name: string, target: EngineTarget): Promise<BrowserBankDocument> {
+    return this.#update(name, { kind: "snapshot" }, target);
   }
 
   async open(file: File, discardCurrent = false): Promise<BrowserBankDocument> {
@@ -265,27 +272,38 @@ export class BrowserBankSession {
       throw new Error("The bank engine did not return a document.");
     }
     const { document_id, revision } = reply;
-    const raw = await this.#dispatch(
-      { kind: "raw_text" },
-      { document_id, expected_revision: revision },
-    );
     if (
-      raw.reply.result.kind !== "raw_text" ||
-      raw.bytes === undefined ||
-      raw.reply.revision !== revision
+      target &&
+      (command.kind === "snapshot"
+        ? revision !== target.expected_revision
+        : !revisionAtLeast(revision, target.expected_revision))
     ) {
-      throw new Error(
-        "The bank engine did not return XML for the current document.",
-      );
+      throw new Error("The bank engine did not return the requested snapshot.");
     }
-    return projectDocument(
-      name,
-      document_id,
-      revision,
-      reply.result.payload,
-      raw.bytes,
-      raw.reply.result.payload.source_encoding,
-    );
+    const accepted = { document_id, expected_revision: revision };
+    try {
+      const raw = await this.#dispatch({ kind: "raw_text" }, accepted);
+      if (
+        raw.reply.result.kind !== "raw_text" ||
+        raw.bytes === undefined ||
+        raw.reply.revision !== revision
+      ) {
+        throw new Error(
+          "The bank engine did not return XML for the current document.",
+        );
+      }
+      return projectDocument(
+        name,
+        document_id,
+        revision,
+        reply.result.payload,
+        raw.bytes,
+        raw.reply.result.payload.source_encoding,
+      );
+    } catch (error) {
+      if (!target || error instanceof SnapshotRefreshRequired) throw error;
+      throw new SnapshotRefreshRequired(accepted, error);
+    }
   }
 
   async #dispatch(
@@ -298,9 +316,8 @@ export class BrowserBankSession {
     const request = engineRequest(requestId, command, target);
     const response = await this.client.request(JSON.stringify(request), bytes);
     const reply = decodeEngineReply(response.control, requestId);
-    if (reply.result.kind === "error") {
-      throw new Error(reply.result.payload.message);
-    }
+    const error = engineReplyError(reply, target);
+    if (error) throw error;
     if (target && target.document_id !== reply.document_id) {
       throw new Error("The bank engine returned a different document.");
     }
