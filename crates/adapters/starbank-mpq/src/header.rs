@@ -34,11 +34,12 @@ const HET_BYTES_OFFSET: usize = 92;
 const BET_BYTES_OFFSET: usize = 100;
 const SECTOR_BYTES_BASE: usize = 512;
 const MAX_SECTOR_SHIFT: u16 = 7;
-const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
+pub(crate) const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_TABLE_ENTRIES: u32 = 64 * 1024;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Header {
+	version: u16,
 	pub(crate) hash_table: Range<u64>,
 	pub(crate) block_table: Range<u64>,
 	pub(crate) payload: Range<u64>,
@@ -160,11 +161,16 @@ impl Header {
 			}
 		}
 		Ok(Self {
+			version,
 			hash_table,
 			block_table,
 			payload: content_start..content_end,
 			sector_bytes: SECTOR_BYTES_BASE << sector_shift,
 		})
+	}
+
+	pub(crate) fn is_v1(&self) -> bool {
+		self.version == VERSION_V1
 	}
 }
 

@@ -30,3 +30,19 @@ PY
 mkdir generated
 ./generate-fixtures payload.txt empty.txt generated
 ```
+
+## V1 append preservation
+
+The [append fixture generator](generate-append.cpp) creates a flat V1 archive with no listfile, an authored metadata text member, and an unnamed-in-the-archive binary member packed in bzip2 sectors. It adds two original text payloads to a separate copy and reopens that copy with StormLib. These inputs exercise byte preservation and append semantics. They contain no StarCraft II editor or game assets.
+
+- `append-v1-source.s2ma`, SHA-256 `33f2f9b45e2a56f6e7cd4b6e3302493e8960774f19913305c2376858af4b53d9`.
+- `append-v1-output.s2ma`, SHA-256 `d36c622faa3c268d036218561e6f66505d9019fb305262d1e461e5978eae3fa7`.
+
+With the same pinned StormLib build described above, run the generator in a fresh output directory.
+
+```sh
+c++ -std=c++17 -Wall -Wextra -Werror -IStormLib-9.40/src "$fixture_dir/generate-append.cpp" \
+  storm-build/libstorm.a -o generate-append
+mkdir generated-append
+./generate-append generated-append
+```
