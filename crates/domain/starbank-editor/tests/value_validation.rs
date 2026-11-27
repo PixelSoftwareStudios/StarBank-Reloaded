@@ -239,3 +239,122 @@ fn scalar_limit_is_an_issue_for_one_draft_and_a_commit_error_for_the_batch() {
 	assert!(!session.can_redo());
 	assert!(!session.is_dirty());
 }
+
+#[test]
+fn draft_xml_scalar_rejections_are_addressed_without_mutating_the_wire_session() {
+	const AMPERSAND_ESCAPE_BYTES: usize = "&amp;".len();
+	let mut engine = Engine::default();
+	let opened = open(&mut engine);
+	let id = &opened["result"]["payload"]["sections"][0]["keys"][0]["values"][2]["id"];
+	let limit = Limits::default().scalar_bytes;
+	let expanded = "&".repeat(limit / AMPERSAND_ESCAPE_BYTES + 1);
+
+	for (value, code) in [
+		("left\u{1}right", "invalid_xml_character"),
+		(expanded.as_str(), "value_too_large"),
+	] {
+		let edits = json!([{ "id": id, "value": value }]);
+		let validation = validate(&opened, edits.clone());
+		assert!(validation.to_string().len() < MAX_CONTROL_BYTES);
+		let checked = dispatch(&mut engine, &validation, None);
+		assert_eq!(checked["document_id"], opened["document_id"]);
+		assert_eq!(checked["revision"], opened["revision"]);
+		assert_eq!(checked["result"]["kind"], "value_validation");
+		let issues = checked["result"]["payload"]["issues"].as_array().unwrap();
+		assert_eq!(issues.len(), 1);
+		assert_eq!(issues[0]["id"], id.clone());
+		assert_eq!(issues[0]["code"], code);
+
+		let attempted = dispatch(
+			&mut engine,
+			&request(
+				&opened,
+				json!({ "kind": "set_values", "payload": { "edits": edits } }),
+			),
+			None,
+		);
+		assert_eq!(attempted["result"]["kind"], "error");
+		assert_eq!(attempted["revision"], opened["revision"]);
+	}
+
+	let observed = dispatch(
+		&mut engine,
+		&request(&opened, json!({ "kind": "snapshot" })),
+		None,
+	);
+	assert_eq!(observed["result"], opened["result"]);
+	let raw_request = request(&opened, json!({ "kind": "raw" }));
+	assert_eq!(
+		engine
+			.dispatch(&raw_request.to_string(), None)
+			.bytes
+			.as_deref(),
+		Some(BANK),
+	);
+}
+
+#[test]
+fn scalar_validation_uses_the_target_quote_and_accepts_exact_escaped_boundary() {
+	use sc2bank::{LimitKind, SerializeError};
+
+	const BANK_WITH_QUOTES: &[u8] =
+		br#"<Bank><Section name='Stats'><Key name='Test'><A string='old'/><B string="old"/></Key></Section></Bank>"#;
+	let limits = Limits {
+		scalar_bytes: "&amp;&amp;ab".len(),
+		..Limits::default()
+	};
+	let mut session = Session::open(BANK_WITH_QUOTES, limits, None).unwrap();
+	let [first, second] = session.document().sections()[0].keys()[0].values() else {
+		panic!("fixture has two known values");
+	};
+	let first = session.id_of_value(first.id()).unwrap();
+	let second = session.id_of_value(second.id()).unwrap();
+	let overflow = ValueChange {
+		id: first,
+		value: "'''",
+	};
+	let valid = ValueChange {
+		id: second,
+		value: "'''",
+	};
+
+	assert_eq!(
+		session
+			.validate_values(Revision::INITIAL, &[valid, overflow])
+			.unwrap(),
+		[ValueIssue {
+			id: first,
+			code: ValueIssueCode::ValueTooLarge
+		}],
+	);
+	assert!(matches!(
+		session.set_values(Revision::INITIAL, &[valid, overflow]),
+		Err(EditorError::Serialize(SerializeError::LimitExceeded(
+			LimitKind::ScalarBytes
+		))),
+	));
+	assert_eq!(session.document().source(), BANK_WITH_QUOTES);
+	assert_eq!(session.revision(), Revision::INITIAL);
+	assert!(!session.can_undo());
+
+	let boundary = [
+		ValueChange {
+			id: first,
+			value: "&&ab",
+		},
+		valid,
+	];
+	assert!(
+		session
+			.validate_values(Revision::INITIAL, &boundary)
+			.unwrap()
+			.is_empty()
+	);
+	let revision = session.set_values(Revision::INITIAL, &boundary).unwrap();
+	assert_eq!(
+		session.document().source(),
+		br#"<Bank><Section name='Stats'><Key name='Test'><A string='&amp;&amp;ab'/><B string="'''"/></Key></Section></Bank>"#,
+	);
+	let _ = session.undo(revision).unwrap();
+	assert_eq!(session.document().source(), BANK_WITH_QUOTES);
+}

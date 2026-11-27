@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, ops::Range};
 
 use crate::{
-	BankDocument, LimitKind, Limits, ParseErrorKind, SerializeError, ValueId, ValueKind, parse,
-	parse::is_xml_character,
+	BankDocument, LimitKind, Limits, ParseErrorKind, SerializeError, ValueId, ValueKind, ValueNode,
+	parse, parse::is_xml_character,
 };
 
 /// A replacement for one value attribute in the document from which the ID was obtained.
@@ -18,6 +18,27 @@ struct Replacement<'value> {
 	range: Range<usize>,
 	value: &'value str,
 	quote: char,
+	encoded_len: usize,
+}
+
+/// Validates an intended replacement for a projected value's XML attribute.
+///
+/// Pass a value node from this document. An exact unchanged value remains valid.
+/// This checks the attribute's original quote, legal XML characters, and escaped
+/// scalar size without allocating replacement text. The caller still needs
+/// [`serialize`] to check the complete document and aggregate limits.
+///
+/// # Errors
+///
+/// Rejects opaque or unsupported attributes, invalid source spans or characters,
+/// and escaped values above the scalar byte limit.
+pub fn validate_value_scalar(
+	document: &BankDocument,
+	node: &ValueNode,
+	value: &str,
+	limits: Limits,
+) -> Result<(), SerializeError> {
+	prepare_replacement(document, node, value, limits.scalar_bytes).map(|_| ())
 }
 
 /// Exports the original bank with only the specified value attributes replaced.
@@ -58,33 +79,19 @@ pub fn serialize(
 			let Some(new_value) = pending.remove(&node.id()) else {
 				continue;
 			};
-			let attribute = node
-				.attribute()
-				.ok_or(SerializeError::UnsupportedValue(node.id()))?;
-			if new_value == attribute.value() {
+			let Some(replacement) =
+				prepare_replacement(document, node, new_value, limits.scalar_bytes)?
+			else {
 				continue;
-			}
-			if matches!(attribute.kind(), ValueKind::Unknown(_)) {
-				return Err(SerializeError::UnsupportedValue(node.id()));
-			}
-
-			let range = document
-				.text_range(attribute.source_range())
-				.ok_or(SerializeError::InvalidSourceSpan)?;
-			let quote = source_quote(&document.source, &range)?;
-			let length = encoded_length(new_value, quote, node.id(), limits.scalar_bytes)?;
+			};
 			total_replacement_bytes = total_replacement_bytes
-				.checked_add(length)
+				.checked_add(replacement.encoded_len)
 				.filter(|&total| total <= limits.document_bytes)
 				.ok_or(SerializeError::LimitExceeded(LimitKind::DocumentBytes))?;
 			remaining_source_bytes = remaining_source_bytes
-				.checked_sub(range.len())
+				.checked_sub(replacement.range.len())
 				.ok_or(SerializeError::InvalidSourceSpan)?;
-			replacements.push(Replacement {
-				range,
-				value: new_value,
-				quote,
-			});
+			replacements.push(replacement);
 		}
 	}
 	if let Some((&id, _)) = pending.first_key_value() {
@@ -106,6 +113,35 @@ pub fn serialize(
 	let bytes = native_bytes(document, output, limits)?;
 	parse(&bytes, limits).map_err(SerializeError::InvalidOutput)?;
 	Ok(bytes)
+}
+
+fn prepare_replacement<'value>(
+	document: &BankDocument,
+	node: &ValueNode,
+	value: &'value str,
+	maximum: usize,
+) -> Result<Option<Replacement<'value>>, SerializeError> {
+	let attribute = node
+		.attribute()
+		.ok_or(SerializeError::UnsupportedValue(node.id()))?;
+	if value == attribute.value() {
+		return Ok(None);
+	}
+	if matches!(attribute.kind(), ValueKind::Unknown(_)) {
+		return Err(SerializeError::UnsupportedValue(node.id()));
+	}
+
+	let range = document
+		.text_range(attribute.source_range())
+		.ok_or(SerializeError::InvalidSourceSpan)?;
+	let quote = source_quote(&document.source, &range)?;
+	let encoded_len = encoded_length(value, quote, node.id(), maximum)?;
+	Ok(Some(Replacement {
+		range,
+		value,
+		quote,
+		encoded_len,
+	}))
 }
 
 pub(crate) fn native_bytes(

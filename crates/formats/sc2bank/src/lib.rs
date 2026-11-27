@@ -20,7 +20,7 @@ pub use model::{
 	ValueId, ValueKind, ValueNode,
 };
 pub use parse::parse;
-pub use serialize::{ValueEdit, serialize};
+pub use serialize::{ValueEdit, serialize, validate_value_scalar};
 pub use signature::replace_signature;
 pub use structural::{
 	StructuralEdit, StructuralEditError, StructuralEditResult, StructuralIdMap, StructuralNodeId,

@@ -230,25 +230,32 @@ describe("local file adapter and protocol", () => {
       document_id: "d1",
       revision: "2",
     };
-    const issue = {
-      id: "v1",
-      code: "invalid_integer",
-      message: "Enter an integer with optional comma grouping.",
-    };
+    const issues = [
+      {
+        id: "v1",
+        code: "invalid_integer",
+        message: "Enter an integer with optional comma grouping.",
+      },
+      {
+        id: "v2",
+        code: "invalid_xml_character",
+        message: "This value contains a character XML cannot store.",
+      },
+    ];
     const reply = (issues: unknown[]) =>
       JSON.stringify({
         ...scope,
         result: { kind: "value_validation", payload: { issues } },
       });
-    expect(decodeEngineReply(reply([issue]), "check").result).toEqual({
+    expect(decodeEngineReply(reply(issues), "check").result).toEqual({
       kind: "value_validation",
-      payload: { issues: [issue] },
+      payload: { issues },
     });
     expect(() =>
-      decodeEngineReply(reply([{ ...issue, code: "unknown" }]), "check"),
+      decodeEngineReply(reply([{ ...issues[1], code: "unknown" }]), "check"),
     ).toThrow("invalid reply");
     expect(() =>
-      decodeEngineReply(reply([{ ...issue, id: undefined }]), "check"),
+      decodeEngineReply(reply([{ ...issues[1], id: undefined }]), "check"),
     ).toThrow("invalid reply");
   });
 

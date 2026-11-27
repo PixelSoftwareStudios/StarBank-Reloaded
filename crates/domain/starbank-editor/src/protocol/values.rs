@@ -18,6 +18,7 @@ enum WireValueIssueCode {
 	DuplicateValue,
 	OpaqueValue,
 	ValueTooLarge,
+	InvalidXmlCharacter,
 	InvalidInteger,
 	InvalidFixed,
 	UnsupportedKind,
@@ -40,6 +41,10 @@ impl From<ValueIssue> for WireValueIssue {
 			ValueIssueCode::ValueTooLarge => {
 				(WireValueIssueCode::ValueTooLarge, ProtocolError::EditLimit)
 			}
+			ValueIssueCode::InvalidXmlCharacter => (
+				WireValueIssueCode::InvalidXmlCharacter,
+				ProtocolError::InvalidXmlCharacter,
+			),
 			ValueIssueCode::InvalidInteger => (
 				WireValueIssueCode::InvalidInteger,
 				ProtocolError::InvalidInteger,

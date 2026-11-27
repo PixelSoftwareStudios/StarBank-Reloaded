@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const bank =
-  '<Bank><Section name="Player"><Key name="Gold"><Value int="001"/></Key><Key name="Rank"><Value int="002"/></Key><Key name="Precise"><Value fixed="0.001"/></Key></Section></Bank>';
+  '<Bank><Section name="Player"><Key name="Gold"><Value int="001"/></Key><Key name="Rank"><Value int="002"/></Key><Key name="Precise"><Value fixed="0.001"/></Key><Key name="Caption"><Value string="Original"/></Key></Section></Bank>';
 
 export async function verifyTableDraftSwitch(page, chooseBank) {
   await page.getByRole("button", { name: "Open Bank…" }).waitFor();
@@ -174,7 +174,50 @@ export async function verifyTableDraftSwitch(page, chooseBank) {
   assert.equal(await gold.inputValue(), "003");
   assert.equal(await invalid.count(), 0);
 
+  await verifyXmlScalarDraft(page);
   await verifyRepairFocus(page, chooseBank);
+}
+
+async function verifyXmlScalarDraft(page) {
+  const caption = page.getByRole("textbox", {
+    name: "Caption · Value value",
+    exact: true,
+  });
+  const apply = page.getByRole("button", { name: "Apply edits", exact: true });
+  const save = page.getByRole("button", { name: "Save As…", exact: true });
+  const dirty = page.getByRole("status").filter({ hasText: "Unsaved changes" });
+  const invalid = caption.and(page.locator('input[aria-invalid="true"]'));
+  // Native text insertion retains this XML-forbidden scalar in all three engines.
+  const illegal = "left\uFFFEright";
+
+  await caption.fill(illegal);
+  assert.equal(await caption.inputValue(), illegal);
+  await invalid.waitFor();
+  const issue = await caption.getAttribute("aria-describedby");
+  assert.equal(
+    await page.locator(`[id="${issue}"]`).textContent(),
+    "This value contains a character XML cannot store.",
+  );
+  assert.equal(await apply.isDisabled(), true);
+  assert.equal(await save.isDisabled(), true);
+  assert.equal(await dirty.count(), 0);
+
+  const legal = "a & b < c";
+  await caption.fill(legal);
+  await apply.click();
+  await apply.waitFor({ state: "hidden" });
+  await dirty.waitFor();
+  assert.equal(await invalid.count(), 0);
+  assert.equal(await caption.inputValue(), legal);
+
+  await page.getByRole("tab", { name: "Raw View" }).click();
+  const raw = page.getByRole("textbox", { name: "Bank XML" });
+  await raw.waitFor();
+  assert((await raw.textContent()).includes('string="a &amp; b &lt; c"'));
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await dirty.waitFor({ state: "hidden" });
+  await page.getByRole("tab", { name: "Table View" }).click();
+  assert.equal(await caption.inputValue(), "Original");
 }
 
 async function verifyRepairFocus(page, chooseBank) {

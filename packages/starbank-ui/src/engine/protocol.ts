@@ -44,6 +44,7 @@ const engineValueValidationIssue = v.object({
     "value_too_large",
     "invalid_integer",
     "invalid_fixed",
+    "invalid_xml_character",
     "unsupported_kind",
   ]),
   message: v.string(),

@@ -3,7 +3,7 @@ use std::{
 	collections::{BTreeMap, BTreeSet},
 };
 
-use sc2bank::{ValueEdit, ValueId, ValueNode};
+use sc2bank::{LimitKind, SerializeError, ValueEdit, ValueId, ValueNode, validate_value_scalar};
 use starbank_core::Revision;
 
 use crate::{
@@ -38,8 +38,10 @@ pub enum ValueIssueCode {
 	DuplicateValue,
 	/// The value can only be edited in Raw View.
 	OpaqueValue,
-	/// The draft exceeds the document's scalar byte limit.
+	/// The draft or its escaped XML exceeds the document's scalar byte limit.
 	ValueTooLarge,
+	/// The draft contains a character disallowed in XML.
+	InvalidXmlCharacter,
 	/// The integer grammar rejected the draft.
 	InvalidInteger,
 	/// The exact decimal grammar rejected the draft.
@@ -48,31 +50,28 @@ pub enum ValueIssueCode {
 	UnsupportedKind,
 }
 
-impl ValueIssueCode {
-	fn edit_error(self, id: OccurrenceId) -> EditorError {
-		match self {
-			Self::UnknownValue => EditorError::UnknownValue(id),
-			Self::DuplicateValue => EditorError::DuplicateValue(id),
-			Self::OpaqueValue => EditorError::OpaqueValue(id),
-			Self::ValueTooLarge => EditorError::EditLimit,
-			Self::InvalidInteger => EditorError::InvalidValue {
-				id,
-				source: LexemeError::InvalidInteger,
-			},
-			Self::InvalidFixed => EditorError::InvalidValue {
-				id,
-				source: LexemeError::InvalidFixed,
-			},
-			Self::UnsupportedKind => EditorError::InvalidValue {
-				id,
-				source: LexemeError::UnsupportedKind,
-			},
+fn issue_code(error: EditorError) -> Result<ValueIssueCode, EditorError> {
+	Ok(match error {
+		EditorError::UnknownValue(_) => ValueIssueCode::UnknownValue,
+		EditorError::OpaqueValue(_) => ValueIssueCode::OpaqueValue,
+		EditorError::EditLimit
+		| EditorError::Serialize(SerializeError::LimitExceeded(LimitKind::ScalarBytes)) => {
+			ValueIssueCode::ValueTooLarge
 		}
-	}
+		EditorError::Serialize(SerializeError::InvalidCharacter { .. }) => {
+			ValueIssueCode::InvalidXmlCharacter
+		}
+		EditorError::InvalidValue { source, .. } => match source {
+			LexemeError::InvalidInteger => ValueIssueCode::InvalidInteger,
+			LexemeError::InvalidFixed => ValueIssueCode::InvalidFixed,
+			LexemeError::UnsupportedKind => ValueIssueCode::UnsupportedKind,
+		},
+		other => return Err(other),
+	})
 }
 
 impl Session {
-	/// Checks draft occurrence IDs and value lexemes without changing the session.
+	/// Checks draft occurrences, lexemes and XML scalars without changing the session.
 	///
 	/// Issues follow input order. Later occurrences of the same ID report duplicates.
 	/// The commit still checks the complete serialized XML and aggregate document limits.
@@ -98,7 +97,7 @@ impl Session {
 				Ok(id) => {
 					requested.insert(id, index);
 				}
-				Err(code) => codes[index] = Some(code),
+				Err(error) => codes[index] = Some(issue_code(error)?),
 			}
 		}
 		let mut nodes = self.value_nodes();
@@ -106,7 +105,16 @@ impl Session {
 			&& let Some(value) = nodes.next()
 		{
 			if let Some(index) = requested.remove(&value.id()) {
-				codes[index] = normalize_change(value, changes[index].value).err();
+				let check = normalize_change(value, &changes[index]).and_then(|lexeme| {
+					if let Some(lexeme) = lexeme {
+						validate_value_scalar(&self.document, value, &lexeme, self.limits)
+							.map_err(EditorError::Serialize)?;
+					}
+					Ok(())
+				});
+				if let Err(error) = check {
+					codes[index] = Some(issue_code(error)?);
+				}
 			}
 		}
 		for index in requested.into_values() {
@@ -137,9 +145,7 @@ impl Session {
 		self.require_value_batch(expected, changes)?;
 		let mut requested = BTreeMap::new();
 		for change in changes {
-			let value = self
-				.requested_value(change)
-				.map_err(|code| code.edit_error(change.id))?;
+			let value = self.requested_value(change)?;
 			if requested.insert(value, change).is_some() {
 				return Err(EditorError::DuplicateValue(change.id));
 			}
@@ -152,8 +158,7 @@ impl Session {
 			let Some(change) = requested.remove(&value.id()) else {
 				continue;
 			};
-			let lexeme =
-				normalize_change(value, change.value).map_err(|code| code.edit_error(change.id))?;
+			let lexeme = normalize_change(value, change)?;
 			if let Some(lexeme) = lexeme {
 				normalized.push((value.id(), lexeme));
 			}
@@ -186,13 +191,13 @@ impl Session {
 		Ok(())
 	}
 
-	fn requested_value(&self, change: &ValueChange<'_>) -> Result<ValueId, ValueIssueCode> {
+	fn requested_value(&self, change: &ValueChange<'_>) -> Result<ValueId, EditorError> {
 		if change.value.len() > self.limits.scalar_bytes {
-			return Err(ValueIssueCode::ValueTooLarge);
+			return Err(EditorError::EditLimit);
 		}
 		match self.ids.resolve(change.id) {
 			Some(Occurrence::Value(id)) => Ok(id),
-			_ => Err(ValueIssueCode::UnknownValue),
+			_ => Err(EditorError::UnknownValue(change.id)),
 		}
 	}
 
@@ -207,17 +212,18 @@ impl Session {
 
 fn normalize_change<'value>(
 	node: &ValueNode,
-	proposed: &'value str,
-) -> Result<Option<Cow<'value, str>>, ValueIssueCode> {
-	let attribute = node.attribute().ok_or(ValueIssueCode::OpaqueValue)?;
-	if proposed == attribute.value() {
+	change: &ValueChange<'value>,
+) -> Result<Option<Cow<'value, str>>, EditorError> {
+	let attribute = node
+		.attribute()
+		.ok_or(EditorError::OpaqueValue(change.id))?;
+	if change.value == attribute.value() {
 		return Ok(None);
 	}
-	normalize_value(attribute.kind(), proposed)
+	normalize_value(attribute.kind(), change.value)
 		.map(Some)
-		.map_err(|error| match error {
-			LexemeError::InvalidInteger => ValueIssueCode::InvalidInteger,
-			LexemeError::InvalidFixed => ValueIssueCode::InvalidFixed,
-			LexemeError::UnsupportedKind => ValueIssueCode::UnsupportedKind,
+		.map_err(|source| EditorError::InvalidValue {
+			id: change.id,
+			source,
 		})
 }
