@@ -54,11 +54,13 @@ A command report has `schema_version`, `command` and `result` fields. Preconditi
 |---|---|
 | 0 | Success, including a prepared dry-run. |
 | 2 | Invalid invocation. |
-| 3 | Invalid bank, edit, signature, context, backup or map input. |
+| 3 | Invalid input or a resource limit was reached. |
 | 4 | File or output I/O failure. |
-| 5 | Fingerprint conflict or existing destination. |
+| 5 | Input changed or the destination already exists. |
 | 6 | Inspect before retrying. Publication may have occurred, or the command could not deliver its report after a write. |
 | 7 | Unsupported format, storage capability or platform feature. |
+
+For `discover`, a path that is neither a directory nor a regular `.SC2Bank` file returns `invalid_bank_selection` (3). A scan limit returns `input_limit` (3). A detected file or directory change during discovery returns `input_changed` (5). Missing or unreadable paths return `discovery_failed` (4). Unsupported automatic discovery returns `discovery_unavailable` (7).
 
 The version 1 patch schema uses the exact byte digest reported by `inspect`. Locate a value by zero-based `section`, `key` and `value` positions in the ordered `contents` arrays for that digest. Lexemes are JSON strings.
 

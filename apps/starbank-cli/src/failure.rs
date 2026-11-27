@@ -44,6 +44,7 @@ pub(crate) enum ErrorCode {
 	BackupMetadata,
 	BackupUncertain,
 	Io,
+	InvalidBankSelection,
 	DiscoveryUnavailable,
 	DiscoveryFailed,
 	InvalidMapSelection,
@@ -178,6 +179,21 @@ impl From<ParseError> for Failure {
 impl From<PathError> for Failure {
 	fn from(value: PathError) -> Self {
 		match value {
+			PathError::InvalidSelection(_) => Self::new(
+				Status::Validation,
+				ErrorCode::InvalidBankSelection,
+				"Select a directory or a regular .SC2Bank file.",
+			),
+			PathError::LimitReached { .. } => Self::new(
+				Status::Validation,
+				ErrorCode::InputLimit,
+				"Bank discovery exceeded a scan limit. Select a narrower location with --root.",
+			),
+			PathError::EntryChanged(_) => Self::new(
+				Status::Conflict,
+				ErrorCode::InputChanged,
+				"A file or directory changed during bank discovery.",
+			),
 			PathError::NotImplemented | PathError::UnsupportedPlatform => Self::new(
 				Status::Unsupported,
 				ErrorCode::DiscoveryUnavailable,
@@ -247,5 +263,21 @@ impl From<StorageError> for Failure {
 			}
 			StorageError::Io { source, .. } => source.into(),
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::path::PathBuf;
+
+	use super::{Failure, PathError, Status};
+
+	#[test]
+	fn discovery_entry_change_is_a_redacted_conflict() {
+		let failure = Failure::from(PathError::EntryChanged(PathBuf::from("private-bank")));
+		assert_eq!(failure.status, Status::Conflict);
+		let json = serde_json::to_value(failure).expect("serialize discovery conflict");
+		assert_eq!(json["code"], "input_changed");
+		assert!(!json.to_string().contains("private-bank"));
 	}
 }
