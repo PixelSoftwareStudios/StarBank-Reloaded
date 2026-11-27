@@ -35,7 +35,6 @@ function rowLabel(row: EditorRow) {
 export function TableEditor({
   sections,
   values,
-  invalid,
   issues,
   validationError,
   canEdit,
@@ -48,7 +47,6 @@ export function TableEditor({
 }: {
   sections: readonly EditorSection[];
   values?: ReadonlyMap<string, string>;
-  invalid?: ReadonlySet<string>;
   issues?: ReadonlyMap<string, string>;
   validationError?: string;
   canEdit: boolean;
@@ -59,7 +57,7 @@ export function TableEditor({
   onOpenStructure?: (sectionId?: string) => void;
   onOpenDiff?: () => void;
 }) {
-  const instructionsId = useId();
+  const issueDescriptionId = useId();
   const [sectionId, setSectionId] = useState<string>();
   const [sectionQuery, setSectionQuery] = useState("");
   const [rowQuery, setRowQuery] = useState("");
@@ -186,8 +184,8 @@ export function TableEditor({
         ? groupNumberLexeme(row.type, value)
         : value;
     const issue = issues?.get(row.id);
-    const invalidValue = issue !== undefined || invalid?.has(row.id) === true;
-    const issueId = issue ? `${instructionsId}-${row.id}` : undefined;
+    const issueId =
+      issue !== undefined ? `${issueDescriptionId}-${row.id}` : undefined;
     const name = rowLabel(row);
     return (
       <tr
@@ -245,11 +243,9 @@ export function TableEditor({
               type="text"
               inputMode={row.type === "fixed" ? "decimal" : "text"}
               aria-label={`${name} value`}
-              aria-invalid={invalidValue || undefined}
+              aria-invalid={issue !== undefined || undefined}
               data-table-draft={edited !== undefined || undefined}
-              aria-describedby={
-                issueId ?? (invalidValue ? instructionsId : undefined)
-              }
+              aria-describedby={issueId}
               data-bank-field={windowed ? "value" : undefined}
               readOnly={!editable}
               value={shownValue}
@@ -424,11 +420,6 @@ export function TableEditor({
         {validationError && (
           <p className="editor-error" role="status">
             {validationError}
-          </p>
-        )}
-        {invalid && invalid.size > 0 && (
-          <p id={instructionsId} className="editor-error" role="status">
-            Check the marked values. Use commas only between three-digit groups.
           </p>
         )}
       </div>

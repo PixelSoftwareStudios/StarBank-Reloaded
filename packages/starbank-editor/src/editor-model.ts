@@ -109,39 +109,3 @@ export interface BankEditorController {
 export type EditorDraft =
   | { kind: "table"; revision: string; values: ReadonlyMap<string, string> }
   | { kind: "raw"; revision: string; text: string };
-
-const GROUPED_INTEGER = /^[+-]?\d{1,3}(?:,\d{3})+$/;
-const GROUPED_FIXED = /^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
-
-export function normalizeDraft(row: EditorRow, value: string): string | null {
-  if (!value.includes(",")) return value;
-
-  const grouping =
-    row.type === "int"
-      ? GROUPED_INTEGER
-      : row.type === "fixed"
-        ? GROUPED_FIXED
-        : null;
-  if (!grouping) return value;
-  return grouping.test(value) ? value.replaceAll(",", "") : null;
-}
-
-export function prepareTableDraft(
-  sections: readonly EditorSection[],
-  values: ReadonlyMap<string, string>,
-): { edits: EditorValueEdit[]; invalid: ReadonlySet<string> } {
-  const edits: EditorValueEdit[] = [];
-  const invalid = new Set(values.keys());
-
-  for (const section of sections) {
-    for (const row of section.rows) {
-      const draft = values.get(row.id);
-      if (draft === undefined || row.editable === false) continue;
-      const value = normalizeDraft(row, draft);
-      if (value === null) continue;
-      invalid.delete(row.id);
-      if (value !== row.value) edits.push({ id: row.id, value });
-    }
-  }
-  return { edits, invalid };
-}

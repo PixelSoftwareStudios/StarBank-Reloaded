@@ -1,12 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { defaultSettings } from "starbank-platform/settings";
-import {
-  AppShell,
-  type BankEditorDocument,
-  type EditorRow,
-  normalizeDraft,
-  prepareTableDraft,
-} from "starbank-ui";
+import { AppShell, type BankEditorDocument, type EditorRow } from "starbank-ui";
 import { describe, expect, it } from "vitest";
 
 const gold: EditorRow = {
@@ -70,16 +64,6 @@ describe("bank editor", () => {
     expect(markup).not.toContain("Simple View");
   });
 
-  it("normalizes intentional grouping without coercion or rounding", () => {
-    expect(normalizeDraft(gold, "9,007,199,254,740,993")).toBe(
-      "9007199254740993",
-    );
-    expect(normalizeDraft(experience, "-1,234.50")).toBe("-1234.50");
-    expect(normalizeDraft(gold, "12,34")).toBeNull();
-    expect(normalizeDraft(experience, "-1,,234.50")).toBeNull();
-    expect(normalizeDraft(note, "A, C")).toBe("A, C");
-  });
-
   it("groups display values without losing precision or lexical padding", () => {
     const rows = [
       gold,
@@ -102,22 +86,5 @@ describe("bank editor", () => {
     expect(markup).toContain('value="00,042"');
     expect(markup).toContain('value="-9,007,199,254,740,993.500"');
     expect(markup).toContain('value="00042"');
-  });
-
-  it("preserves exact edited strings and identifies invalid targets before apply", () => {
-    const result = prepareTableDraft(
-      document.sections,
-      new Map([
-        ["gold", "00042"],
-        ["xp", "9,007,199,254,740,993.50"],
-        ["note", "C, D"],
-        ["removed", "3"],
-      ]),
-    );
-    expect(result.edits).toEqual([
-      { id: "xp", value: "9007199254740993.50" },
-      { id: "note", value: "C, D" },
-    ]);
-    expect([...result.invalid]).toEqual(["removed"]);
   });
 });

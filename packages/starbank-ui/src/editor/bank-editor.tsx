@@ -18,7 +18,6 @@ import {
   type EditorProfileField,
   type EditorProfileInput,
   type EditorRow,
-  prepareTableDraft,
   profileStatus,
   useEditorState,
 } from "starbank-editor";
@@ -147,24 +146,21 @@ export function BankEditor({
     onRevert,
   } = controller;
   const hasValidator = onValidateValues !== undefined;
-  const prepared = useMemo(() => {
-    if (!tableDraft) return undefined;
-    if (!hasValidator)
-      return prepareTableDraft(document.sections, tableDraft.values);
-    return {
-      edits: Array.from(tableDraft.values, ([id, value]) => ({ id, value })),
-      invalid: undefined,
-    };
-  }, [document.sections, tableDraft, hasValidator]);
+  const tableEdits = useMemo(
+    () =>
+      tableDraft &&
+      Array.from(tableDraft.values, ([id, value]) => ({ id, value })),
+    [tableDraft],
+  );
   const validationRequest = useMemo(
     () =>
-      hasValidator && !stale && prepared?.edits.length
+      hasValidator && !stale && tableEdits?.length
         ? {
             target: { id: document.id, revision: document.revision },
-            edits: prepared.edits,
+            edits: tableEdits,
           }
         : undefined,
-    [document.id, document.revision, hasValidator, prepared, stale],
+    [document.id, document.revision, hasValidator, tableEdits, stale],
   );
   const validation = useTableDraftValidation(
     validationRequest,
@@ -174,9 +170,7 @@ export function BankEditor({
   const validationPending = validation?.kind === "pending";
   const tableIssues =
     validation?.kind === "checked" ? validation.issues : undefined;
-  const hasInvalidTableEdits = Boolean(
-    prepared?.invalid?.size || tableIssues?.size,
-  );
+  const hasInvalidTableEdits = Boolean(tableIssues?.size);
   const [waitingTableSwitch, setWaitingTableSwitch] = useState<{
     request: TableValidationRequest;
     nextView: EditorView;
@@ -317,14 +311,15 @@ export function BankEditor({
   }
 
   function applyTable(nextView?: EditorView) {
-    if (!prepared || hasInvalidTableEdits || validationPending || !onEditValues)
+    if (
+      !tableEdits ||
+      hasInvalidTableEdits ||
+      validationPending ||
+      !onEditValues
+    )
       return;
-    if (prepared.edits.length > 0)
-      submitDraft(
-        "table",
-        () => onEditValues(target, prepared.edits),
-        nextView,
-      );
+    if (tableEdits.length > 0)
+      submitDraft("table", () => onEditValues(target, tableEdits), nextView);
     else finishDraft(nextView);
   }
 
@@ -370,7 +365,7 @@ export function BankEditor({
       } else {
         submitDraft("raw", () => onReplaceXml(target, rawDraft.text), nextView);
       }
-    } else if (selectedView === "table" && prepared) {
+    } else if (selectedView === "table" && tableEdits) {
       if (validationPending && validationRequest && onEditValues) {
         setWaitingTableSwitch({ request: validationRequest, nextView });
         return;
@@ -379,10 +374,7 @@ export function BankEditor({
         ? staleMessage
         : !onEditValues
           ? "The Table draft cannot currently be applied."
-          : (tableIssues?.values().next().value ??
-            (prepared.invalid?.size
-              ? "Check the marked values. Use commas only between three-digit groups."
-              : undefined));
+          : tableIssues?.values().next().value;
       if (message) setDraftSwitch({ kind: "table", nextView, message });
       else applyTable(nextView);
     } else {
@@ -516,7 +508,6 @@ export function BankEditor({
           <TableEditor
             sections={document.sections}
             values={tableDraft?.values}
-            invalid={prepared?.invalid}
             issues={tableIssues}
             validationError={
               validation?.kind === "failed" ? validation.message : undefined

@@ -1,15 +1,13 @@
 export * as Dropdown from "@radix-ui/react-dropdown-menu";
-export {
-  type BankEditorController,
-  type BankEditorDocument,
-  type EditorAction,
-  type EditorActionResult,
-  type EditorRow,
-  type EditorSection,
-  type EditorTarget,
-  type EditorValueEdit,
-  normalizeDraft,
-  prepareTableDraft,
+export type {
+  BankEditorController,
+  BankEditorDocument,
+  EditorAction,
+  EditorActionResult,
+  EditorRow,
+  EditorSection,
+  EditorTarget,
+  EditorValueEdit,
 } from "starbank-editor";
 export { AppShell, preloadSettingsPage } from "./app/app-shell";
 export { preloadEditorTools, preloadRawEditor } from "./editor/bank-editor";
