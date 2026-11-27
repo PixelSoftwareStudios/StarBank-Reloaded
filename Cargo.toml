@@ -1,4 +1,5 @@
 [workspace]
+default-members = ["apps/starbank-desktop/src-tauri"]
 members = [
     "apps/starbank-cli",
     "apps/starbank-desktop/src-tauri",

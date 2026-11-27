@@ -1,5 +1,6 @@
 [package]
 name = "starbank-desktop"
+default-run = "starbank-desktop"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,6 +12,7 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [features]
+default = ["custom-protocol"]
 desktop = [
   "dep:libc",
   "dep:rfd",

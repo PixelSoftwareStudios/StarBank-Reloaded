@@ -23,6 +23,13 @@ pnpm dev
 
 StarBank Web opens individual banks or a local bank list from selected files and folders. It edits Table and Raw views and offers Simple View for matching local profiles. Structural edits, targeted reverts, signed downloads and byte-exact backups of the opening file work offline after the editor loads. The shared engine preserves UTF-8 and BOM-marked UTF-16 bank files.
 
+Build the desktop webview assets, then run the desktop app from the repository root.
+
+```sh
+pnpm --filter starbank-desktop run build:webview
+cargo run --locked
+```
+
 Run the Tauri desktop development host or the command-line editor from the same checkout.
 
 ```sh
