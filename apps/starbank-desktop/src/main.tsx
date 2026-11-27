@@ -18,11 +18,15 @@ import type {
   EngineProfile,
   EngineReply,
   EngineSnapshot,
+  EngineTarget,
 } from "starbank-ui/engine/protocol";
 import {
   decodeEngineReply,
+  engineReplyError,
   engineRequest,
   profileLoadForFile,
+  revisionAtLeast,
+  SnapshotRefreshRequired,
 } from "starbank-ui/engine/protocol";
 import {
   type BackupAction,
@@ -85,6 +89,15 @@ type OpenBankSource = (control: string) => Promise<FileDialogReply | null>;
 function DesktopApp() {
   const currentDocument = useRef<DesktopDocument>(null);
   const [document, setDocument] = useState<DesktopDocument>();
+  const [refreshRequest, setRefreshRequest] = useState<{
+    displayed: EditorTarget;
+    observed: EngineTarget;
+  }>();
+  const refreshTarget =
+    refreshRequest?.displayed.id === document?.projection.id &&
+    refreshRequest?.displayed.revision === document?.projection.revision
+      ? refreshRequest?.observed
+      : undefined;
   const [profile, setProfile] = useState<EngineProfile>();
   const [hasDraft, setHasDraft] = useState(false);
   const [nativeNotice, setNativeNotice] = useState<string>();
@@ -112,7 +125,7 @@ function DesktopApp() {
     onDraft: setHasDraft,
     onNotice: setNativeNotice,
     save:
-      document && (overwriteAvailable || exportAvailable)
+      document && !refreshTarget && (overwriteAvailable || exportAvailable)
         ? async () => {
             const result = await save(
               document.projection,
@@ -180,14 +193,18 @@ function DesktopApp() {
     bytes?: Uint8Array,
   ) {
     const id = requestId();
-    const control = engineRequest(id, command, {
+    const scope = {
       document_id: target.id,
       expected_revision: target.revision,
-    });
+    };
+    const control = engineRequest(id, command, scope);
     const nativeReply = await dispatchBank(JSON.stringify(control), bytes);
     const reply = decodeEngineReply(nativeReply.control, id);
-    if (reply.result.kind === "error") {
-      throw new Error(reply.result.payload.message);
+    const error = engineReplyError(reply, scope);
+    if (error) {
+      if (error instanceof SnapshotRefreshRequired)
+        rememberRefresh(error.target);
+      throw error;
     }
     return { reply, bytes: nativeReply.bytes };
   }
@@ -236,17 +253,19 @@ function DesktopApp() {
       canUndo: snapshot.can_undo,
       canRedo: snapshot.can_redo,
     };
-    currentDocument.current = next;
-    setDocument(next);
     if (document?.projection.id !== target.id) {
       setProfile(undefined);
     } else if (profile && profile.status !== "unloaded") {
       try {
         await updateProfile(target, { kind: "profile_snapshot" });
-      } catch {
+      } catch (error) {
+        if (error instanceof SnapshotRefreshRequired) throw error;
         setProfile(undefined);
       }
     }
+    currentDocument.current = next;
+    setDocument(next);
+    setRefreshRequest(undefined);
     return target;
   }
 
@@ -276,14 +295,65 @@ function DesktopApp() {
     command: EngineCommand,
     bytes?: Uint8Array,
   ) {
+    return updateDocument(
+      target,
+      async () => (await dispatch(target, command, bytes)).reply,
+    );
+  }
+
+  function updateDocument(
+    target: EditorTarget,
+    load: () => Promise<EngineReply>,
+    expectedRevision?: string,
+  ) {
     return action<EditorMutationResult>(async () => {
       const { projection } = activeDocument(target);
-      const { reply } = await dispatch(target, command, bytes);
-      if (reply.document_id !== target.id)
-        throw new Error("The bank engine returned a different document.");
-      const next = await adopt(projection.name, reply);
-      return { ok: true, target: next };
+      let accepted: EngineTarget | undefined;
+      try {
+        const reply = await load();
+        if (
+          reply.result.kind !== "snapshot" ||
+          reply.document_id !== target.id ||
+          reply.revision === null ||
+          !revisionAtLeast(reply.revision, target.revision) ||
+          (expectedRevision !== undefined &&
+            reply.revision !== expectedRevision)
+        ) {
+          throw new Error(
+            "The bank engine did not return the requested snapshot.",
+          );
+        }
+        accepted = {
+          document_id: reply.document_id,
+          expected_revision: reply.revision,
+        };
+        const next = await adopt(projection.name, reply);
+        return {
+          ok: true,
+          target: next,
+          message:
+            expectedRevision === undefined ? undefined : "Editor refreshed.",
+        };
+      } catch (error) {
+        if (error instanceof SnapshotRefreshRequired) throw error;
+        if (!accepted) throw error;
+        rememberRefresh(accepted);
+        throw new SnapshotRefreshRequired(accepted, error);
+      }
     });
+  }
+
+  function rememberRefresh(observed: EngineTarget) {
+    const displayed = currentDocument.current?.projection;
+    if (
+      displayed?.id === observed.document_id &&
+      revisionAtLeast(observed.expected_revision, displayed.revision)
+    ) {
+      setRefreshRequest({
+        displayed: { id: displayed.id, revision: displayed.revision },
+        observed,
+      });
+    }
   }
 
   function activeDocument(target: EditorTarget): DesktopDocument {
@@ -313,6 +383,7 @@ function DesktopApp() {
           message: "Apply or discard the current draft first.",
         };
       }
+      if (refreshTarget) throw new SnapshotRefreshRequired(refreshTarget);
       let discardRequestId: string | undefined;
       const current = document?.projection;
       if (current?.dirty) {
@@ -352,7 +423,8 @@ function DesktopApp() {
   const inventory = useInventory({
     backupGeneration,
     selectedBankId,
-    disabled: busy || hasDraft || closeGuard.pending,
+    disabled:
+      busy || hasDraft || refreshTarget !== undefined || closeGuard.pending,
     onOpenBank: (id) => {
       void openFrom((control) => openInventoryBank(id, control), id).then(
         (result) => setNativeNotice(result.message),
@@ -509,6 +581,23 @@ function DesktopApp() {
     backupStatus,
     onOpen: () => openFrom(pickBank),
     onDraftChange: closeGuard.reportDraft,
+    onRefreshSnapshot: refreshTarget
+      ? (target) =>
+          updateDocument(
+            target,
+            async () =>
+              (
+                await dispatch(
+                  {
+                    id: refreshTarget.document_id,
+                    revision: refreshTarget.expected_revision,
+                  },
+                  { kind: "snapshot" },
+                )
+              ).reply,
+            refreshTarget.expected_revision,
+          )
+      : undefined,
     profile: {
       current: profile ?? { status: "unloaded" },
       requireAuthor: profile?.status === "missing_context",

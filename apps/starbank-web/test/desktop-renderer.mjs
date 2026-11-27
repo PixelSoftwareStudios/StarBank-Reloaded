@@ -102,19 +102,21 @@ function dispatch(engine, control, bytes) {
   }
 }
 
-function dispatchFrame(engine, packet, beforeDispatch) {
+function dispatchFrame(engine, packet, beforeDispatch, afterDispatch) {
   const frame = Buffer.from(packet);
   const controlEnd = frameHeaderBytes + frame.readUInt32LE(controlLengthOffset);
   assert(controlEnd <= frame.length);
   const attached = frame[0] === 1;
   assert(attached || (frame[0] === 0 && controlEnd === frame.length));
   const request = frame.subarray(frameHeaderBytes, controlEnd).toString();
-  beforeDispatch?.(JSON.parse(request));
-  const reply = dispatch(
+  const parsed = JSON.parse(request);
+  beforeDispatch(parsed);
+  const actual = dispatch(
     engine,
     request,
     attached ? frame.subarray(controlEnd) : undefined,
   );
+  const reply = afterDispatch(parsed, actual);
 
   const control = Buffer.from(reply.control);
   const output = Buffer.alloc(
@@ -135,6 +137,9 @@ function createBridge(engine, canOverwrite) {
   let saved = false;
   let malformedBackupList = false;
   let supersedeNextEdit = false;
+  let failNextEditProjection = false;
+  let failedProjectionRevision;
+  const wireRequests = [];
   let inventoryResponse = canOverwrite ? blockedInventory : inventory;
   let preferences = { ...settings };
 
@@ -168,13 +173,35 @@ function createBridge(engine, canOverwrite) {
     assert.notEqual(reset.revision, request.expected_revision);
   }
 
+  function transformReply(request, reply) {
+    if (failNextEditProjection && request.command.kind === "set_values") {
+      const accepted = JSON.parse(reply.control);
+      assert.equal(accepted.result.kind, "snapshot");
+      failedProjectionRevision = accepted.revision;
+      failNextEditProjection = false;
+    }
+    if (
+      failedProjectionRevision !== undefined &&
+      request.command.kind === "raw_text" &&
+      request.expected_revision === failedProjectionRevision
+    ) {
+      failedProjectionRevision = undefined;
+      return { control: "unreadable fixture control" };
+    }
+    return reply;
+  }
+
   function invoke(command, args) {
     if (command === "dispatch_bank") {
       return {
         value: dispatchFrame(
           engine,
           args,
-          supersedeNextEdit ? advanceRevisionBeforeEdit : undefined,
+          (request) => {
+            wireRequests.push(request);
+            if (supersedeNextEdit) advanceRevisionBeforeEdit(request);
+          },
+          transformReply,
         ),
       };
     }
@@ -319,6 +346,10 @@ function createBridge(engine, canOverwrite) {
     supersedeNextEdit() {
       supersedeNextEdit = true;
     },
+    failNextEditProjection() {
+      failNextEditProjection = true;
+    },
+    wireRequests,
     corruptBackupList() {
       malformedBackupList = true;
     },
@@ -676,12 +707,76 @@ async function verifyDraftSave(page, bridge, canOverwrite) {
   await page
     .getByRole("status")
     .filter({
-      hasText: "The document changed. Refresh its snapshot before retrying.",
+      hasText: "Refresh the editor to check the current bank revision.",
     })
     .waitFor();
   assert.equal(await gold.inputValue(), "0042");
   assert(await button(page, "Discard draft").isVisible());
   assert.equal(bridge.callsFor(saveCommand).length, before + 1);
+  const primarySave = button(page, canOverwrite ? "Save" : "Save As…");
+  assert(await primarySave.isDisabled());
+  await refreshEditorOnly(page, bridge);
+  assert(
+    await primarySave.isDisabled(),
+    "a draft from an older revision stays blocked",
+  );
+  await page.getByText("Review Table draft", { exact: true }).click();
+  const reviewed = page.getByRole("textbox", { name: "Original Table draft" });
+  assert.deepEqual(JSON.parse(await reviewed.inputValue()), [
+    { section: "Player", field: "Gold", value: "0042" },
+  ]);
+  await button(page, "Discard draft").click();
+  assert.equal(await goldField(page).inputValue(), "001");
+
+  await editGold(page, "1000");
+  await goldField(page).focus();
+  assert.equal(await goldField(page).inputValue(), "1000");
+  await goldField(page).fill("1,000");
+  await button(page, "Discard draft").waitFor();
+  const editCount = bridge.wireRequests.filter(
+    ({ command }) => command.kind === "set_values",
+  ).length;
+  bridge.failNextEditProjection();
+  await goldField(page).press("Control+s");
+  await page
+    .getByRole("status")
+    .filter({
+      hasText: "Refresh the editor to check the current bank revision.",
+    })
+    .waitFor();
+  assert(await primarySave.isDisabled());
+  await refreshEditorOnly(page, bridge);
+  assert(
+    await primarySave.isEnabled(),
+    "the draft still belongs to the same no-op revision",
+  );
+  assert(await button(page, "Discard draft").isVisible());
+  assert.equal(await goldField(page).inputValue(), "1,000");
+  assert.equal(
+    bridge.wireRequests.filter(({ command }) => command.kind === "set_values")
+      .length,
+    editCount + 1,
+  );
+  assert.equal(bridge.callsFor(saveCommand).length, before + 1);
+  await button(page, "Discard draft").click();
+}
+
+async function refreshEditorOnly(page, bridge) {
+  const before = bridge.wireRequests.length;
+  await button(page, "Refresh editor").click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Editor refreshed." })
+    .waitFor();
+  const reads = bridge.wireRequests
+    .slice(before)
+    .filter(({ command }) => command.kind !== "validate_values");
+  assert.deepEqual(
+    reads.map(({ command }) => command.kind),
+    ["snapshot", "raw_text"],
+  );
+  assert.equal(reads[0].document_id, reads[1].document_id);
+  assert.equal(reads[0].expected_revision, reads[1].expected_revision);
 }
 
 async function verifyRenderer(browser, canOverwrite) {
