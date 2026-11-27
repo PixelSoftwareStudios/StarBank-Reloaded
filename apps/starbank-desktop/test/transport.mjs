@@ -5,6 +5,7 @@ import {
   compareBankConflict,
   exportActiveBackup,
   readActiveBackupStatus,
+  readInventory,
   readInventoryBackupStatuses,
   reviewActiveBackup,
 } from "../src/transport.ts";
@@ -39,7 +40,7 @@ const status = {
 const invalidResponse = /invalid desktop response/;
 
 beforeEach(() => {
-  globalThis.window = {};
+  globalThis.window = { crypto: globalThis.crypto };
 });
 afterEach(() => {
   clearMocks();
@@ -169,4 +170,174 @@ test("native rejection remains a rejection instead of becoming a review", async 
     reviewActiveBackup(target, 7),
     (error) => error === failure,
   );
+});
+
+const inventory = {
+  generation: "9007199254740993",
+  status: "ready",
+  reason: null,
+  maps: [
+    {
+      id: "synthetic-map",
+      name: "Synthetic Map",
+      isBlizzard: false,
+      hasBankFiles: true,
+      author: null,
+      modifiedAtMillis: null,
+    },
+  ],
+  banks: [
+    {
+      id: "synthetic-bank",
+      name: "Synthetic.SC2Bank",
+      scopeId: null,
+      playerHandle: null,
+      authorHandle: null,
+      mapIds: ["synthetic-map"],
+    },
+  ],
+  rootName: "Synthetic",
+  manual: false,
+  incomplete: false,
+  canRebuildMapIndex: true,
+};
+
+function inventoryReply(value) {
+  mockIPC((command, { progress }) => {
+    assert.equal(command, "refresh_inventory");
+    assert.equal(typeof progress.onmessage, "function");
+    return value;
+  });
+}
+
+test("inventory reads validate all four query commands without coercing opaque generations", async () => {
+  for (const command of [
+    "refresh_inventory",
+    "rebuild_map_index",
+    "use_automatic_inventory",
+    "select_inventory_folder",
+  ]) {
+    mockIPC((actual, { progress }) => {
+      assert.equal(actual, command);
+      progress.onmessage({
+        generation: inventory.generation,
+        stage: "locating_folder",
+      });
+      return inventory;
+    });
+    assert.deepEqual(await readInventory(command, () => {}), inventory);
+  }
+  for (const value of [
+    null,
+    {
+      ...inventory,
+      generation: "",
+      status: "root-not-found",
+      maps: [],
+      banks: [],
+      reason: "unreadable",
+    },
+  ]) {
+    inventoryReply(value);
+    assert.deepEqual(await readInventory("refresh_inventory", () => {}), value);
+  }
+});
+
+test("inventory snapshots reject malformed maps, bank targets, statuses, and flags before publication", async () => {
+  for (const value of [
+    {},
+    { ...inventory, generation: 1 },
+    { ...inventory, status: "scanning" },
+    { ...inventory, reason: "unknown_reason" },
+    { ...inventory, maps: null },
+    { ...inventory, maps: [{ ...inventory.maps[0], isBlizzard: "false" }] },
+    {
+      ...inventory,
+      maps: [{ ...inventory.maps[0], modifiedAtMillis: 2 ** 53 }],
+    },
+    { ...inventory, banks: [{ ...inventory.banks[0], id: 1 }] },
+    {
+      ...inventory,
+      banks: [{ ...inventory.banks[0], mapIds: "synthetic-map" }],
+    },
+    { ...inventory, banks: [{ ...inventory.banks[0], scopeId: false }] },
+    { ...inventory, canRebuildMapIndex: "false" },
+    { ...inventory, manual: null },
+  ]) {
+    inventoryReply(value);
+    await assert.rejects(
+      readInventory("refresh_inventory", () => {}),
+      invalidResponse,
+    );
+  }
+});
+
+test("inventory progress ignores malformed and foreign updates without poisoning the active generation", async () => {
+  const updates = [];
+  const valid = {
+    generation: inventory.generation,
+    stage: "inspecting_archives",
+    completed: 1,
+    total: 2,
+  };
+  const invalid = [
+    null,
+    {},
+    { generation: "wrong", stage: "unknown_stage" },
+    { stage: "locating_folder" },
+    { generation: 1, stage: "locating_folder" },
+    ...[-1, 0.5, "1", 2 ** 53].map((completed) => ({
+      ...valid,
+      generation: "wrong",
+      completed,
+    })),
+    { ...valid, generation: "wrong", total: Number.NaN },
+  ];
+  mockIPC((_command, { progress }) => {
+    for (const update of invalid) progress.onmessage(update);
+    progress.onmessage(valid);
+    progress.onmessage({ generation: "foreign", stage: "enumerating_banks" });
+    return inventory;
+  });
+  assert.deepEqual(
+    await readInventory("refresh_inventory", (value) => updates.push(value)),
+    inventory,
+  );
+  assert.deepEqual(updates, [valid]);
+});
+
+test("inventory rejects a snapshot from another progress generation and ignores settled channel updates", async () => {
+  const updates = [];
+  let send;
+  mockIPC((_command, { progress }) => {
+    send = progress.onmessage;
+    send({ generation: "older-generation", stage: "locating_folder" });
+    return inventory;
+  });
+  await assert.rejects(
+    readInventory("refresh_inventory", (value) => updates.push(value)),
+    invalidResponse,
+  );
+  send({ generation: "older-generation", stage: "enumerating_banks" });
+  assert.equal(updates.length, 1);
+});
+
+test("inventory cancellation and native failures do not keep accepting channel updates", async () => {
+  for (const value of [null, new Error("Synthetic native failure")]) {
+    const updates = [];
+    let send;
+    mockIPC((_command, { progress }) => {
+      send = progress.onmessage;
+      if (value instanceof Error) throw value;
+      return value;
+    });
+    const request = readInventory("refresh_inventory", (update) =>
+      updates.push(update),
+    );
+    if (value instanceof Error)
+      await assert.rejects(request, (error) => error === value);
+    else assert.equal(await request, null);
+    send({ generation: inventory.generation, stage: "locating_folder" });
+    assert.deepEqual(updates, []);
+  }
 });

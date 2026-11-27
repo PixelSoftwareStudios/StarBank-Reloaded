@@ -1,32 +1,15 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MapInventory, MapListItem } from "starbank-ui";
+import type { MapInventory } from "starbank-ui";
 import { useInventoryBackupStatuses } from "./inventory-backup-status";
-import { fileDialogReply, invokeChecked } from "./transport";
-
-interface InventorySnapshot {
-  generation: string;
-  status: "ready" | "root-not-found" | "manual-required" | "failed";
-  reason: keyof typeof FAILURE_TEXT | null;
-  maps: readonly MapListItem[];
-  banks: readonly {
-    id: string;
-    name: string;
-    scopeId: string | null;
-    playerHandle: string | null;
-    authorHandle: string | null;
-    mapIds: readonly string[];
-  }[];
-  rootName: string | null;
-  manual: boolean;
-  incomplete: boolean;
-  canRebuildMapIndex: boolean;
-}
-
-type InventoryProgress = { generation: string } & (
-  | { stage: "locating_folder" | "enumerating_banks" | "indexing_maps" }
-  | { stage: "inspecting_archives"; completed: number; total: number }
-);
+import {
+  fileDialogReply,
+  type InventoryProgress,
+  type InventoryQuery,
+  type InventorySnapshot,
+  invokeChecked,
+  readInventory,
+} from "./transport";
 
 const PROGRESS_LABELS: Record<InventoryProgress["stage"], string> = {
   locating_folder: "Finding the bank folder…",
@@ -45,12 +28,6 @@ const FAILURE_TEXT = {
     "The saved bank folder could not be read or updated.",
 };
 const INVENTORY_FAILURE = "The bank inventory could not be loaded.";
-
-type InventoryQuery =
-  | "refresh_inventory"
-  | "rebuild_map_index"
-  | "use_automatic_inventory"
-  | "select_inventory_folder";
 
 export function openInventoryBank(id: string, control: string) {
   return invokeChecked(fileDialogReply, "open_bank_id", { id, control });
@@ -82,18 +59,8 @@ export function useInventory({
     setCancelled(false);
     setQuery(command);
     setProgress(undefined);
-    let receiving = true;
-    let generation: string | undefined;
-    const channel = new Channel<InventoryProgress>((update) => {
-      if (!receiving || (generation && update.generation !== generation))
-        return;
-      generation = update.generation;
-      setProgress(update);
-    });
     try {
-      const result = await invoke<InventorySnapshot | null>(command, {
-        progress: channel,
-      });
+      const result = await readInventory(command, setProgress);
       if (result) {
         setSnapshot(result);
         if (
@@ -119,7 +86,6 @@ export function useInventory({
         );
       }
     } finally {
-      receiving = false;
       active.current = false;
       setQuery(undefined);
       setProgress(undefined);

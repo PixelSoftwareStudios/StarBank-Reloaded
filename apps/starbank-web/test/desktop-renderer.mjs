@@ -36,6 +36,8 @@ const settings = {
 const inventory = {
   generation: "17",
   status: "ready",
+  reason: null,
+  canRebuildMapIndex: false,
   rootName: "Synthetic",
   manual: false,
   incomplete: false,
@@ -45,9 +47,20 @@ const inventory = {
       name: "Synthetic Map",
       isBlizzard: false,
       hasBankFiles: true,
+      author: null,
+      modifiedAtMillis: null,
     },
   ],
-  banks: [{ id: "bank-a", name: initialName, mapIds: ["map-a"] }],
+  banks: [
+    {
+      id: "bank-a",
+      name: initialName,
+      scopeId: null,
+      playerHandle: null,
+      authorHandle: null,
+      mapIds: ["map-a"],
+    },
+  ],
 };
 const backups = {
   records: [

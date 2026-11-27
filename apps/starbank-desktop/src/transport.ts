@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   type EngineSigningContext,
   signatureStatus,
@@ -328,4 +328,99 @@ export function reopenBankConflict(target: ActiveBankTarget, reviewId: string) {
     target,
     reviewId,
   });
+}
+
+const inventorySnapshot = v.object({
+  generation: v.string(),
+  status: v.picklist(["ready", "root-not-found", "manual-required", "failed"]),
+  reason: v.nullable(
+    v.picklist([
+      "invalid_folder",
+      "unreadable",
+      "too_many_entries",
+      "too_many_matches",
+      "identifier_conflict",
+      "configuration_unavailable",
+    ]),
+  ),
+  maps: v.array(
+    v.object({
+      id: v.string(),
+      name: v.string(),
+      isBlizzard: v.boolean(),
+      hasBankFiles: v.boolean(),
+      author: v.nullable(v.string()),
+      modifiedAtMillis: v.nullable(v.pipe(v.number(), v.safeInteger())),
+    }),
+  ),
+  banks: v.array(
+    v.object({
+      id: v.string(),
+      name: v.string(),
+      scopeId: v.nullable(v.string()),
+      playerHandle: v.nullable(v.string()),
+      authorHandle: v.nullable(v.string()),
+      mapIds: v.array(v.string()),
+    }),
+  ),
+  rootName: v.nullable(v.string()),
+  manual: v.boolean(),
+  incomplete: v.boolean(),
+  canRebuildMapIndex: v.boolean(),
+});
+const inventoryProgress = v.variant("stage", [
+  v.object({
+    generation: v.string(),
+    stage: v.picklist([
+      "locating_folder",
+      "enumerating_banks",
+      "indexing_maps",
+    ]),
+  }),
+  v.object({
+    generation: v.string(),
+    stage: v.literal("inspecting_archives"),
+    completed: count,
+    total: count,
+  }),
+]);
+
+export type InventorySnapshot = v.InferOutput<typeof inventorySnapshot>;
+export type InventoryProgress = v.InferOutput<typeof inventoryProgress>;
+export type InventoryQuery =
+  | "refresh_inventory"
+  | "rebuild_map_index"
+  | "use_automatic_inventory"
+  | "select_inventory_folder";
+
+export async function readInventory(
+  command: InventoryQuery,
+  onProgress: (progress: InventoryProgress) => void,
+): Promise<InventorySnapshot | null> {
+  let receiving = true;
+  let generation: string | undefined;
+  const channel = new Channel<unknown>((update) => {
+    if (!receiving) return;
+    const result = v.safeParse(inventoryProgress, update);
+    if (!result.success) return;
+    const progress = result.output;
+    if (generation !== undefined && progress.generation !== generation) return;
+    generation = progress.generation;
+    onProgress(progress);
+  });
+  try {
+    const result = await invokeChecked(v.nullable(inventorySnapshot), command, {
+      progress: channel,
+    });
+    if (
+      result &&
+      generation !== undefined &&
+      result.generation !== generation
+    ) {
+      throw new Error("StarBank received an invalid desktop response.");
+    }
+    return result;
+  } finally {
+    receiving = false;
+  }
 }
