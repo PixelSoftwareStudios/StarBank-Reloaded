@@ -1,6 +1,6 @@
 use std::{
 	os::windows::ffi::OsStrExt as _,
-	process::{self, Child, Command},
+	process,
 	sync::{
 		Arc, Mutex,
 		atomic::{AtomicBool, AtomicU32, Ordering},
@@ -14,6 +14,10 @@ use windows_sys::Win32::Foundation::{ERROR_BROKEN_PIPE, ERROR_PIPE_NOT_CONNECTED
 
 use super::*;
 use crate::MAX_FRAME_LEN;
+
+#[path = "tests/child.rs"]
+mod child;
+use child::QualificationChild;
 
 const NAMESPACE_PREFIX: &str = "org.starbank.instance-test.";
 const CHILD_TEST: &str = "windows::tests::run_qualification_child";
@@ -149,40 +153,6 @@ async fn abort_listener(task: tokio::task::JoinHandle<Result<(), InstanceError>>
 	);
 }
 
-struct QualificationChild(Child);
-
-impl QualificationChild {
-	fn launch(name: &str, case: &str) -> Self {
-		let child = Command::new(std::env::current_exe().expect("test executable"))
-			.args(["--exact", CHILD_TEST, "--ignored", "--nocapture"])
-			.env(CHILD_PARENT_PID, process::id().to_string())
-			.env(CHILD_NAMESPACE, name)
-			.env(CHILD_CASE, case)
-			.spawn()
-			.expect("start test child");
-		assert_ne!(child.id(), process::id());
-		Self(child)
-	}
-
-	async fn verify_exit(mut self) {
-		loop {
-			if let Some(status) = self.0.try_wait().expect("child exit status") {
-				assert!(status.success(), "qualification child exited with {status}");
-				return;
-			}
-			sleep_until(Instant::now() + RETRY_INTERVAL).await;
-		}
-	}
-}
-
-impl Drop for QualificationChild {
-	fn drop(&mut self) {
-		if self.0.kill().is_ok() {
-			let _ = self.0.wait();
-		}
-	}
-}
-
 #[test]
 #[ignore = "private subprocess entry for isolated named-pipe qualification"]
 fn run_qualification_child() {
@@ -280,7 +250,7 @@ fn qualify_windows_pipe_election_peers_and_admission() {
 				.verify_client(&listener.server)
 				.expect("child identity")
 				.pid(),
-			child.0.id()
+			child.pid()
 		);
 		timeout(
 			CONNECTION_BUDGET,
@@ -417,6 +387,9 @@ fn qualify_cancel_pending_read_and_reacquire_endpoint() {
 	run(async {
 		let name = namespace();
 		let listener = primary(&name).await;
+		let guard = listener
+			.retain_endpoint()
+			.expect("duplicate primary endpoint");
 		let connected = Arc::new(AtomicBool::new(false));
 		let ready = Arc::clone(&connected);
 		let task = tokio::spawn(async move {
@@ -444,6 +417,11 @@ fn qualify_cancel_pending_read_and_reacquire_endpoint() {
 				.expect_err("pending native read cancelled")
 				.is_cancelled()
 		);
+		assert!(matches!(
+			security::bind(&address(&name), &owner()),
+			Err(error) if has_code(&error, ERROR_ACCESS_DENIED) || has_code(&error, ERROR_PIPE_BUSY)
+		));
+		drop(guard);
 		disconnected(&mut client).await;
 		drop(client);
 		let _replacement = primary(&name).await;

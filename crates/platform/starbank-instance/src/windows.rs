@@ -4,7 +4,10 @@ use std::{
 	error::Error,
 	ffi::OsString,
 	fmt, io,
-	os::windows::ffi::OsStringExt,
+	os::windows::{
+		ffi::OsStringExt,
+		io::{AsHandle as _, OwnedHandle},
+	},
 	path::{Component, Path, PathBuf, Prefix},
 	time::{Duration, Instant as AdmissionDeadline},
 };
@@ -51,6 +54,14 @@ pub enum Claim {
 pub struct Listener {
 	server: NamedPipeServer,
 	owner: security::LogonSid,
+}
+
+/// Owns the first pipe instance independently of the listener task.
+///
+/// Keep it while an editor session is active, including after the listener fails.
+#[must_use = "retain the guard while the editor owns the endpoint"]
+pub struct EndpointGuard {
+	_handle: OwnedHandle,
 }
 
 /// Native operations that can fail without a launch request being delivered.
@@ -171,6 +182,16 @@ pub async fn claim(namespace: &str, request: &OpenRequest) -> Result<Claim, Inst
 }
 
 impl Listener {
+	/// Duplicate this instance handle so a serving failure does not release ownership.
+	///
+	/// # Errors
+	///
+	/// Returns the operating-system error if the pipe handle cannot be duplicated.
+	pub fn retain_endpoint(&self) -> io::Result<EndpointGuard> {
+		let handle = self.server.as_handle().try_clone_to_owned()?;
+		Ok(EndpointGuard { _handle: handle })
+	}
+
 	/// Admit path-only requests until the listener is dropped or a native listener error occurs.
 	///
 	/// Use nonblocking queue access, such as `try_lock`, inside the admission callback and report
@@ -283,7 +304,11 @@ fn candidate_paths(request: &OpenRequest) -> Result<Vec<PathBuf>, InstanceError>
 		.collect()
 }
 
-fn is_bank_candidate(path: &Path) -> bool {
+/// Check whether a path is a syntactically valid local absolute launch candidate.
+///
+/// File authority, existence, and on-disk validity are checked by the caller when opening it.
+#[must_use]
+pub fn is_bank_candidate(path: &Path) -> bool {
 	let mut components = path.components();
 	matches!(components.next(), Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)))
 		&& path.is_absolute()

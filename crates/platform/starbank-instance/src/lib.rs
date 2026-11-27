@@ -12,4 +12,6 @@ mod windows_security;
 #[cfg(any(windows, test))]
 pub use frame::{FrameError, MAX_FRAME_LEN, MAX_PATHS, OpenRequest, QueueAdmission};
 #[cfg(windows)]
-pub use windows::{Claim, InstanceError, Listener, PipeOperation, claim};
+pub use windows::{
+	Claim, EndpointGuard, InstanceError, Listener, PipeOperation, claim, is_bank_candidate,
+};
