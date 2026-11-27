@@ -1,4 +1,4 @@
-# Local package qualification
+# Package qualification
 
 ## macOS arm64 disk image
 
@@ -40,4 +40,8 @@ The Windows association passes a selected bank through startup arguments. Forwar
 
 Tauri single-instance 2.5.5 matches the pinned Tauri series and supports a Windows-only dependency. Its Windows receiver decodes and allocates incoming arguments before the application callback can apply its queue limit. The receiver also assumes its native pointers are valid. A bounded receiver is required before adding this dependency for running-instance delivery. [Pinned plugin manifest](https://github.com/tauri-apps/plugins-workspace/blob/128190689dbe59b59d344e01bf07b00862aa3791/plugins/single-instance/Cargo.toml) · [Windows receiver](https://github.com/tauri-apps/plugins-workspace/blob/128190689dbe59b59d344e01bf07b00862aa3791/plugins/single-instance/src/platform_impl/windows.rs#L175-L207)
 
-Signed release artifacts, the Windows installer and Explorer flow, native Windows runtime, and final rights and license approval remain open.
+## Windows x64 NSIS
+
+The [Windows desktop CI job](../../.github/workflows/ci.yml) builds an unsigned debug installer with the current per-user NSIS hooks and runs the [silent installer checks](../../apps/starbank-desktop/verification/windows-nsis.ps1) on a fresh GitHub-hosted Windows runner. The checks cover Open With registration and the quoted executable and filename, preserve a synthetic default handler and bank through uninstall, and compare the installed executable's SHA-256 with the fresh build after applying the expected Tauri 2.12.6 bundle marker. A failed check logs the expected and observed registry values and hashes without uploading binaries. [Tauri 2.12.6 bundler](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.12.6/crates/tauri-bundler/src/bundle.rs#L35-L89)
+
+Local validation passed with actionlint, the PowerShell 7.5.4 parser, and PSScriptAnalyzer 1.24.0. Synthetic probes covered the marker change, path guards, and failure reporting and cleanup. Hosted Windows execution, Explorer open flows, signed release artifacts, and final rights and license approval remain open.
