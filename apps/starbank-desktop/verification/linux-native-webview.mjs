@@ -15,6 +15,8 @@ const pollInterval = 100;
 const failureItemLimit = 8;
 const failureTextLimit = 1_000;
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
+const controlKey = "\uE009";
+const backspaceKey = "\uE003";
 
 async function reservePort() {
   const socket = createServer();
@@ -243,7 +245,30 @@ async function verifyEditor(command, first, second) {
 
   const field = await control(gold, null);
   await command(`/element/${field}/click`, "POST", {});
-  await command(`/element/${field}/clear`, "POST", {});
+  await command("/actions", "POST", {
+    actions: [
+      {
+        type: "key",
+        id: "table-keyboard",
+        actions: [
+          { type: "keyDown", value: controlKey },
+          { type: "keyDown", value: "a" },
+          { type: "keyUp", value: "a" },
+          { type: "keyUp", value: controlKey },
+          { type: "keyDown", value: backspaceKey },
+          { type: "keyUp", value: backspaceKey },
+        ],
+      },
+    ],
+  });
+  await waitFor("the focused Table draft to be cleared", () =>
+    evaluate(
+      `const field = document.querySelector(arguments[0]);
+      return document.activeElement === field && field?.value === "" &&
+        field.hasAttribute("data-table-draft");`,
+      gold,
+    ),
+  );
   await command(`/element/${field}/value`, "POST", {
     text: "1,234",
   });
