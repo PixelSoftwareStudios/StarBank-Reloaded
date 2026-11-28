@@ -113,14 +113,17 @@ export async function chooseGtkManualCollectionDirectory(
     !/\p{Cc}/u.test(directory),
     "The fixture path must be typed without keyboard control characters.",
   );
-  const info = await lstat(directory);
+  const directoryPath = directory.replace(/\/+$/, "") || "/";
+  const info = await lstat(directoryPath);
   assert(
     info.isDirectory() && !info.isSymbolicLink(),
     "The fixture directory must be an existing non-symlink directory.",
   );
+  // GTK's inline completion presents a directory with a trailing separator.
+  const locationText = directoryPath === "/" ? "/" : `${directoryPath}/`;
   await submitGtkLocationPath(
     manualFolderTitle,
-    directory,
+    locationText,
     assertLocationText,
     "manual folder",
   );

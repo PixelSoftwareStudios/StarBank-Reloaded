@@ -1136,6 +1136,8 @@ async function run(
     async (command, { scratch, assertInputsUnchanged }) => {
       const collectionPath = join(scratch, collectionName);
       await mkdir(join(collectionPath, "Nested"), { recursive: true });
+      // Distinct child names keep GTK from completing the directory into its sole child.
+      await mkdir(join(collectionPath, "Empty sibling"));
       for (const [name, bytes] of collectionInputs)
         await writeFile(join(collectionPath, name), bytes, { flag: "wx" });
       const refreshBankPath = join(collectionPath, refreshBankName);
