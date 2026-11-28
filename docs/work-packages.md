@@ -163,6 +163,7 @@ Depends on: 11,12.
 - [x] Preserve rapid Settings width increments through pending native replies and restore the refreshed value on failure. The focused held-reply regression passed in three headless browser engines at `7ce7b6a`. [Slider evidence](verification/IMPLEMENTATION.md#settings-slider-input-during-pending-saves)
 - [x] Preserve rapid visibility-filter reversals across Quick Options and Settings, including older replies, independent pending filters and failure read-back. Focused regressions passed in three headless engines at `be1ed19`. [Filter evidence](verification/IMPLEMENTATION.md#map-visibility-filters-during-pending-saves)
 - [x] Preserve rapid presentation-checkbox reversals through older settings replies and restore confirmed values after failure. Three controls passed focused regressions in three headless engines at `0fa7fc4`. [Presentation evidence](verification/IMPLEMENTATION.md#presentation-checkbox-input-during-pending-saves)
+- [x] Verify installed Linux real Normal→Small→Large text-size controls and exact computed typography, with Large restored before Settings in a fresh process. Both installed Linux steps passed at `48b4b0f` in the 16px browser-default profile; the full matrix was pending. [Text-size restart](verification/IMPLEMENTATION.md#installed-linux-text-size-across-restart)
 - [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
