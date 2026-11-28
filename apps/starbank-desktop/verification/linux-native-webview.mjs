@@ -179,9 +179,12 @@ async function reportFailureState(origin, session) {
             .map((node) => node.textContent.slice(0, textLimit)),
           statuses: Array.from(document.querySelectorAll('[role="status"]')).slice(0, itemLimit)
             .map((node) => node.textContent.slice(0, textLimit)),
+          selectedTabs: Array.from(document.querySelectorAll('[role="tab"][aria-selected="true"]')).slice(0, itemLimit)
+            .map((node) => node.textContent.slice(0, textLimit)),
           fields: Array.from(document.querySelectorAll('table input[type="text"]')).slice(0, itemLimit)
             .map((node) => ({label: node.getAttribute("aria-label"), value: node.value.slice(0, textLimit),
-              readOnly: node.readOnly, invalid: node.getAttribute("aria-invalid")})),
+              readOnly: node.readOnly, visible: node.getClientRects().length > 0,
+              invalid: node.getAttribute("aria-invalid")})),
           queue: document.querySelector('aside[aria-label="File open requests"]')?.textContent.slice(0, textLimit),
           focused: document.activeElement?.getAttribute("aria-label"),
           documentFocused: document.hasFocus()

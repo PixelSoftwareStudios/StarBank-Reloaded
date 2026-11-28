@@ -149,12 +149,15 @@ export async function verifyRawEditing({
     async () => (await text()) === editedXml && (await hint()) === null,
   );
   await clickButton("Apply XML");
+  // Raw replacement gives the changed section a new ID. The engine counts the
+  // prior occurrence as removed and the new occurrence as added.
   await waitFor(
     "the accepted Raw revision",
     async () =>
+      (await content(selectedTab)) === "Raw View" &&
       (await text()) === editedXml &&
       (await content(draftActions)) === null &&
-      (await content(dirtyStatus)) === "Unsaved changes in 1 section",
+      (await content(dirtyStatus)) === "Unsaved changes in 2 sections",
   );
   await clickTab("Table View");
   await waitFor(
