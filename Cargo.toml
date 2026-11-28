@@ -22,11 +22,13 @@ members = [
     "crates/platform/starbank-instance",
 ]
 resolver = "3"
-exclude = ["crates/vendor/glib"]
+exclude = ["crates/vendor/glib", "crates/vendor/rfd"]
 
 [patch.crates-io]
 # Exact GLib 0.18.5 source with the upstream RUSTSEC-2024-0429 fix.
 glib = { path = "crates/vendor/glib" }
+# Exact RFD 0.17.2 source with the GTK native-chooser reference fix.
+rfd = { path = "crates/vendor/rfd" }
 
 [workspace.package]
 version = "0.1.0"

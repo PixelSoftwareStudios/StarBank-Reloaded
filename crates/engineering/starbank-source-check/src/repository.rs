@@ -10,6 +10,7 @@ const RUST_PATHSPEC: &str = "*.rs";
 const ARCHIVE_EXCLUSION: &str = ":(exclude,top)original/";
 // Publisher formatting is preserved and checked by the vendored byte-integrity gate.
 const GLIB_VENDOR_EXCLUSION: &str = ":(exclude,top)crates/vendor/glib/";
+const RFD_VENDOR_EXCLUSION: &str = ":(exclude,top)crates/vendor/rfd/";
 const GIT_SYMLINK_MODE: &[u8] = b"120000 ";
 
 pub(crate) fn run() -> ExitCode {
@@ -59,6 +60,7 @@ fn list_sources(options: &[&str]) -> io::Result<Vec<u8>> {
 		RUST_PATHSPEC,
 		ARCHIVE_EXCLUSION,
 		GLIB_VENDOR_EXCLUSION,
+		RFD_VENDOR_EXCLUSION,
 	]);
 	git(&args)
 }

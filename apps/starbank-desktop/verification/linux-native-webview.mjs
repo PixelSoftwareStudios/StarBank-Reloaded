@@ -17,7 +17,9 @@ import {
   cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
   cancelGtkDraftClose,
+  cancelGtkExportCopy,
   cancelGtkSaveAsOnClose,
+  cancelGtkSaveAsOnOpen,
   chooseGtkExportDestination,
   discardGtkDirtyClose,
   discardGtkDirtyOpen,
@@ -25,6 +27,8 @@ import {
   requestGtkWindowClose,
   saveGtkDirtyCloseAs,
   saveGtkDirtyOpenAs,
+  waitForGtkExportChooserReleased,
+  waitForGtkSaveAsChooserReleased,
 } from "./linux-gtk-dialog.mjs";
 
 const loopback = "127.0.0.1";
@@ -485,13 +489,26 @@ async function verifyEditor(
   await verifyCopy();
   await click('button[aria-label="More save options"]', null);
   await click('[role="menuitem"]', "Export copy…");
+  await cancelGtkExportCopy();
+  await waitFor(
+    "the usable dirty editor after Export chooser Cancel",
+    async () =>
+      (await dirtyBankAndQueueRetained()) &&
+      (await findControl("button", "Undo")),
+  );
+  await assertInputsUnchanged();
+  await waitForGtkExportChooserReleased();
+  await click('button[aria-label="More save options"]', null);
+  await click('[role="menuitem"]', "Export copy…");
   await exportCopy();
   await waitFor(
     "a verified export receipt with the dirty document retained",
     async () =>
       (await content(".editor-status"))?.includes("Exported Copy.sc2bank.") &&
-      (await dirtyBankAndQueueRetained()),
+      (await dirtyBankAndQueueRetained()) &&
+      (await findControl("button", "Undo")),
   );
+  await waitForGtkExportChooserReleased();
   await click(`${queue} button`, "Open");
   await cancelGtkDirtyOpen();
   await waitFor(
@@ -543,6 +560,20 @@ async function verifyEditor(
     (await content(xml))?.includes('int="2345"'),
   );
   await click(`${queue} button`, "Open");
+  await cancelGtkSaveAsOnOpen();
+  await waitFor(
+    "the usable dirty bank and queue after Save As chooser Cancel",
+    async () =>
+      (await content(".document-editor h1")) === second &&
+      (await content(".editor-dirty-status")) === dirtyStatus &&
+      (await content(xml))?.includes('int="2345"') &&
+      (await queuedName(third)) === third &&
+      (await findControl("button", "Undo")) &&
+      (await findControl(`${queue} button`, "Open")),
+  );
+  await assertInputsUnchanged();
+  await waitForGtkSaveAsChooserReleased();
+  await click(`${queue} button`, "Open");
   await saveCopy();
   await waitFor(
     "the third native document after Save As",
@@ -554,9 +585,14 @@ async function verifyEditor(
     async () =>
       (await tableValue()) === "008" &&
       (await content(".editor-dirty-status")) === null &&
-      (await content(queue)) === null,
+      (await content(queue)) === null &&
+      (await findControl(gold, null)),
   );
   assert.equal(await hasHistory(), false);
+  await waitForGtkSaveAsChooserReleased();
+  console.log(
+    "Linux native Export Copy and Save As chooser X windows released after Cancel and Accept.",
+  );
   await stageGold("3,456", { hasQueuedOpen: false });
   await applyGold();
   await clickTab("Raw View");
@@ -678,6 +714,7 @@ async function verifySaveAsOnClose(
   );
   await assertInputsUnchanged();
   await assert.rejects(readFile(destination), { code: "ENOENT" });
+  await waitForGtkSaveAsChooserReleased();
 
   await requestGtkWindowClose(closeSender, mainWindow);
   await saveGtkDirtyCloseAs(destination);
@@ -703,6 +740,7 @@ async function withNativeSession(application, scenario, inputs, verify) {
     const environment = {
       ...process.env,
       GTK_USE_PORTAL: "0",
+      G_DEBUG: "fatal-criticals",
       LC_ALL: "C.UTF-8",
     };
     for (const directory of ["CONFIG", "CACHE", "DATA"]) {

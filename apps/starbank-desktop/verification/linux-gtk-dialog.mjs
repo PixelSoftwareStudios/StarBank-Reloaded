@@ -94,6 +94,26 @@ async function waitForWindowGone(title, { visibleOnly = false } = {}) {
   throw new Error(`The ${title} window did not close.`);
 }
 
+async function cancelGtkDestination(title) {
+  await focusDialog(title);
+  await xdotool(["key", "--clearmodifiers", "alt+c"]);
+  // A native chooser hides before GTK finalizes its underlying X window.
+  await waitForWindowGone(title, { visibleOnly: true });
+}
+
+export function cancelGtkExportCopy() {
+  return cancelGtkDestination(exportTitle);
+}
+
+// These checks include hidden X windows and run after the editor has settled.
+export function waitForGtkExportChooserReleased() {
+  return waitForWindowGone(exportTitle);
+}
+
+export function waitForGtkSaveAsChooserReleased() {
+  return waitForWindowGone(saveAsTitle);
+}
+
 async function respondToGtkPrompt(title, ...keys) {
   await focusDialog(title);
   await xdotool(["key", "--clearmodifiers", ...keys]);
@@ -117,6 +137,11 @@ export async function saveGtkDirtyOpenAs(destination) {
   // The exact three-button dialog on Noble's GTK 3.24.41 initially focuses Save.
   await respondToGtkPrompt(dirtyOpenTitle, "space");
   await chooseGtkDestination(saveAsTitle, destination);
+}
+
+export async function cancelGtkSaveAsOnOpen() {
+  await respondToGtkPrompt(dirtyOpenTitle, "space");
+  await cancelGtkDestination(saveAsTitle);
 }
 
 /** Sends ICCCM WM_DELETE_WINDOW to this fixture's exact main X11 window. */
@@ -153,10 +178,7 @@ export async function discardGtkDraftClose() {
 
 export async function cancelGtkSaveAsOnClose() {
   await respondToGtkPrompt(dirtyCloseTitle, "space");
-  await focusDialog(saveAsTitle);
-  await xdotool(["key", "--clearmodifiers", "alt+c"]);
-  // GTK hides its native chooser before finalizing the underlying child window.
-  await waitForWindowGone(saveAsTitle, { visibleOnly: true });
+  await cancelGtkDestination(saveAsTitle);
 }
 
 export async function saveGtkDirtyCloseAs(destination) {
