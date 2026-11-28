@@ -59,6 +59,14 @@ Payload poisoning detects copying after release; real GLib allocates and frees
 the fixture buffers and links. The checks do not initialize GTK or measure heap
 usage. CI runs them on Linux x64 and arm64 separately from installed Xvfb tests.
 
+Cargo 1.100 places libraries in separate build-unit directories. The runner
+validates all reported `.rlib` paths and supplies their parent directories for
+transitive metadata lookup; the four direct `--extern` paths remain exact.
+It does not discover dependencies by globbing prior build outputs. A local
+Rust 1.100 probe against the root CLI build reproduced E0463 with only the
+direct `serde_json` directory, then compiled and passed its single test with
+all 93 Cargo-reported directories.
+
 The fixture is authored Rust with the root formatting configuration:
 
 ```sh

@@ -34,6 +34,19 @@ def run(arguments, *, env=None):
     return result.stdout
 
 
+def root_rlibs(artifacts):
+    libraries = {}
+    for artifact in artifacts:
+        for filename in artifact["filenames"]:
+            path = Path(filename)
+            if path.suffix != ".rlib":
+                continue
+            if not path.is_absolute() or not path.is_file():
+                raise RuntimeError(f"Expected an existing root library artifact: {path}")
+            libraries.setdefault(artifact["package_id"], set()).add(path.resolve())
+    return libraries
+
+
 def main():
     if sys.platform != "linux":
         raise RuntimeError("This verification requires Linux root-graph GTK artifacts")
@@ -63,30 +76,27 @@ def main():
     if "gtk3" not in features or "xdg-portal" in features:
         raise RuntimeError(f"Unexpected root RFD backend features: {features}")
     node = next(node for node in metadata["resolve"]["nodes"] if node["id"] == package["id"])
+    libraries = root_rlibs(artifacts)
     externs = {}
-    directories = set()
     for dependency in node["deps"]:
         if dependency["name"] not in REQUIRED:
             continue
         if not any(kind["kind"] is None for kind in dependency["dep_kinds"]):
             continue
-        candidates = {
-            Path(filename).resolve()
-            for artifact in artifacts if artifact["package_id"] == dependency["pkg"]
-            for filename in artifact["filenames"] if filename.endswith(".rlib")
-        }
+        candidates = libraries.get(dependency["pkg"])
         if not candidates:
             continue  # Locked target-specific dependency absent from this build.
         if len(candidates) != 1:
             raise RuntimeError(f"Ambiguous root artifact for {dependency['name']}: {candidates}")
-        artifact = candidates.pop()
-        externs[dependency["name"]] = artifact
-        directories.add(artifact.parent)
+        externs[dependency["name"]] = next(iter(candidates))
     if not REQUIRED <= externs.keys():
         raise RuntimeError(f"Missing root artifacts: {REQUIRED - externs.keys()}")
+    # Cargo 1.100 can place transitive libraries in separate unit directories.
+    directories = {path.parent for candidates in libraries.values() for path in candidates}
     print(f"Root RFD package={package['id']} features={features}", flush=True)
     for name, artifact in sorted(externs.items()):
         print(f"Root extern {name}={artifact}", flush=True)
+    print(f"Root dependency search directories: {len(directories)}", flush=True)
     env = os.environ.copy()
     for key in ("DISPLAY", "WAYLAND_DISPLAY", "LD_PRELOAD", "LD_AUDIT"):
         env.pop(key, None)

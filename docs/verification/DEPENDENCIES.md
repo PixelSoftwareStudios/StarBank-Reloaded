@@ -27,6 +27,8 @@ The REQ-ENG-02/PERF-01 follow-up releases the single returned filename after cop
 
 The integrity verifier now checks nine disjoint hunks across three files against all 61 published file hashes. Offline and authenticated-archive checks passed, as did all 18 verifier tests. The Linux ownership fixture calls the real patched functions through private test-only FFI bindings, checks copy-before-release and exactly-once cleanup, and uses dependency artifacts from the locked root desktop build. Its six getter cases and borrowed-child case run without a display or GTK initialization. Linux compilation and execution are pending hosted CI at this revision; source-integrity checks alone do not establish runtime cleanup. [Reproduction and test scope](../../crates/vendor/verification/rfd/README.md)
 
+The first hosted attempt at `747d1b2` failed both Linux ownership-test compilations with E0463 before executing any cases. The runner provided direct library paths but omitted transitive libraries' separate Cargo 1.100 build-unit directories. The correction validates every root-build `.rlib` and supplies their parent directories while preserving the four exact direct externs. A local display-free root-CLI probe reproduced the missing-metadata error and passed with the complete reported paths. The installed Xvfb checks were skipped after the failed gate; they are not counted as runtime evidence for that attempt. [Failed run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46097806657)
+
 ## Installed frontend license inventory
 
 On 2026-11-27, pnpm 12.23.0 reported the following installed dependency inventories on macOS arm64.
