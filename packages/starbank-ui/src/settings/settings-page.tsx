@@ -249,28 +249,28 @@ export function SettingsPage({
           onChange={(value) => onChange("sectionsLayout", value)}
         />
         {breadcrumbAvailable && (
-          <Toggle
+          <PresentationToggle
             checked={settings.showBreadcrumbs}
             onChange={(value) => onChange("showBreadcrumbs", value)}
           >
             Show path breadcrumbs
-          </Toggle>
+          </PresentationToggle>
         )}
-        <Toggle
+        <PresentationToggle
           checked={settings.wrapRaw}
           onChange={(value) => onChange("wrapRaw", value)}
         >
           Wrap Raw View lines
-        </Toggle>
+        </PresentationToggle>
       </Group>
 
       <Group title="Editing" disabled={readOnly}>
-        <Toggle
+        <PresentationToggle
           checked={settings.groupNumbers}
           onChange={(value) => onChange("groupNumbers", value)}
         >
           Group numbers with commas
-        </Toggle>
+        </PresentationToggle>
       </Group>
 
       <Group title="Saving" disabled={readOnly}>
@@ -370,6 +370,33 @@ function Toggle({
       />
       {children}
     </label>
+  );
+}
+
+function PresentationToggle({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (enabled: boolean) => void | Promise<void>;
+  children: ReactNode;
+}) {
+  const [pending, setPending] = useState<{ checked: boolean }>();
+
+  function change(enabled: boolean) {
+    const next = { checked: enabled };
+    setPending(next);
+    function settle() {
+      setPending((current) => (current === next ? undefined : current));
+    }
+    void Promise.resolve(onChange(enabled)).then(settle, settle);
+  }
+
+  return (
+    <Toggle checked={pending?.checked ?? checked} onChange={change}>
+      {children}
+    </Toggle>
   );
 }
 

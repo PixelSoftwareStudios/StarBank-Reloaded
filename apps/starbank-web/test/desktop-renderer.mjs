@@ -16,6 +16,10 @@ import {
   verifyDesktopProfileImport,
 } from "./desktop-profile-import.mjs";
 import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
+import {
+  presentationSettingKeys,
+  verifyPresentationSettings,
+} from "./presentation-settings.mjs";
 import { verifySidebarResize } from "./sidebar-resize.mjs";
 import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
@@ -221,6 +225,13 @@ function createBridge(
   let preferences = { ...settings };
   const heldWidthWrites = [];
   const heldFilterWrites = [];
+  const heldPresentationWrites = [];
+  const heldSettingsWrites = new Map([
+    ["mapPaneWidth", heldWidthWrites],
+    ["hideBlizzardMaps", heldFilterWrites],
+    ["hideMapsWithoutBanks", heldFilterWrites],
+    ...presentationSettingKeys.map((key) => [key, heldPresentationWrites]),
+  ]);
 
   function settingsSnapshot() {
     return {
@@ -374,15 +385,11 @@ function createBridge(
         return {};
       case "read_settings":
         return settingsSnapshot();
-      case "change_setting":
-        if (
-          args.change.key === "mapPaneWidth" ||
-          isMapFilter(args.change.key)
-        ) {
-          const { key, value } = args.change;
-          const writes =
-            key === "mapPaneWidth" ? heldWidthWrites : heldFilterWrites;
-          if (isMapFilter(key)) assert.equal(typeof value, "boolean");
+      case "change_setting": {
+        const { key, value } = args.change;
+        const writes = heldSettingsWrites.get(key);
+        if (writes) {
+          if (key !== "mapPaneWidth") assert.equal(typeof value, "boolean");
           const finish = (error) => {
             if (error) return { error };
             preferences = { ...preferences, [key]: value };
@@ -397,6 +404,7 @@ function createBridge(
           mapIndexWorkers: args.change.value,
         };
         return settingsSnapshot();
+      }
       case "read_backup_preferences":
         return { value: { location: { mode: "default" }, keepNewest: null } };
       case "list_open_requests":
@@ -619,6 +627,16 @@ function createBridge(
       heldFilterWrites.push(promise);
       return resolve;
     },
+    holdNextPresentationWrite() {
+      const { promise, resolve } = Promise.withResolvers();
+      heldPresentationWrites.push(promise);
+      return resolve;
+    },
+    setStoredPresentationSetting(key, value) {
+      assert(presentationSettingKeys.includes(key));
+      assert.equal(typeof value, "boolean");
+      preferences = { ...preferences, [key]: value };
+    },
     setStoredFilter(key, value) {
       assert(isMapFilter(key) && typeof value === "boolean");
       preferences = { ...preferences, [key]: value };
@@ -661,7 +679,7 @@ function isMapFilter(key) {
 
 async function bindRenderer(page, bridge) {
   await page.exposeFunction("invokeDesktopFixture", bridge.invoke);
-  await page.addInitScript(() => {
+  await page.addInitScript((presentationKeys) => {
     let callbackId = 0;
     const callbacks = new Map();
     window.fixtureNavigationReplies = 0;
@@ -669,6 +687,8 @@ async function bindRenderer(page, bridge) {
     window.fixtureWidthReplies = 0;
     window.fixtureFilterRequests = 0;
     window.fixtureFilterReplies = 0;
+    window.fixturePresentationRequests = 0;
+    window.fixturePresentationReplies = 0;
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
     window.__TAURI_INTERNALS__ = {
       transformCallback(callback) {
@@ -700,14 +720,19 @@ async function bindRenderer(page, bridge) {
           command === "change_setting" &&
           (args.change.key === "hideBlizzardMaps" ||
             args.change.key === "hideMapsWithoutBanks");
+        const changingPresentation =
+          command === "change_setting" &&
+          presentationKeys.includes(args.change.key);
         if (changingWidth) window.fixtureWidthRequests += 1;
         if (changingFilter) window.fixtureFilterRequests += 1;
+        if (changingPresentation) window.fixturePresentationRequests += 1;
         const reply = await window.invokeDesktopFixture(
           command,
           binary ? Array.from(args) : args,
         );
         if (changingWidth) window.fixtureWidthReplies += 1;
         if (changingFilter) window.fixtureFilterReplies += 1;
+        if (changingPresentation) window.fixturePresentationReplies += 1;
         if (command === "confirm_bank_navigation")
           window.fixtureNavigationReplies += 1;
         if (command === "can_create_bank_copy")
@@ -720,7 +745,7 @@ async function bindRenderer(page, bridge) {
         return binary ? Uint8Array.from(reply.value).buffer : reply.value;
       },
     };
-  });
+  }, presentationSettingKeys);
 }
 
 function button(page, name) {
@@ -1916,6 +1941,16 @@ async function verifyRenderer(
       );
       return;
     }
+    if (openRecovery === "presentation_settings") {
+      await verifyPresentationSettings(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer preserved rapid presentation setting reversals through delayed settings writes.`,
+      );
+      return;
+    }
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
       const currentName = "Replacement-2.SC2Bank";
@@ -1978,6 +2013,7 @@ try {
   await verifyRenderer(browser, true, "structure_close");
   await verifyRenderer(browser, false, "sidebar_resize");
   await verifyRenderer(browser, false, "visibility_filters");
+  await verifyRenderer(browser, false, "presentation_settings");
   await verifyRenderer(browser, false, "legacy_profile");
   await verifyRenderer(browser, false, "clipboard_absent");
   await verifyRenderer(browser, false, "clipboard_denied");
