@@ -69,6 +69,14 @@ jobs:
       - run: cargo check --workspace --exclude starbank-desktop --all-targets --locked
       - run: cargo clippy --workspace --exclude starbank-desktop --all-targets --locked -- -D warnings
       - run: cargo nextest run --workspace --exclude starbank-desktop --locked --no-tests fail
+      - name: Stress the APFS crash-worker checkpoint lifetime
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: >-
+          cargo nextest run --locked -p starbank-fs --lib
+          -E 'test(=native::commit::tests::process_death_at_apfs_commit_boundaries_retains_bytes_and_releases_lease)'
+          --stress-count 100 --test-threads 1 --no-tests fail
+          --status-level fail --final-status-level fail
       - name: Exercise Linux staging space exhaustion
         if: runner.os == 'Linux'
         shell: bash
