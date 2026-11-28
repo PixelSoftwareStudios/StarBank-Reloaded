@@ -154,6 +154,7 @@ Depends on: 11,12.
 - [x] Persist native preferences and authorized roots. Share account selection, appearance, automatic backup policy and platform capability information in Settings. Add explicit map-index rebuild. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Configure a managed backup folder and persist a retention count with a read-only review of older backups. Keep access to earlier managed folders. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Verify the installed Linux auto re-sign preference survives a fresh process restart and controls exact unsigned Save As output. [Restart evidence](verification/IMPLEMENTATION.md#installed-linux-preference-restart)
+- [x] Verify installed Linux Use auto-detect clears the recovered manual override and a fresh process retains the exact rootless manual-required state with unchanged fixture bytes. All eleven jobs passed at `6138424`. [Override-clear evidence](verification/IMPLEMENTATION.md#installed-linux-manual-override-clearing-across-restart)
 - [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
