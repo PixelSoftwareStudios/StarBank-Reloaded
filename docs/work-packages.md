@@ -19,7 +19,8 @@ Depends on: 01.
 - [x] Pass the hosted source, wasm32 and frontend checks and the Linux and macOS jobs at `4143952`. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-4143952)
 - [x] Run the pinned local Rust and frontend advisory checks and collect installed frontend dependency license inventories. [Dependency checks](verification/DEPENDENCIES.md)
 - [x] Pass all 11 hosted CI jobs at `e4385da`, including the Linux arm64 desktop leg, both advisory checks and the previously failing Windows probes. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-e4385da)
-- [ ] Fix the pinned RFD GTK native-chooser reference leak and qualify repeated async picker teardown. [Dependency ownership review](verification/DEPENDENCIES.md#gtk-native-chooser-reference-under-review)
+- [x] Fix the pinned RFD GTK native-chooser reference leak and qualify repeated async picker teardown. [Checked backport](verification/DEPENDENCIES.md#gtk-native-chooser-reference-backport)
+- [ ] Release the separate GTK filename/list allocations while preserving existing UTF-8 path behavior; qualify the remaining owned-resource paths.
 - [ ] Complete production dependency and capability qualification for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01. Verify later revisions in their own hosted runs.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
