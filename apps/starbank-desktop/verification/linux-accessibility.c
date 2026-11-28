@@ -16,6 +16,7 @@ enum {
 	MAX_TREE_DEPTH = 24,
 	MAX_CONTROL_NAME_BYTES = 64,
 	MAX_EXPECTED_TEXT_BYTES = 512,
+	MAX_DIAGNOSTIC_TEXT_BYTES = 160,
 	PROBE_BUDGET_MS = 2500,
 	PROBE_WATCHDOG_SECONDS = 3,
 	RPC_TIMEOUT_MS = 400,
@@ -68,6 +69,7 @@ struct scan {
 	ENTRY(GET_STATES, "Accessible.GetState") \
 	ENTRY(GET_INTERFACES, "Accessible.GetInterfaces") \
 	ENTRY(GET_CHARACTER_COUNT, "Text.CharacterCount") \
+	ENTRY(GET_DIAGNOSTIC_TEXT, "Text.GetText after a CharacterCount mismatch") \
 	ENTRY(GET_TEXT, "Text.GetText") \
 	ENTRY(WAIT_FOR_REGISTRATION, "wait for registration or focus") \
 	ENTRY(DISCONNECT_AFTER_MATCH, "GDBus cleanup after a confirmed match") \
@@ -307,6 +309,36 @@ static bool exposes_text(struct scan *scan, struct object_reference object)
 	return found;
 }
 
+static void report_count_mismatch(struct scan *scan, struct object_reference object,
+	gint32 count, glong expected)
+{
+	fprintf(stderr, "AT-SPI CharacterCount mismatch (reported %" G_GINT32_FORMAT ", expected %ld).\n",
+		count, expected);
+	if (count < 0 || count > MAX_EXPECTED_TEXT_BYTES)
+		return;
+
+	// A failed diagnostic must not replace the original CharacterCount failure.
+	struct scan diagnostic = { .deadline = scan->deadline };
+	GVariant *reply = query(&diagnostic, scan->bus, object, GET_DIAGNOSTIC_TEXT, TEXT_INTERFACE,
+		"GetText", g_variant_new("(ii)", 0, count), G_VARIANT_TYPE("(s)"));
+	if (reply) {
+		const char *actual;
+		g_variant_get(reply, "(&s)", &actual);
+		const bool truncated = strnlen(actual, MAX_DIAGNOSTIC_TEXT_BYTES + 1) > MAX_DIAGNOSTIC_TEXT_BYTES;
+		char *bounded = g_strndup(actual, MAX_DIAGNOSTIC_TEXT_BYTES);
+		// GLib escapes each byte to at most four ASCII characters.
+		char *escaped = g_strescape(bounded, NULL);
+		fprintf(stderr, "AT-SPI mismatch text: \"%s\"%s\n", escaped, truncated ? " (truncated)" : "");
+		g_free(escaped);
+		g_free(bounded);
+		g_variant_unref(reply);
+	} else {
+		fputs("The bounded AT-SPI mismatch text read failed.\n", stderr);
+	}
+	g_clear_error(&diagnostic.rpc_error);
+	enter_operation(GET_CHARACTER_COUNT);
+}
+
 static bool verify_text(struct scan *scan, struct object_reference object, const char *expected)
 {
 	if (!exposes_text(scan, object))
@@ -317,8 +349,10 @@ static bool verify_text(struct scan *scan, struct object_reference object, const
 		return false;
 	const gint32 count = g_variant_get_int32(property_value);
 	g_variant_unref(property_value);
-	if (count != g_utf8_strlen(expected, -1)) {
+	const glong expected_count = g_utf8_strlen(expected, -1);
+	if (count != expected_count) {
 		scan->failure = "The AT-SPI text character count did not match the fixture.";
+		report_count_mismatch(scan, object, count, expected_count);
 		return false;
 	}
 	GVariant *reply = query(scan, scan->bus, object, GET_TEXT, TEXT_INTERFACE, "GetText",
