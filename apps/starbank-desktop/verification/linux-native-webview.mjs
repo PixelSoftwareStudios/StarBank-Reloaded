@@ -5,7 +5,11 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { chooseGtkExportDestination } from "./linux-gtk-save.mjs";
+import {
+  cancelGtkDirtyOpen,
+  chooseGtkExportDestination,
+  discardGtkDirtyOpen,
+} from "./linux-gtk-dialog.mjs";
 
 const loopback = "127.0.0.1";
 const commandTimeout = 5_000;
@@ -220,6 +224,12 @@ async function verifyEditor(command, first, second, exportCopy) {
   const clickButton = (name) => click("button", name);
   const clickTab = (name) => click('button[role="tab"]', name);
   const queuedName = (name) => content(`${queue} p[title="${name}"]`);
+  const dirtyBankAndQueueRetained = async () =>
+    (await content(".document-editor h1")) === first &&
+    (await content(".editor-dirty-status")) ===
+      "Unsaved changes in 1 section" &&
+    (await content(xml))?.includes('int="1234"') &&
+    (await queuedName(second)) === second;
 
   await waitFor(
     "the packaged welcome screen",
@@ -310,11 +320,15 @@ async function verifyEditor(command, first, second, exportCopy) {
     "a verified export receipt with the dirty document retained",
     async () =>
       (await content(".editor-status"))?.includes("Exported Copy.sc2bank.") &&
-      (await content(".document-editor h1")) === first &&
-      (await content(".editor-dirty-status")) ===
-        "Unsaved changes in 1 section" &&
-      (await content(xml))?.includes('int="1234"') &&
-      (await queuedName(second)) === second,
+      (await dirtyBankAndQueueRetained()),
+  );
+  await click(`${queue} button`, "Open");
+  await cancelGtkDirtyOpen();
+  await waitFor(
+    "the dirty document and enabled queued Open after native Cancel",
+    async () =>
+      (await dirtyBankAndQueueRetained()) &&
+      (await findControl(`${queue} button`, "Open")),
   );
   await clickButton("Undo");
   await waitFor(
@@ -323,16 +337,24 @@ async function verifyEditor(command, first, second, exportCopy) {
       (await content(xml))?.includes('int="001"') &&
       (await content(".editor-dirty-status")) === null,
   );
-  await click(`${queue} button`, "Open");
+  await clickButton("Redo");
   await waitFor(
-    "the second native document",
+    "the dirty revision restored by Redo",
+    dirtyBankAndQueueRetained,
+  );
+  await click(`${queue} button`, "Open");
+  await discardGtkDirtyOpen();
+  await waitFor(
+    "the second native document after Discard",
     async () => (await content(".document-editor h1")) === second,
   );
   await clickTab("Table View");
   await waitFor(
-    "the second native Table projection and empty queue",
+    "the second clean native Table projection and empty queue",
     async () =>
-      (await tableValue()) === "007" && (await content(queue)) === null,
+      (await tableValue()) === "007" &&
+      (await content(".editor-dirty-status")) === null &&
+      (await content(queue)) === null,
   );
 }
 
@@ -388,17 +410,18 @@ async function run(application) {
     console.log(
       `Linux native WebView: ${capabilities.browserName} ${capabilities.browserVersion}`,
     );
+    const destination = join(scratch, "Copy.sc2bank");
+    const expectedExport = bank("1234");
     await verifyEditor(
       (path, method, body) =>
         request(driver.origin, session + path, method, body),
       first,
       second,
       async () => {
-        const destination = join(scratch, "Copy.sc2bank");
         await chooseGtkExportDestination(destination);
         await waitFor("the exported bank file", async () => {
           try {
-            return (await readFile(destination)).equals(bank("1234"));
+            return (await readFile(destination)).equals(expectedExport);
           } catch (error) {
             if (error.code === "ENOENT") return false;
             throw error;
@@ -410,6 +433,7 @@ async function run(application) {
     );
     for (const [name, bytes] of inputs)
       assert.deepEqual(await readFile(join(scratch, name)), bytes);
+    assert.deepEqual(await readFile(destination), expectedExport);
   } catch (error) {
     verificationError = error;
     if (driver && session) await reportFailureState(driver.origin, session);
@@ -436,7 +460,7 @@ async function run(application) {
   }
   if (verificationError) throw verificationError;
   console.log(
-    "Linux native open, Table draft guard, Raw adoption, GTK export copy, undo, and queued reopen passed.",
+    "Linux native open, Table draft guard, Raw adoption, GTK export copy, and dirty Open Cancel, Undo, Redo, and Discard passed.",
   );
 }
 
