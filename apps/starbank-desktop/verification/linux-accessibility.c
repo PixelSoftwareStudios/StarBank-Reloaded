@@ -457,6 +457,10 @@ static bool verify_focused_entry(struct scan *scan, bool multiline, const char *
 		scan->failure = "The focused entry did not have the expected AT-SPI states.";
 		return false;
 	}
+	// GTK can focus the entry before its revealer maps it. Keep polling within the same deadline.
+	if (scan->mode == GTK_OPEN_LOCATION &&
+		(!has_state(bits, ATSPI_STATE_VISIBLE) || !has_state(bits, ATSPI_STATE_SHOWING)))
+		return false;
 	return verify_text(scan, object, expected);
 }
 
@@ -495,7 +499,7 @@ static bool find_control(struct scan *scan, bool multiline, const char *expected
 				matched = report_gtk_location_name(scan);
 			pending = !scan->window_found ? "The Open Bank AT-SPI file chooser was not exposed." :
 				!scan->entry ? "The Open Bank AT-SPI location entry was not exposed." :
-				"The Open Bank AT-SPI location entry was not focused.";
+				"The Open Bank AT-SPI location entry was not focused, visible and showing.";
 		} else {
 			pending = !scan->window_found ? "The fixture AT-SPI frame was not exposed." :
 				!scan->document_found ? "The fixture WebView document was not exposed." :

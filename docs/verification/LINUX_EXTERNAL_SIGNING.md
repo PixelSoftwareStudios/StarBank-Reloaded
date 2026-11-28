@@ -63,3 +63,9 @@ In run 46121814070, the named GTK predicate test executed and passed on both arc
 The separate fifth-session source choosers hit the fatal GTK critical at the first slash after focus on both architectures, before any native Location match. No path, signing form or signed output was qualified in those attempts; owned package purge passed. The earlier successful slash observations at `a51a535` do not establish a stable chooser workflow.
 
 A successful direct-path selection must not be recorded as file-list filter coverage. Portal dialogs, other GTK versions and in-game acceptance remain outside this qualification.
+
+## Mapped-entry diagnostic follow-up
+
+The next driver separates Slash keydown from keyup. Between them, the native probe requires the exact `/` in an entry that is focused, visible and showing. It retains the existing editability, line-mode, exact-text and deadline checks. Keyup is attempted even if submission or observation fails; both errors are retained if release also fails. A second exact observation and X focus check precede path typing. Other chooser drivers and fatal-critical handling are unchanged.
+
+This adds a mapping precondition and stage evidence without a fixed delay. The earlier `e739ed0` pass used a combined key press/release and did not require the new visibility states. Results from that pass do not qualify the stronger observer or the timing of the split-key diagnostic. Hosted execution of this follow-up is pending; no product GTK fix or resolution of ordinary keyboard timing is claimed.

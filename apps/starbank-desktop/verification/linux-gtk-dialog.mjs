@@ -105,8 +105,34 @@ export async function chooseGtkExternalSigningSource(
   );
   // GTK's Open chooser handles a leading slash as Location popup input. The
   // handler seeds the entry with the slash and positions the caret after it.
-  await xdotool(["key", "--clearmodifiers", "slash"]);
-  console.log("Linux native external source: Slash sent. Checking Location.");
+  const shortcutErrors = [];
+  try {
+    await xdotool(["keydown", "--clearmodifiers", "slash"]);
+    console.log(
+      "Linux native external source: Slash pressed. Checking mapped Location.",
+    );
+    await assertLocationText("/");
+    await requireFocus(window);
+    console.log(
+      "Linux native external source: mapped Location confirmed before Slash release.",
+    );
+  } catch (error) {
+    shortcutErrors.push(error);
+  } finally {
+    try {
+      console.log("Linux native external source: Releasing Slash.");
+      await xdotool(["keyup", "slash"]);
+      console.log("Linux native external source: Slash released.");
+    } catch (error) {
+      shortcutErrors.push(error);
+    }
+  }
+  if (shortcutErrors.length === 1) throw shortcutErrors[0];
+  if (shortcutErrors.length > 1)
+    throw new AggregateError(
+      shortcutErrors,
+      "GTK Slash press or observation failed, and key release also failed.",
+    );
   await assertLocationText("/");
   await requireFocus(window);
   console.log(
