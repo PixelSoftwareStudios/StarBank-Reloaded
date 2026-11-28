@@ -92,6 +92,7 @@ Depends on: 02.
 - [x] Implement prioritized candidates, Linux manual mode, scoped inventory and signing hints. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Verify installed Linux folder Cancel, nested loose-collection import and explicit Refresh, retaining the dirty editor and exact source bytes. All eleven jobs passed at `f67a74d`. [Manual collection evidence](verification/IMPLEMENTATION.md#installed-linux-manual-collection)
 - [x] Verify installed Linux manual-collection persistence across a fresh process restart with shared config only: three restored banks, no automatic open, and a known bank opened clean with unchanged source bytes. All eleven jobs passed at `f2c42dd`. [Restart evidence](verification/IMPLEMENTATION.md#installed-linux-manual-collection-restart)
+- [x] Verify installed Linux missing manual-root recovery after a synthetic directory rename: retain the explicit failure without automatic fallback, select the relocated three-bank collection through GTK, and preserve all bytes without opening a bank. All eleven jobs passed at `cdd0e26`. [Recovery evidence](verification/IMPLEMENTATION.md#installed-linux-missing-manual-collection-recovery)
 - [ ] Verify real platform paths, player display names and UI integration for REQ-PATH-01, REQ-PATH-02 and REQ-MAP-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
