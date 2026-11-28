@@ -354,12 +354,14 @@ jobs:
           cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
             apps/starbank-desktop/verification/linux-clipboard-read.c \
             -o "$RUNNER_TEMP/starbank-clipboard-read" -lX11
-          accessibility_flags_text=$(pkg-config --cflags --libs atspi-2 gobject-2.0)
-          read -r -a accessibility_flags <<< "$accessibility_flags_text"
+          accessibility_cflags_text=$(pkg-config --cflags atspi-2 gio-2.0)
+          accessibility_libraries_text=$(pkg-config --libs gio-2.0)
+          read -r -a accessibility_cflags <<< "$accessibility_cflags_text"
+          read -r -a accessibility_libraries <<< "$accessibility_libraries_text"
           cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
             apps/starbank-desktop/verification/linux-accessibility.c \
             -o "$RUNNER_TEMP/starbank-accessibility" \
-            "${accessibility_flags[@]}"
+            "${accessibility_cflags[@]}" "${accessibility_libraries[@]}"
           xvfb-run -a --server-args='-screen 0 1280x900x24' \
             dbus-run-session -- env -u NO_AT_BRIDGE -u AT_SPI_BUS_ADDRESS \
             -u WEBKIT_A11Y_BUS_ADDRESS -u WAYLAND_DISPLAY bash -euc '
