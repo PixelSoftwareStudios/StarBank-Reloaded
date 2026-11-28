@@ -87,4 +87,67 @@ export async function verifySidebarResize(page, bridge) {
   await waitForWidth(39);
   await checkWidth(39);
   assert.equal(bridge.callsFor("read_settings").length, reads + 1);
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const range = settings.getByRole("slider", { name: "Map list width" });
+  await range.waitFor();
+  async function checkRange(width) {
+    assert.equal(await range.inputValue(), String(width));
+    assert.equal(await range.getAttribute("aria-valuetext"), `${width}%`);
+  }
+  await checkRange(39);
+  const releaseFirstRange = bridge.holdNextWidthWrite();
+  const releaseSecondRange = bridge.holdNextWidthWrite();
+  try {
+    await range.press("ArrowRight");
+    await waitForRequests(6);
+    await checkRange(39.1);
+    await range.press("ArrowRight");
+    assert.equal(await page.evaluate(() => window.fixtureWidthReplies), 5);
+    await checkRange(39.2);
+    await checkWidth(39);
+
+    releaseFirstRange();
+    await waitForRequests(7);
+    await waitForWidth(39.1);
+    await checkRange(39.2);
+    assert.equal(await page.evaluate(() => window.fixtureWidthReplies), 6);
+  } finally {
+    releaseFirstRange();
+    releaseSecondRange();
+  }
+  await waitForReplies(7);
+  await waitForWidth(39.2);
+  await checkRange(39.2);
+  const rangeWrites = bridge
+    .callsFor("change_setting")
+    .filter(({ change }) => change.key === "mapPaneWidth")
+    .slice(-2)
+    .map(({ change }) => change.value);
+  assert.deepEqual(rangeWrites, [39.1, 39.2]);
+
+  const rejectRange = bridge.holdNextWidthWrite();
+  const readsBeforeRangeFailure = bridge.callsFor("read_settings").length;
+  try {
+    await range.press("ArrowRight");
+    await waitForRequests(8);
+    await checkRange(39.3);
+    await checkWidth(39.2);
+    bridge.setStoredWidth(38.6);
+  } finally {
+    rejectRange("settings_changed");
+  }
+  await settings
+    .getByRole("alert")
+    .filter({
+      hasText: "The saved settings changed. Review them and try again.",
+    })
+    .waitFor();
+  await waitForWidth(38.6);
+  await range.and(page.locator('[aria-valuetext="38.6%"]')).waitFor();
+  await checkRange(38.6);
+  assert.equal(
+    bridge.callsFor("read_settings").length,
+    readsBeforeRangeFailure + 1,
+  );
 }

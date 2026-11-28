@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   AccountScopePicker,
   type AccountScopeSelection,
@@ -115,9 +115,20 @@ export function SettingsPage({
   backupSettings,
 }: SettingsPageProps) {
   const back = useRef<HTMLButtonElement>(null);
+  const [pendingWidth, setPendingWidth] = useState<{ width: number }>();
+  const mapPaneWidth = pendingWidth?.width ?? settings.mapPaneWidth;
   useEffect(() => {
     if (focusOnMount) back.current?.focus();
   }, [focusOnMount]);
+
+  function changeMapPaneWidth(width: number) {
+    const pending = { width };
+    setPendingWidth(pending);
+    function settle() {
+      setPendingWidth((current) => (current === pending ? undefined : current));
+    }
+    void Promise.resolve(onChange("mapPaneWidth", width)).then(settle, settle);
+  }
 
   return (
     <section
@@ -217,10 +228,10 @@ export function SettingsPage({
             min={MAP_PANE_WIDTH.min}
             max={MAP_PANE_WIDTH.max}
             step={0.1}
-            value={settings.mapPaneWidth}
-            aria-valuetext={`${settings.mapPaneWidth}%`}
+            value={mapPaneWidth}
+            aria-valuetext={`${mapPaneWidth}%`}
             onChange={(event) =>
-              onChange("mapPaneWidth", event.currentTarget.valueAsNumber)
+              changeMapPaneWidth(event.currentTarget.valueAsNumber)
             }
           />
         </label>
