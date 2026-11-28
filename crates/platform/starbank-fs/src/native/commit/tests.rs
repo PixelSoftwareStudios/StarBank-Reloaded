@@ -358,6 +358,8 @@ impl PausedWorker {
 	}
 
 	fn kill(&mut self) -> io::Result<()> {
+		// Child::wait closes stdin; keep the checkpoint pause until the child is reaped.
+		let _pause = self.0.stdin.take();
 		self.0.kill()?;
 		let status = self.0.wait()?;
 		assert_eq!(
@@ -371,6 +373,7 @@ impl PausedWorker {
 
 impl Drop for PausedWorker {
 	fn drop(&mut self) {
+		let _pause = self.0.stdin.take();
 		if !matches!(self.0.try_wait(), Ok(Some(_))) {
 			let _ = self.0.kill();
 			let _ = self.0.wait();
