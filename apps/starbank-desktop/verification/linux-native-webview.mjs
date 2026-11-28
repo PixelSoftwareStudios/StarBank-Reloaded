@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { verifyAppearancePreferences } from "./linux-appearance.mjs";
 import { verifyClipboardXml } from "./linux-clipboard.mjs";
 import { verifyExternalSigning } from "./linux-external-signing.mjs";
 import {
@@ -1274,6 +1275,38 @@ async function run(
     "automatic inventory mode after restart",
     [],
     async (command) => {
+      await verifyAutomaticInventoryMode({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+        selectAutomatic: false,
+      });
+      await verifyAppearancePreferences({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        selectAppearance: true,
+        assertUnchanged: assertRecoveredCollectionUnchanged,
+      });
+      await requestGtkWindowClose(closeSender);
+      await waitForWindowGone("StarBank Reloaded");
+      await assertRecoveredCollectionUnchanged();
+    },
+    { configHome },
+  );
+  await withNativeSession(
+    application,
+    "appearance preferences after restart",
+    [],
+    async (command) => {
+      await verifyAppearancePreferences({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        selectAppearance: false,
+        assertUnchanged: assertRecoveredCollectionUnchanged,
+      });
       await verifyAutomaticInventoryMode({
         command,
         waitFor,
