@@ -132,7 +132,9 @@ Depends on: 05,06,07,10,11.
 - [x] Verify installed Linux Raw keyboard editing, native rejection, repair, Apply and Undo while preserving queued files and source bytes. [Raw evidence](verification/IMPLEMENTATION.md#installed-linux-raw-editing)
 - [x] Verify installed Linux unapplied-draft close protection, cancelled/verified Save As on close and independent exact X11 clipboard readback under Xvfb. [Native evidence](verification/IMPLEMENTATION.md#native-unsaved-dialog-response-compatibility)
 - [x] Verify installed Linux Table/Raw native accessibility roles, names, focus, editability, line modes and exact text on x64 and arm64. [Native accessibility](verification/DEPENDENCIES.md#linux-accessibility-test-tools)
-- [x] Verify installed Linux Save menu order, keyboard navigation, Escape focus return and outside dismissal, plus exact X11 clipboard text from an edited UTF-16LE bank with BOM, CRLF and Unicode. [Clipboard and menu evidence](verification/IMPLEMENTATION.md#linux-clipboard-text-preservation)
+- [x] Verify installed Linux Save menu order, keyboard navigation, Escape focus return and outside dismissal. [Native menu evidence](verification/IMPLEMENTATION.md#linux-clipboard-text-preservation)
+- [x] Verify installed Linux Tools menu order, disabled-item skipping, Escape trigger focus and outside dismissal retaining Table tab focus, without activating actions. [Native Tools evidence](verification/IMPLEMENTATION.md#linux-clipboard-text-preservation)
+- [x] Verify exact X11 `UTF8_STRING` and `text/plain;charset=utf-8` clipboard text from an edited UTF-16LE bank with BOM, CRLF and Unicode. [Clipboard evidence](verification/IMPLEMENTATION.md#linux-clipboard-text-preservation)
 - [ ] Complete the installed native platform and assistive technology matrix. Keep writes scoped to qualified storage.
 - [ ] Complete installed native and assistive-technology acceptance for REQ-UI-05, REQ-UI-06, REQ-UI-07 and REQ-UI-08.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
