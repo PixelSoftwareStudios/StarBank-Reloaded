@@ -10,6 +10,12 @@ const badWindowStderr =
   "  Resource id in failed request:  0x200003\n" +
   "  Serial number of failed request:  21\n" +
   "  Current serial number in output stream:  21\n";
+const badTreeStderr =
+  "X Error of failed request:  BadWindow (invalid Window parameter)\n" +
+  "  Major opcode of failed request:  15 (X_QueryTree)\n" +
+  "  Resource id in failed request:  0x200001\n" +
+  "  Serial number of failed request:  24\n" +
+  "  Current serial number in output stream:  24\n";
 
 function searchExit(stderr = "", overrides = {}) {
   return Object.assign(new Error("xdotool exited"), {
@@ -43,19 +49,24 @@ function virtualTime(search) {
   };
 }
 
-test("a title-search BadWindow needs a later clean no-match result", async () => {
-  let attempts = 0;
-  const outcomes = [searchExit(badWindowStderr), "2097155", searchExit()];
-  const clock = virtualTime((searchArgs) => {
-    assert.deepEqual(searchArgs, args);
-    const outcome = outcomes[attempts++];
-    if (outcome instanceof Error) throw outcome;
-    return outcome;
+for (const [query, stderr] of [
+  ["title", badWindowStderr],
+  ["tree", badTreeStderr],
+]) {
+  test(`a ${query}-search BadWindow needs a later clean no-match result`, async () => {
+    let attempts = 0;
+    const outcomes = [searchExit(stderr), "2097155", searchExit()];
+    const clock = virtualTime((searchArgs) => {
+      assert.deepEqual(searchArgs, args);
+      const outcome = outcomes[attempts++];
+      if (outcome instanceof Error) throw outcome;
+      return outcome;
+    });
+    await waitForWindowGone(title, clock.options);
+    assert.equal(attempts, 3);
+    assert.deepEqual(clock.paused, [100, 100]);
   });
-  await waitForWindowGone(title, clock.options);
-  assert.equal(attempts, 3);
-  assert.deepEqual(clock.paused, [100, 100]);
-});
+}
 
 test("a clean no-match result is immediate and preserves visible exact-title search", async () => {
   let attempts = 0;
@@ -77,19 +88,21 @@ test("a clean no-match result is immediate and preserves visible exact-title sea
 });
 
 test("repeated BadWindow results stop within the original deadline", async () => {
-  const timeouts = [];
-  const clock = virtualTime((searchArgs, timeout, advance) => {
-    assert.deepEqual(searchArgs, args);
-    timeouts.push(timeout);
-    advance(timeout + (timeouts.length === 1 ? 0.5 : 0));
-    throw searchExit(badWindowStderr);
-  });
-  await assert.rejects(waitForWindowGone(title, clock.options), {
-    message: `The ${title} window did not close.`,
-  });
-  assert.deepEqual(timeouts, [3_000, 3_000, 3_000, 699]);
-  assert.deepEqual(clock.paused, [100, 100, 100]);
-  assert.equal(clock.options.now(), 9_999.5);
+  for (const stderr of [badWindowStderr, badTreeStderr]) {
+    const timeouts = [];
+    const clock = virtualTime((searchArgs, timeout, advance) => {
+      assert.deepEqual(searchArgs, args);
+      timeouts.push(timeout);
+      advance(timeout + (timeouts.length === 1 ? 0.5 : 0));
+      throw searchExit(stderr);
+    });
+    await assert.rejects(waitForWindowGone(title, clock.options), {
+      message: `The ${title} window did not close.`,
+    });
+    assert.deepEqual(timeouts, [3_000, 3_000, 3_000, 699]);
+    assert.deepEqual(clock.paused, [100, 100, 100]);
+    assert.equal(clock.options.now(), 9_999.5);
+  }
 });
 
 test("a clean no-match at or after the deadline does not confirm closure", async () => {
@@ -111,14 +124,17 @@ test("a clean no-match at or after the deadline does not confirm closure", async
 test("unrelated commands, errors and incomplete results remain fatal", async () => {
   const failures = [
     searchExit(badWindowStderr, { cmd: "xdotool getwindowname 2097155" }),
+    searchExit(badTreeStderr, { cmd: "xdotool getwindowname 2097155" }),
     searchExit(badWindowStderr, { code: 2 }),
     searchExit(badWindowStderr, { killed: true, signal: "SIGKILL" }),
     searchExit("", { killed: true, signal: "SIGKILL" }),
     searchExit(badWindowStderr, { stdout: "2097155\n" }),
     searchExit(badWindowStderr.replace("BadWindow", "BadMatch")),
     searchExit(
-      badWindowStderr.replace("20 (X_GetProperty)", "15 (X_QueryTree)"),
+      badWindowStderr.replace("20 (X_GetProperty)", "15 (X_GetProperty)"),
     ),
+    searchExit(badTreeStderr.replace("15 (X_QueryTree)", "20 (X_QueryTree)")),
+    searchExit(badTreeStderr.replace("15 (X_QueryTree)", "16 (X_InternAtom)")),
     searchExit(badWindowStderr.replace("0x200003", "invalid")),
     searchExit(`${badWindowStderr}unexpected stderr\n`),
     searchExit("unterminated diagnostic"),

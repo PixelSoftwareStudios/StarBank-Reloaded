@@ -81,7 +81,8 @@ function windowDisappearedDuringSearch(stderr) {
   return (
     error ===
       "X Error of failed request:  BadWindow (invalid Window parameter)" &&
-    opcode === "  Major opcode of failed request:  20 (X_GetProperty)" &&
+    (opcode === "  Major opcode of failed request:  20 (X_GetProperty)" ||
+      opcode === "  Major opcode of failed request:  15 (X_QueryTree)") &&
     /^ {2}Resource id in failed request: {2}0x[0-9a-f]+$/.test(resource) &&
     /^ {2}Serial number of failed request: {2}[0-9]+$/.test(serial) &&
     /^ {2}Current serial number in output stream: {2}[0-9]+$/.test(
@@ -127,8 +128,8 @@ export async function waitForWindowGone(
         if (now() < deadline) return;
         break;
       }
-      // X11 may destroy a listed window before xdotool reads its title. A
-      // clean no-match search must still confirm the window is gone.
+      // A window may disappear during xdotool's tree or title query. A clean
+      // no-match search must still confirm the window is gone.
       if (!windowDisappearedDuringSearch(error.stderr)) throw error;
     }
     remaining = Math.floor(deadline - now());
