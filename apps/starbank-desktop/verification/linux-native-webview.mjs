@@ -13,6 +13,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
   cancelGtkDirtyClose,
@@ -759,12 +760,12 @@ function bank(value) {
   );
 }
 
-async function withNativeSession(
+export async function withNativeSession(
   application,
   scenario,
   inputs,
   verify,
-  { configHome } = {},
+  { configHome, applicationArgumentsPrefix = [] } = {},
 ) {
   const scratch = await mkdtemp(join(tmpdir(), "starbank-linux-webview-"));
   let driver;
@@ -793,6 +794,7 @@ async function withNativeSession(
       await writeFile(join(scratch, name), bytes);
     driver = await startDriver(environment);
     await waitForDriver(driver);
+    const sessionStartedAt = performance.now();
     const { sessionId, capabilities } = await request(
       driver.origin,
       "/session",
@@ -802,13 +804,17 @@ async function withNativeSession(
           alwaysMatch: {
             "tauri:options": {
               application,
-              args: inputs.map(([name]) => join(scratch, name)),
+              args: [
+                ...applicationArgumentsPrefix,
+                ...inputs.map(([name]) => join(scratch, name)),
+              ],
             },
           },
         },
       },
       startupTimeout,
     );
+    const sessionCreatedAt = performance.now();
     assert(
       typeof sessionId === "string" && sessionId.length > 0,
       "Missing WebDriver session ID",
@@ -820,7 +826,13 @@ async function withNativeSession(
     await verify(
       (path, method, body) =>
         request(driver.origin, session + path, method, body),
-      { scratch, assertInputsUnchanged },
+      {
+        scratch,
+        assertInputsUnchanged,
+        sessionStartedAt,
+        sessionCreatedAt,
+        capabilities,
+      },
     );
     await assertInputsUnchanged();
   } catch (error) {
@@ -959,20 +971,25 @@ async function run(
   );
 }
 
-assert.equal(
-  process.platform,
-  "linux",
-  "Run the native WebView check on Linux under Xvfb.",
-);
-assert(process.env.DISPLAY, "Start the check with xvfb-run.");
-assert.equal(
-  process.argv.length,
-  6,
-  "Pass the packaged application, X11 close sender, clipboard reader and AT-SPI probe paths.",
-);
-await run(
-  resolve(process.argv[2]),
-  resolve(process.argv[3]),
-  resolve(process.argv[4]),
-  resolve(process.argv[5]),
-);
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  assert.equal(
+    process.platform,
+    "linux",
+    "Run the native WebView check on Linux under Xvfb.",
+  );
+  assert(process.env.DISPLAY, "Start the check with xvfb-run.");
+  assert.equal(
+    process.argv.length,
+    6,
+    "Pass the packaged application, X11 close sender, clipboard reader and AT-SPI probe paths.",
+  );
+  await run(
+    resolve(process.argv[2]),
+    resolve(process.argv[3]),
+    resolve(process.argv[4]),
+    resolve(process.argv[5]),
+  );
+}

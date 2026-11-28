@@ -386,6 +386,51 @@ jobs:
           desktop::tests::distinguishes_interactive_webview_origins -- --exact
       - run: cargo clippy --locked -p starbank-desktop --no-default-features --features desktop --all-targets -- -D warnings
       - run: cargo test --locked -p starbank-desktop --no-default-features --features desktop
+      - name: Install the owned Linux measurement launcher
+        id: performance_tools
+        if: runner.os == 'Linux'
+        run: |
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
+            apps/starbank-desktop/verification/native-performance/linux-app-launcher.c \
+            -o "$RUNNER_TEMP/starbank-perf-launcher"
+          performance_token=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
+          performance_directory="/usr/local/lib/starbank-perf-$performance_token"
+          sudo mkdir --mode=0755 -- "$performance_directory"
+          printf 'directory=%s\n' "$performance_directory" >> "$GITHUB_OUTPUT"
+          sudo install --owner=root --group=root --mode=0755 \
+            "$RUNNER_TEMP/starbank-perf-launcher" "$performance_directory/linux-app-launcher"
+          sudo install --owner=root --group=root --mode=0644 \
+            apps/starbank-desktop/verification/native-performance/linux-cgroup.py \
+            "$performance_directory/linux-cgroup.py"
+      - name: Measure the installed Linux app and WebKit resource group
+        if: runner.os == 'Linux'
+        timeout-minutes: 12
+        env:
+          STARBANK_PERFORMANCE_TOOLS: ${{ steps.performance_tools.outputs.directory }}
+        run: |
+          xvfb-run -a --server-args='-screen 0 1280x900x24' \
+            dbus-run-session -- env -u NO_AT_BRIDGE -u AT_SPI_BUS_ADDRESS \
+            -u WEBKIT_A11Y_BUS_ADDRESS -u WAYLAND_DISPLAY \
+            node apps/starbank-desktop/verification/native-performance/linux-performance.mjs \
+            "$STARBANK_PERFORMANCE_TOOLS" "$RUNNER_TEMP/starbank-close-window" \
+            "$RUNNER_TEMP/starbank-linux-performance-${{ runner.arch }}.json"
+      - name: Retain Linux resource measurement evidence
+        if: always() && runner.os == 'Linux' && steps.performance_tools.outputs.directory != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: starbank-linux-performance-${{ runner.arch }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/starbank-linux-performance-${{ runner.arch }}.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove the owned Linux measurement launcher
+        if: always() && runner.os == 'Linux' && steps.performance_tools.outputs.directory != ''
+        env:
+          STARBANK_PERFORMANCE_TOOLS: ${{ steps.performance_tools.outputs.directory }}
+        run: |
+          [[ "$STARBANK_PERFORMANCE_TOOLS" =~ ^/usr/local/lib/starbank-perf-[a-f0-9]{32}$ ]]
+          sudo rm --force -- "$STARBANK_PERFORMANCE_TOOLS/linux-app-launcher" \
+            "$STARBANK_PERFORMANCE_TOOLS/linux-cgroup.py"
+          sudo rmdir -- "$STARBANK_PERFORMANCE_TOOLS"
       - name: Remove the installed test package
         if: always() && runner.os == 'Linux' && steps.install_deb.outputs.purge_owned == 'true'
         run: |
