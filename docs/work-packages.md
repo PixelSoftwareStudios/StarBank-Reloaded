@@ -20,7 +20,7 @@ Depends on: 01.
 - [x] Run the pinned local Rust and frontend advisory checks and collect installed frontend dependency license inventories. [Dependency checks](verification/DEPENDENCIES.md)
 - [x] Pass all 11 hosted CI jobs at `e4385da`, including the Linux arm64 desktop leg, both advisory checks and the previously failing Windows probes. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-e4385da)
 - [x] Fix the pinned RFD GTK native-chooser reference leak and qualify repeated async picker teardown. [Checked backport](verification/DEPENDENCIES.md#gtk-native-chooser-reference-backport)
-- [ ] Release the separate GTK filename/list allocations while preserving existing UTF-8 path behavior; qualify the remaining owned-resource paths.
+- [x] Release the separate GTK filename/list allocations while preserving existing UTF-8 path behavior; verify real-function ownership tests and installed dialog regressions on Linux x64 and arm64. [Ownership evidence](verification/DEPENDENCIES.md#gtk-filename-and-list-ownership)
 - [ ] Complete production dependency and capability qualification for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01. Verify later revisions in their own hosted runs.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -141,6 +141,7 @@ Depends on: 11,12.
 - [x] Implement versioned browser preferences, legacy decoding and the shared settings page. Preserve in-flight drafts across settings navigation.
 - [x] Persist native preferences and authorized roots. Share account selection, appearance, automatic backup policy and platform capability information in Settings. Add explicit map-index rebuild. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Configure a managed backup folder and persist a retention count with a read-only review of older backups. Keep access to earlier managed folders. [Implementation evidence](verification/IMPLEMENTATION.md)
+- [x] Verify the installed Linux auto re-sign preference survives a fresh process restart and controls exact unsigned Save As output. [Restart evidence](verification/IMPLEMENTATION.md#installed-linux-preference-restart)
 - [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
