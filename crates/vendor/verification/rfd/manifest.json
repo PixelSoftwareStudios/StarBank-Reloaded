@@ -4,12 +4,62 @@
     "sha256": "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220",
     "upstream_revision": "cca0cfa5fc38c2752c9c98f9f5168904a515fd55"
   },
-  "patch": {
-    "path": "src/backend/gtk3/file_dialog/dialog_ffi.rs",
-    "before": "impl Drop for GtkFileDialog {\n    fn drop(&mut self) {\n        unsafe {\n            gtk_sys::gtk_native_dialog_destroy(self.ptr as _);\n        }\n    }\n}\n",
-    "after": "impl Drop for GtkFileDialog {\n    fn drop(&mut self) {\n        // SAFETY: This wrapper owns the constructor's full reference and is\n        // dropped on the GTK thread. Destroy only disposes the dialog; unref\n        // releases our reference. Signal emission retains it during callbacks.\n        unsafe {\n            gtk_sys::gtk_native_dialog_destroy(self.ptr as _);\n            gobject_sys::g_object_unref(self.ptr as _);\n        }\n    }\n}\n",
-    "sha256": "822ae3a9a072a81e966f556037cb9eefe667a55dd488b0eb82e865fe1e527ced"
-  },
+  "patches": [
+    {
+      "path": "src/backend/gtk3/file_dialog/dialog_ffi.rs",
+      "sha256": "de4b66bc7e60e1faf59df6d6c8263d5a9e0bbd2d123b1680c4986083815436a9",
+      "hunks": [
+        {
+          "before": "    pub fn get_result(&self) -> Option<PathBuf> {\n        let cstr = unsafe {\n            let chosen_filename = gtk_sys::gtk_file_chooser_get_filename(self.ptr as _);\n            CStr::from_ptr(chosen_filename).to_str()\n        };\n\n        if let Ok(cstr) = cstr {\n            Some(PathBuf::from(cstr.to_owned()))\n        } else {\n            None\n        }\n    }\n",
+          "after": "    pub fn get_result(&self) -> Option<PathBuf> {\n        // SAFETY: GTK returns NULL or an owned NUL-terminated filename. Copy\n        // any valid UTF-8 path before releasing that buffer with GTK's allocator.\n        unsafe {\n            let chosen_filename = gtk_sys::gtk_file_chooser_get_filename(self.ptr as _);\n            if chosen_filename.is_null() {\n                return None;\n            }\n\n            let path = CStr::from_ptr(chosen_filename)\n                .to_str()\n                .ok()\n                .map(PathBuf::from);\n            glib_sys::g_free(chosen_filename as _);\n            path\n        }\n    }\n"
+        },
+        {
+          "before": "    pub fn get_results(&self) -> Vec<PathBuf> {\n        #[derive(Debug)]\n        struct FileList(*mut glib_sys::GSList);\n\n        impl Iterator for FileList {\n            type Item = glib_sys::GSList;\n            fn next(&mut self) -> Option<Self::Item> {\n                let curr_ptr = self.0;\n\n                if !curr_ptr.is_null() {\n                    let curr = unsafe { *curr_ptr };\n\n                    self.0 = curr.next;\n\n                    Some(curr)\n                } else {\n                    None\n                }\n            }\n        }\n\n        let chosen_filenames =\n            unsafe { gtk_sys::gtk_file_chooser_get_filenames(self.ptr as *mut _) };\n\n        let paths: Vec<PathBuf> = FileList(chosen_filenames)\n            .filter_map(|item| {\n                let cstr = unsafe { CStr::from_ptr(item.data as _).to_str() };\n\n                if let Ok(cstr) = cstr {\n                    Some(PathBuf::from(cstr.to_owned()))\n                } else {\n                    None\n                }\n            })\n            .collect();\n\n        paths\n    }\n",
+          "after": "    pub fn get_results(&self) -> Vec<PathBuf> {\n        #[derive(Debug)]\n        struct FileList(*mut glib_sys::GSList);\n\n        impl Iterator for FileList {\n            type Item = glib_sys::GSList;\n            fn next(&mut self) -> Option<Self::Item> {\n                let curr_ptr = self.0;\n\n                if !curr_ptr.is_null() {\n                    let curr = unsafe { *curr_ptr };\n\n                    self.0 = curr.next;\n\n                    Some(curr)\n                } else {\n                    None\n                }\n            }\n        }\n\n        let chosen_filenames =\n            unsafe { gtk_sys::gtk_file_chooser_get_filenames(self.ptr as *mut _) };\n\n        let paths: Vec<PathBuf> = FileList(chosen_filenames)\n            .filter_map(|item| {\n                if item.data.is_null() {\n                    return None;\n                }\n                // SAFETY: Each non-NULL entry is a NUL-terminated filename\n                // owned by this list and remains alive until collection ends.\n                let cstr = unsafe { CStr::from_ptr(item.data as _).to_str() };\n\n                if let Ok(cstr) = cstr {\n                    Some(PathBuf::from(cstr.to_owned()))\n                } else {\n                    None\n                }\n            })\n            .collect();\n\n        // SAFETY: All returned paths are owned copies. GTK transfers both the\n        // list nodes and each filename buffer, which must use GLib's allocator.\n        unsafe { glib_sys::g_slist_free_full(chosen_filenames, Some(glib_sys::g_free)) };\n        paths\n    }\n"
+        },
+        {
+          "before": "impl Drop for GtkFileDialog {\n    fn drop(&mut self) {\n        unsafe {\n            gtk_sys::gtk_native_dialog_destroy(self.ptr as _);\n        }\n    }\n}\n",
+          "after": "impl Drop for GtkFileDialog {\n    fn drop(&mut self) {\n        // SAFETY: This wrapper owns the constructor's full reference and is\n        // dropped on the GTK thread. Destroy only disposes the dialog; unref\n        // releases our reference. Signal emission retains it during callbacks.\n        unsafe {\n            gtk_sys::gtk_native_dialog_destroy(self.ptr as _);\n            gobject_sys::g_object_unref(self.ptr as _);\n        }\n    }\n}\n"
+        },
+        {
+          "before": "use super::super::AsGtkDialog;\nuse crate::FileDialog;\n",
+          "after": "use super::super::AsGtkDialog;\n#[cfg(all(test, target_os = \"linux\"))]\nuse crate::gtk_ownership_tests::{glib_sys, gtk_sys};\nuse crate::FileDialog;\n"
+        },
+        {
+          "before": "impl AsGtkDialog for GtkFileDialog {\n",
+          "after": "#[cfg(all(test, target_os = \"linux\"))]\n#[test]\nfn gtk_ownership_getters() {\n    // The fixture supplies getter allocations; the sentinel must not enter GTK Drop.\n    let dialog = std::mem::ManuallyDrop::new(GtkFileDialog {\n        ptr: ptr::null_mut(),\n    });\n    crate::gtk_ownership_tests::check_getters(|| dialog.get_result(), || dialog.get_results());\n}\n\nimpl AsGtkDialog for GtkFileDialog {\n"
+        }
+      ]
+    },
+    {
+      "path": "src/backend/gtk3/message_dialog.rs",
+      "sha256": "c5bcee7425c97c637e3f40c5e4cf64f1fe144e8485640eeb0955ff6a71819625",
+      "hunks": [
+        {
+          "before": "unsafe fn set_child_labels_selectable(dialog: *mut gtk_sys::GtkDialog) {\n    let area = gtk_sys::gtk_message_dialog_get_message_area(dialog as _);\n    let mut children = gtk_sys::gtk_container_get_children(area as _);\n    while !children.is_null() {\n        let child = (*children).data;\n        if is_label(child as _) {\n            gtk_sys::gtk_label_set_selectable(child as _, 1);\n        }\n        children = (*children).next;\n    }\n}\n",
+          "after": "unsafe fn set_child_labels_selectable(dialog: *mut gtk_sys::GtkDialog) {\n    let area = gtk_sys::gtk_message_dialog_get_message_area(dialog as _);\n    let children = gtk_sys::gtk_container_get_children(area as _);\n    let mut current = children;\n    while !current.is_null() {\n        let child = (*current).data;\n        if is_label(child as _) {\n            gtk_sys::gtk_label_set_selectable(child as _, 1);\n        }\n        current = (*current).next;\n    }\n    // SAFETY: GTK transfers the list links, while the child widgets stay borrowed.\n    glib_sys::g_list_free(children);\n}\n"
+        },
+        {
+          "before": "use super::AsGtkDialog;\n\nuse crate::message_dialog::{MessageButtons, MessageDialog, MessageLevel};\n",
+          "after": "use super::AsGtkDialog;\n\n#[cfg(all(test, target_os = \"linux\"))]\nuse crate::gtk_ownership_tests::{glib_sys, gobject_sys, gtk_sys};\nuse crate::message_dialog::{MessageButtons, MessageDialog, MessageLevel};\n"
+        },
+        {
+          "before": "impl Drop for GtkMessageDialog {\n",
+          "after": "#[cfg(all(test, target_os = \"linux\"))]\n#[test]\nfn gtk_ownership_children() {\n    crate::gtk_ownership_tests::check_children(|dialog| {\n        // SAFETY: The test-only FFI shims supply the live list and borrowed label data.\n        unsafe { set_child_labels_selectable(dialog) }\n    });\n}\n\nimpl Drop for GtkMessageDialog {\n"
+        }
+      ]
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "7815e182e56630af35be2a734b3c26cb1b5cc7231986d2901737de3cbdbafef9",
+      "hunks": [
+        {
+          "before": "mod backend;\n\nmod file_handle;\n",
+          "after": "mod backend;\n\n#[cfg(all(test, feature = \"gtk3\", target_os = \"linux\"))]\n#[path = \"../../verification/rfd/ownership.rs\"]\nmod gtk_ownership_tests;\n\nmod file_handle;\n"
+        }
+      ]
+    }
+  ],
   "files": {
     ".cargo_vcs_info.json": "69185ac7c46bf3c7825ddc4b1737bd3b0fe831bbc941879269bf542aa65363cf",
     ".editorconifg": "2dbc17b31e88f2be42da722ce0740de94dd3475c58bc03fb6951f2b9fb7ff544",

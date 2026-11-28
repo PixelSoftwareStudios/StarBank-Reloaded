@@ -130,6 +130,10 @@
 
 mod backend;
 
+#[cfg(all(test, feature = "gtk3", target_os = "linux"))]
+#[path = "../../verification/rfd/ownership.rs"]
+mod gtk_ownership_tests;
+
 mod file_handle;
 pub use file_handle::FileHandle;
 

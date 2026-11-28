@@ -1,4 +1,6 @@
 use super::super::AsGtkDialog;
+#[cfg(all(test, target_os = "linux"))]
+use crate::gtk_ownership_tests::{glib_sys, gtk_sys};
 use crate::FileDialog;
 use gtk_sys::GtkFileChooserNative;
 
@@ -97,15 +99,20 @@ impl GtkFileDialog {
     }
 
     pub fn get_result(&self) -> Option<PathBuf> {
-        let cstr = unsafe {
+        // SAFETY: GTK returns NULL or an owned NUL-terminated filename. Copy
+        // any valid UTF-8 path before releasing that buffer with GTK's allocator.
+        unsafe {
             let chosen_filename = gtk_sys::gtk_file_chooser_get_filename(self.ptr as _);
-            CStr::from_ptr(chosen_filename).to_str()
-        };
+            if chosen_filename.is_null() {
+                return None;
+            }
 
-        if let Ok(cstr) = cstr {
-            Some(PathBuf::from(cstr.to_owned()))
-        } else {
-            None
+            let path = CStr::from_ptr(chosen_filename)
+                .to_str()
+                .ok()
+                .map(PathBuf::from);
+            glib_sys::g_free(chosen_filename as _);
+            path
         }
     }
 
@@ -135,6 +142,11 @@ impl GtkFileDialog {
 
         let paths: Vec<PathBuf> = FileList(chosen_filenames)
             .filter_map(|item| {
+                if item.data.is_null() {
+                    return None;
+                }
+                // SAFETY: Each non-NULL entry is a NUL-terminated filename
+                // owned by this list and remains alive until collection ends.
                 let cstr = unsafe { CStr::from_ptr(item.data as _).to_str() };
 
                 if let Ok(cstr) = cstr {
@@ -145,6 +157,9 @@ impl GtkFileDialog {
             })
             .collect();
 
+        // SAFETY: All returned paths are owned copies. GTK transfers both the
+        // list nodes and each filename buffer, which must use GLib's allocator.
+        unsafe { glib_sys::g_slist_free_full(chosen_filenames, Some(glib_sys::g_free)) };
         paths
     }
 
@@ -265,6 +280,16 @@ impl GtkFileDialog {
 
         dialog
     }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[test]
+fn gtk_ownership_getters() {
+    // The fixture supplies getter allocations; the sentinel must not enter GTK Drop.
+    let dialog = std::mem::ManuallyDrop::new(GtkFileDialog {
+        ptr: ptr::null_mut(),
+    });
+    crate::gtk_ownership_tests::check_getters(|| dialog.get_result(), || dialog.get_results());
 }
 
 impl AsGtkDialog for GtkFileDialog {

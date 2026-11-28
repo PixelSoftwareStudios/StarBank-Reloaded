@@ -5,6 +5,8 @@ use super::gtk_future::GtkDialogFuture;
 use super::utils::GtkGlobalThread;
 use super::AsGtkDialog;
 
+#[cfg(all(test, target_os = "linux"))]
+use crate::gtk_ownership_tests::{glib_sys, gobject_sys, gtk_sys};
 use crate::message_dialog::{MessageButtons, MessageDialog, MessageLevel};
 use crate::MessageDialogResult;
 
@@ -159,14 +161,26 @@ unsafe fn is_label(type_instance: *const gobject_sys::GTypeInstance) -> bool {
 /// Sets the child labels of a widget selectable
 unsafe fn set_child_labels_selectable(dialog: *mut gtk_sys::GtkDialog) {
     let area = gtk_sys::gtk_message_dialog_get_message_area(dialog as _);
-    let mut children = gtk_sys::gtk_container_get_children(area as _);
-    while !children.is_null() {
-        let child = (*children).data;
+    let children = gtk_sys::gtk_container_get_children(area as _);
+    let mut current = children;
+    while !current.is_null() {
+        let child = (*current).data;
         if is_label(child as _) {
             gtk_sys::gtk_label_set_selectable(child as _, 1);
         }
-        children = (*children).next;
+        current = (*current).next;
     }
+    // SAFETY: GTK transfers the list links, while the child widgets stay borrowed.
+    glib_sys::g_list_free(children);
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[test]
+fn gtk_ownership_children() {
+    crate::gtk_ownership_tests::check_children(|dialog| {
+        // SAFETY: The test-only FFI shims supply the live list and borrowed label data.
+        unsafe { set_child_labels_selectable(dialog) }
+    });
 }
 
 impl Drop for GtkMessageDialog {

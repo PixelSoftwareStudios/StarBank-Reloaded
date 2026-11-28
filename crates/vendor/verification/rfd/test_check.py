@@ -30,27 +30,49 @@ class IntegrityCheckTests(unittest.TestCase):
         self.archive = self.scratch / "rfd-fixture.crate"
 
         self.patch_path = "src/dialog.rs"
-        self.original = b"destroy();\n"
-        self.patched = b"destroy();\nunref();\n"
+        self.message_path = "src/message.rs"
+        self.original = b"choose();\ndestroy();\n"
+        self.patched = b"choose();\nfree();\ndestroy();\nunref();\n"
+        self.message_original = b"collect();\n"
+        self.message_patched = b"collect();\nfree_list();\n"
         self.stock = {
             "README.md": b"fixture documentation\n",
             "LICENSE": b"publisher notice\n",
             self.patch_path: self.original,
+            self.message_path: self.message_original,
         }
-        for name, contents in self.stock.items():
+        source_files = {
+            **self.stock,
+            self.patch_path: self.patched,
+            self.message_path: self.message_patched,
+        }
+        for name, contents in source_files.items():
             path = self.source / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(self.patched if name == self.patch_path else contents)
+            path.write_bytes(contents)
 
+        self.chooser_patch = {
+            "path": self.patch_path,
+            "sha256": sha256(self.patched),
+            "hunks": [
+                {"before": "choose();\n", "after": "choose();\nfree();\n"},
+                {"before": "destroy();\n", "after": "destroy();\nunref();\n"},
+            ],
+        }
+        self.message_patch = {
+            "path": self.message_path,
+            "sha256": sha256(self.message_patched),
+            "hunks": [
+                {
+                    "before": self.message_original.decode(),
+                    "after": self.message_patched.decode(),
+                },
+            ],
+        }
         self.manifest = {
             "archive": {"name": self.archive.name},
             "files": {name: sha256(contents) for name, contents in self.stock.items()},
-            "patch": {
-                "path": self.patch_path,
-                "before": self.original.decode(),
-                "after": self.patched.decode(),
-                "sha256": sha256(self.patched),
-            },
+            "patches": [self.chooser_patch, self.message_patch],
         }
         self.write_archive(self.stock)
 
@@ -83,15 +105,25 @@ class IntegrityCheckTests(unittest.TestCase):
         for archive in (False, True):
             result = self.run_check(archive=archive)
             self.assertEqual(result.returncode, 0, result)
-            self.assertEqual(result.stdout, "Verified 3 vendored RFD files\n")
+            self.assertEqual(result.stdout, "Verified 4 vendored RFD files\n")
 
     def test_rejects_changed_unpatched_file(self):
         (self.source / "README.md").write_bytes(b"changed documentation\n")
         self.assert_rejected("SHA-256 mismatch: README.md")
 
-    def test_rejects_reverted_ownership_patch(self):
-        (self.source / self.patch_path).write_bytes(self.original)
-        self.assert_rejected(f"SHA-256 mismatch: {self.patch_path}")
+    def test_rejects_reverting_any_ownership_hunk(self):
+        for patch in self.manifest["patches"]:
+            name = patch["path"]
+            path = self.source / name
+            contents = path.read_bytes()
+            for hunk in patch["hunks"]:
+                with self.subTest(path=name, hunk=hunk["before"]):
+                    reverted = contents.replace(
+                        hunk["after"].encode(), hunk["before"].encode()
+                    )
+                    path.write_bytes(reverted)
+                    self.assert_rejected(f"SHA-256 mismatch: {name}")
+            path.write_bytes(contents)
 
     def test_rejects_extra_file(self):
         (self.source / "src/unexpected.rs").touch()
@@ -124,11 +156,74 @@ class IntegrityCheckTests(unittest.TestCase):
     def test_rejects_additional_change_even_with_replaced_patched_digest(self):
         altered = self.patched + b"unrelated change\n"
         (self.source / self.patch_path).write_bytes(altered)
-        self.manifest["patch"]["sha256"] = sha256(altered)
+        self.chooser_patch["sha256"] = sha256(altered)
         self.write_manifest()
+        self.assert_rejected(f"stock SHA-256 mismatch after reversal: {self.patch_path}")
         self.assert_rejected(
             f"ownership patch SHA-256 mismatch: {self.patch_path}", archive=True
         )
+
+    def test_rejects_missing_hunk_description(self):
+        self.chooser_patch["hunks"].pop()
+        self.write_manifest()
+        self.assert_rejected(f"stock SHA-256 mismatch after reversal: {self.patch_path}")
+        self.assert_rejected(
+            f"ownership patch SHA-256 mismatch: {self.patch_path}", archive=True
+        )
+
+    def test_rejects_missing_patch_description(self):
+        self.manifest["patches"].remove(self.message_patch)
+        self.write_manifest()
+        self.assert_rejected(f"SHA-256 mismatch: {self.message_path}")
+
+    def test_rejects_duplicate_patch_path(self):
+        self.manifest["patches"].append(self.chooser_patch)
+        self.write_manifest()
+        self.assert_rejected(f"duplicate ownership patch path: {self.patch_path}")
+
+    def test_rejects_duplicate_hunk(self):
+        self.chooser_patch["hunks"].append(self.chooser_patch["hunks"][0])
+        self.write_manifest()
+        self.assert_rejected(f"duplicate ownership hunk: {self.patch_path}")
+
+    def test_rejects_unlisted_patch_path(self):
+        self.message_patch["path"] = "src/unexpected.rs"
+        self.write_manifest()
+        self.assert_rejected("unexpected ownership patch path: src/unexpected.rs")
+
+    def test_rejects_hunk_absent_from_stock_and_patched_file(self):
+        self.message_patch["hunks"].append(
+            {"before": "allocate();\n", "after": "allocate();\nrelease();\n"}
+        )
+        self.write_manifest()
+        for archive in (False, True):
+            self.assert_rejected(
+                f"ownership hunk must match exactly once: {self.message_path}",
+                archive=archive,
+            )
+
+    def test_rejects_overlapping_hunks(self):
+        self.chooser_patch["hunks"][0]["before"] += "destroy();\n"
+        self.chooser_patch["hunks"][0]["after"] += "destroy();\n"
+        self.write_manifest()
+        for archive in (False, True):
+            self.assert_rejected(
+                f"overlapping ownership hunks: {self.patch_path}", archive=archive
+            )
+
+    def test_rejects_ambiguous_stock_hunk_even_with_a_unique_patched_match(self):
+        repeated = b"choose();\n"
+        stock = self.original + repeated
+        altered = self.patched + repeated
+        (self.source / self.patch_path).write_bytes(altered)
+        self.manifest["files"][self.patch_path] = sha256(stock)
+        self.chooser_patch["sha256"] = sha256(altered)
+        self.write_archive({**self.stock, self.patch_path: stock})
+        for archive in (False, True):
+            self.assert_rejected(
+                f"ownership hunk must match exactly once: {self.patch_path}",
+                archive=archive,
+            )
 
 
 if __name__ == "__main__":
