@@ -178,3 +178,13 @@ Use the timebase ratio reported by `cpu-units.swift` on the measurement host.
 The tracked `samples.jsonl` contains the measured data. The original
 capture used a `_ns` suffix on the CPU counter fields. The checked-in data
 and runner use `_ticks`. The underlying counter values are unchanged.
+
+## Linux release measurement gate
+
+The [release workflow](../../../../.github/workflows/linux-release-performance.yml) adds separate Ubuntu x64 and arm64 jobs for an unsigned optimized desktop package. Its first hosted execution is pending; the existing measurements below retain their original profile and environment labels.
+
+The build runs `pnpm --filter starbank-desktop exec tauri build --bundles deb --no-sign -- --locked --message-format=json-render-diagnostics`. The [receipt checker](linux-release-build.mjs) requires exactly one desktop binary compiler artifact with optimization level 3, debug assertions and test mode off, and desktop/custom-protocol features. The receipt records the exact read-only DEB and extracted packaged executable hashes. Tauri may patch the packaged executable's bundle marker, so compiler output bytes are not assumed to equal packaged bytes.
+
+After payload verification and minimal-Ubuntu dependency qualification, installation must match the receipt's DEB hash. The measurement observer requires the installed executable to match the packaged name, size and SHA-256 before any trial. It then reuses the existing fifteen cgroup trials, readiness checks, early and later windows, byte-preservation checks and owned cleanup. The extended invocation is `node linux-performance.mjs <root-owned-tools> <close-sender> <report.json> release <readonly-deb> <build-receipt.json>`; the original three-argument debug invocation remains supported.
+
+The workflow retains the mixed Cargo build log, compiler/package receipt and incremental measurement report. Only completed trials with matching executable admission and confirmed cleanup qualify as results. A hard runner timeout can interrupt cleanup and does not establish success. These synthetic, automation-inclusive, unflushed-cache observations will not establish real-workload budgets or a controlled comparison with separately hosted debug runs. Twenty-eight local Node helper tests passed before integration; actual release builds and measurements still require hosted execution.

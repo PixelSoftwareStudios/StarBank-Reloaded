@@ -1,0 +1,175 @@
+name: Linux release desktop measurements
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 2
+
+jobs:
+  measure:
+    name: Release resources on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - name: Install Linux build and measurement dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libx11-dev \
+            webkit2gtk-driver xvfb xdotool
+      - run: rustup show
+      - run: pnpm install --frozen-lockfile
+      - name: Test measurement and build provenance helpers
+        run: >-
+          node --test
+          apps/starbank-desktop/verification/native-performance/linux-performance.test.mjs
+          apps/starbank-desktop/verification/native-performance/linux-release-build.test.mjs
+      - name: Build the unsigned release Debian package
+        id: release_build
+        run: |
+          pnpm --filter starbank-desktop exec tauri build --bundles deb --no-sign \
+            -- --locked --message-format=json-render-diagnostics \
+            > "$RUNNER_TEMP/starbank-release-build.stdout.log"
+      - name: Verify the release package and compiler receipt
+        id: release_package
+        run: |
+          python3 apps/starbank-desktop/verification/verify_package.py \
+            target/release/bundle Linux "${{ runner.arch }}"
+          deb_version=$(node -p 'require("./apps/starbank-desktop/src-tauri/tauri.conf.json").version')
+          deb_arch=$(dpkg --print-architecture)
+          deb_path="$GITHUB_WORKSPACE/target/release/bundle/deb/starbank-reloaded_${deb_version}_${deb_arch}.deb"
+          chmod 0444 -- "$deb_path"
+          payload_directory=$(mktemp -d "$RUNNER_TEMP/starbank-release-payload.XXXXXXXX")
+          trap 'rm -rf -- "$payload_directory"' EXIT
+          dpkg-deb --extract "$deb_path" "$payload_directory"
+          packaged_executable="$payload_directory/usr/bin/starbank-desktop"
+          chmod 0444 -- "$packaged_executable"
+          node apps/starbank-desktop/verification/native-performance/linux-release-build.mjs \
+            "$RUNNER_TEMP/starbank-release-build.stdout.log" "$deb_path" \
+            "$packaged_executable" \
+            "$RUNNER_TEMP/starbank-release-build-receipt.json"
+          deb_hash=$(node --input-type=module -e \
+            'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.argv[1], "utf8")).deb.sha256)' \
+            "$RUNNER_TEMP/starbank-release-build-receipt.json")
+          printf 'path=%s\nversion=%s\narchitecture=%s\n' \
+            "$deb_path" "$deb_version" "$deb_arch" >> "$GITHUB_OUTPUT"
+          printf 'deb_sha256=%s\n' "$deb_hash" >> "$GITHUB_OUTPUT"
+      - name: Resolve release dependencies in minimal Ubuntu
+        timeout-minutes: 8
+        env:
+          DEB_PATH: ${{ steps.release_package.outputs.path }}
+          DEB_VERSION: ${{ steps.release_package.outputs.version }}
+          DEB_ARCH: ${{ steps.release_package.outputs.architecture }}
+        run: |
+          bash apps/starbank-desktop/verification/linux-minimal-dependencies.sh \
+            "$DEB_PATH" "$DEB_VERSION" "$DEB_ARCH"
+      - name: Install the exact verified release package
+        id: install_deb
+        env:
+          DEB_PATH: ${{ steps.release_package.outputs.path }}
+          DEB_VERSION: ${{ steps.release_package.outputs.version }}
+          DEB_ARCH: ${{ steps.release_package.outputs.architecture }}
+          EXPECTED_DEB_SHA256: ${{ steps.release_package.outputs.deb_sha256 }}
+        run: |
+          if dpkg-query -W starbank-reloaded >/dev/null 2>&1; then
+            echo 'The release test package must not already have a package record.' >&2
+            exit 1
+          fi
+          current_hash=$(sha256sum "$DEB_PATH")
+          test "${current_hash%% *}" = "$EXPECTED_DEB_SHA256"
+          echo 'purge_owned=true' >> "$GITHUB_OUTPUT"
+          sudo dpkg --install "$DEB_PATH"
+          test "$(dpkg-query -W -f='${Status} ${Version} ${Architecture}' starbank-reloaded)" \
+            = "install ok installed $DEB_VERSION $DEB_ARCH"
+          test -x /usr/bin/starbank-desktop
+          test "$(dpkg-query -S /usr/share/applications/starbank-reloaded.desktop)" \
+            = 'starbank-reloaded: /usr/share/applications/starbank-reloaded.desktop'
+          payload_hash=$(node --input-type=module -e \
+            'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.argv[1], "utf8")).packagedExecutable.sha256)' \
+            "$RUNNER_TEMP/starbank-release-build-receipt.json")
+          installed_hash=$(sha256sum /usr/bin/starbank-desktop)
+          test "$payload_hash" = "${installed_hash%% *}"
+      - name: Install the pinned Linux WebView test driver
+        run: |
+          cargo install tauri-driver --version '=2.0.6' --locked --root "$RUNNER_TEMP/starbank-webdriver"
+          echo "$RUNNER_TEMP/starbank-webdriver/bin" >> "$GITHUB_PATH"
+      - name: Install the owned Linux measurement launcher
+        id: performance_tools
+        run: |
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
+            apps/starbank-desktop/verification/linux-close-window.c \
+            -o "$RUNNER_TEMP/starbank-close-window" -lX11
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
+            apps/starbank-desktop/verification/native-performance/linux-app-launcher.c \
+            -o "$RUNNER_TEMP/starbank-perf-launcher"
+          performance_token=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
+          performance_directory="/usr/local/lib/starbank-perf-$performance_token"
+          sudo mkdir --mode=0755 -- "$performance_directory"
+          printf 'directory=%s\n' "$performance_directory" >> "$GITHUB_OUTPUT"
+          sudo install --owner=root --group=root --mode=0755 \
+            "$RUNNER_TEMP/starbank-perf-launcher" "$performance_directory/linux-app-launcher"
+          sudo install --owner=root --group=root --mode=0644 \
+            apps/starbank-desktop/verification/native-performance/linux-cgroup.py \
+            "$performance_directory/linux-cgroup.py"
+      - name: Measure the installed release app and WebKit resource group
+        timeout-minutes: 12
+        env:
+          STARBANK_PERFORMANCE_TOOLS: ${{ steps.performance_tools.outputs.directory }}
+          DEB_PATH: ${{ steps.release_package.outputs.path }}
+        run: |
+          receipt_hash=$(node --input-type=module -e \
+            'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.argv[1], "utf8")).deb.sha256)' \
+            "$RUNNER_TEMP/starbank-release-build-receipt.json")
+          current_hash=$(sha256sum "$DEB_PATH")
+          test "${current_hash%% *}" = "$receipt_hash"
+          xvfb-run -a --server-args='-screen 0 1280x900x24' \
+            dbus-run-session -- env -u NO_AT_BRIDGE -u AT_SPI_BUS_ADDRESS \
+            -u WEBKIT_A11Y_BUS_ADDRESS -u WAYLAND_DISPLAY \
+            node apps/starbank-desktop/verification/native-performance/linux-performance.mjs \
+            "$STARBANK_PERFORMANCE_TOOLS" "$RUNNER_TEMP/starbank-close-window" \
+            "$RUNNER_TEMP/starbank-linux-release-performance-${{ runner.arch }}.json" \
+            release "$DEB_PATH" "$RUNNER_TEMP/starbank-release-build-receipt.json"
+      - name: Retain release build and measurement evidence
+        if: always() && steps.release_build.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: starbank-linux-release-performance-${{ runner.arch }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/starbank-release-build.stdout.log
+            ${{ runner.temp }}/starbank-release-build-receipt.json
+            ${{ runner.temp }}/starbank-linux-release-performance-${{ runner.arch }}.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove the owned Linux measurement launcher
+        if: always() && steps.performance_tools.outputs.directory != ''
+        env:
+          STARBANK_PERFORMANCE_TOOLS: ${{ steps.performance_tools.outputs.directory }}
+        run: |
+          [[ "$STARBANK_PERFORMANCE_TOOLS" =~ ^/usr/local/lib/starbank-perf-[a-f0-9]{32}$ ]]
+          sudo rm --force -- "$STARBANK_PERFORMANCE_TOOLS/linux-app-launcher" \
+            "$STARBANK_PERFORMANCE_TOOLS/linux-cgroup.py"
+          sudo rmdir -- "$STARBANK_PERFORMANCE_TOOLS"
+      - name: Remove the installed release test package
+        if: always() && steps.install_deb.outputs.purge_owned == 'true'
+        run: |
+          if dpkg-query -W starbank-reloaded >/dev/null 2>&1; then
+            sudo dpkg --purge starbank-reloaded
+          fi
+          test ! -e /usr/bin/starbank-desktop
+          test ! -e /usr/share/applications/starbank-reloaded.desktop

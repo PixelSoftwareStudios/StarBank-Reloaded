@@ -13,6 +13,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  release-performance:
+    name: Release desktop resources
+    uses: ./.github/workflows/linux-release-performance.yml
+
   checks:
     name: Source checks
     runs-on: ubuntu-24.04
