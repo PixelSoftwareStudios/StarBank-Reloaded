@@ -336,6 +336,9 @@ jobs:
         run: |
           cargo install tauri-driver --version '=2.0.6' --locked --root "$RUNNER_TEMP/starbank-webdriver"
           echo "$RUNNER_TEMP/starbank-webdriver/bin" >> "$GITHUB_PATH"
+      - name: Test strict GTK window disappearance polling
+        if: runner.os == 'Linux'
+        run: node --test apps/starbank-desktop/verification/linux-gtk-dialog.test.mjs
       - name: Exercise the real Linux WebView headlessly
         if: runner.os == 'Linux'
         timeout-minutes: 3

@@ -74,23 +74,67 @@ export function chooseGtkExportDestination(destination) {
   return chooseGtkDestination(exportTitle, destination);
 }
 
-async function waitForWindowGone(title, { visibleOnly = false } = {}) {
-  const deadline = performance.now() + dialogTimeout;
-  do {
+function windowDisappearedDuringSearch(stderr) {
+  if (typeof stderr !== "string") return false;
+  const [error, opcode, resource, serial, currentSerial, end, ...extra] =
+    stderr.split("\n");
+  return (
+    error ===
+      "X Error of failed request:  BadWindow (invalid Window parameter)" &&
+    opcode === "  Major opcode of failed request:  20 (X_GetProperty)" &&
+    /^ {2}Resource id in failed request: {2}0x[0-9a-f]+$/.test(resource) &&
+    /^ {2}Serial number of failed request: {2}[0-9]+$/.test(serial) &&
+    /^ {2}Current serial number in output stream: {2}[0-9]+$/.test(
+      currentSerial,
+    ) &&
+    end === "" &&
+    extra.length === 0
+  );
+}
+
+export async function waitForWindowGone(
+  title,
+  {
+    visibleOnly = false,
+    search = xdotool,
+    now = () => performance.now(),
+    pause = delay,
+  } = {},
+) {
+  const args = [
+    "search",
+    ...(visibleOnly ? ["--onlyvisible"] : []),
+    "--name",
+    titlePattern(title),
+  ];
+  const command = ["xdotool", ...args].join(" ");
+  const deadline = now() + dialogTimeout;
+  let remaining = Math.floor(deadline - now());
+  while (remaining > 0) {
     try {
-      await xdotool([
-        "search",
-        ...(visibleOnly ? ["--onlyvisible"] : []),
-        "--name",
-        titlePattern(title),
-      ]);
+      await search(args, Math.min(commandTimeout, remaining));
     } catch (error) {
-      // xdotool search exits 1 without output when no window matches.
-      if (error.code === 1 && !error.stdout && !error.stderr) return;
-      throw error;
+      if (
+        error?.cmd !== command ||
+        error.code !== 1 ||
+        error.killed !== false ||
+        error.signal !== null ||
+        error.stdout !== ""
+      ) {
+        throw error;
+      }
+      if (error.stderr === "") {
+        if (now() < deadline) return;
+        break;
+      }
+      // X11 may destroy a listed window before xdotool reads its title. A
+      // clean no-match search must still confirm the window is gone.
+      if (!windowDisappearedDuringSearch(error.stderr)) throw error;
     }
-    await delay(pollInterval);
-  } while (performance.now() < deadline);
+    remaining = Math.floor(deadline - now());
+    if (remaining > 0) await pause(Math.min(pollInterval, remaining));
+    remaining = Math.floor(deadline - now());
+  }
   throw new Error(`The ${title} window did not close.`);
 }
 
