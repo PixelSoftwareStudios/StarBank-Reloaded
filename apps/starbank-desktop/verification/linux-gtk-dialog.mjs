@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const exportTitle = "Export bank copy";
 const saveAsTitle = "Save Bank As";
+const externalSourceTitle = "Open Bank";
+const signedCopyTitle = "Save Signed Bank Copy";
 const dirtyOpenTitle = "Save changes before opening another bank?";
 const dirtyCloseTitle = "Save changes before closing?";
 const draftCloseTitle = "Discard changes and close?";
@@ -60,11 +62,14 @@ async function chooseGtkDestination(title, destination) {
     "The fixture path must be typed without keyboard control characters.",
   );
   await assert.rejects(lstat(destination), { code: "ENOENT" });
+  await submitGtkPath(title, destination);
+}
 
+async function submitGtkPath(title, path) {
   const window = await focusDialog(title);
   // Without a window argument, key and type send XTEST events to the focused chooser.
   await xdotool(["key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
-  await xdotool(["type", "--clearmodifiers", "--", destination]);
+  await xdotool(["type", "--clearmodifiers", "--", path]);
   await requireFocus(window);
   await xdotool(["key", "--clearmodifiers", "Return"]);
 }
@@ -72,6 +77,26 @@ async function chooseGtkDestination(title, destination) {
 /** Submits an unused fixture path in the real GTK Export Copy chooser. */
 export function chooseGtkExportDestination(destination) {
   return chooseGtkDestination(exportTitle, destination);
+}
+
+/** Selects an existing synthetic bank in the real GTK external-signing chooser. */
+export async function chooseGtkExternalSigningSource(source) {
+  assert(isAbsolute(source), "The fixture source must be absolute.");
+  assert(
+    !/\p{Cc}/u.test(source),
+    "The fixture path must be typed without keyboard control characters.",
+  );
+  const info = await lstat(source);
+  assert(
+    info.isFile() && !info.isSymbolicLink(),
+    "The fixture source must be an existing regular, non-symlink file.",
+  );
+  await submitGtkPath(externalSourceTitle, source);
+}
+
+/** Submits an unused fixture path in the real GTK signed-copy chooser. */
+export function chooseGtkSignedCopyDestination(destination) {
+  return chooseGtkDestination(signedCopyTitle, destination);
 }
 
 function windowDisappearedDuringSearch(stderr) {
@@ -157,6 +182,14 @@ export function waitForGtkExportChooserReleased() {
 
 export function waitForGtkSaveAsChooserReleased() {
   return waitForWindowGone(saveAsTitle);
+}
+
+export function waitForGtkExternalSourceChooserReleased() {
+  return waitForWindowGone(externalSourceTitle);
+}
+
+export function waitForGtkSignedCopyChooserReleased() {
+  return waitForWindowGone(signedCopyTitle);
 }
 
 async function respondToGtkPrompt(title, ...keys) {

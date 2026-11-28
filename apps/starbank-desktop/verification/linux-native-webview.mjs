@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
+  lstat,
   mkdir,
   mkdtemp,
   mkdtempDisposable,
@@ -16,6 +18,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { verifyClipboardXml } from "./linux-clipboard.mjs";
+import { verifyExternalSigning } from "./linux-external-signing.mjs";
 import {
   cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
@@ -24,6 +27,8 @@ import {
   cancelGtkSaveAsOnClose,
   cancelGtkSaveAsOnOpen,
   chooseGtkExportDestination,
+  chooseGtkExternalSigningSource,
+  chooseGtkSignedCopyDestination,
   discardGtkDirtyClose,
   discardGtkDirtyOpen,
   discardGtkDraftClose,
@@ -32,7 +37,9 @@ import {
   saveGtkDirtyCloseAs,
   saveGtkDirtyOpenAs,
   waitForGtkExportChooserReleased,
+  waitForGtkExternalSourceChooserReleased,
   waitForGtkSaveAsChooserReleased,
+  waitForGtkSignedCopyChooserReleased,
 } from "./linux-gtk-dialog.mjs";
 import { verifySaveMenu, verifyToolsMenu } from "./linux-menus.mjs";
 import { verifyRawEditing } from "./linux-raw-editor.mjs";
@@ -1028,6 +1035,67 @@ async function run(
   );
   console.log(
     "Linux native Copy: exact BOM, CRLF and Unicode X11 text from edited UTF-16LE passed.",
+  );
+
+  const currentBank = "Current.SC2Bank";
+  const foreignName = "Foreign.SC2Bank";
+  const signedName = "Foreign signed.sc2bank";
+  // Independent fixed vector recorded in MACOS_EXTERNAL_SIGNING.md.
+  const foreignXml =
+    '<Bank version="1">\r\n<Section name="Wallet"><Key name="Credits"><Value int="000123"/></Key></Section>\r\n</Bank>';
+  const foreignBytes = Buffer.from(foreignXml, "utf8");
+  const foreignSignature = "89FC4F469AFCE71ADBFA9232810AB818EAF35D74";
+  const signedBytes = Buffer.from(
+    foreignXml.replace(
+      "</Bank>",
+      `<Signature value="${foreignSignature}"/></Bank>`,
+    ),
+    "utf8",
+  );
+  const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  assert.equal(
+    sha256(foreignBytes),
+    "6d440abe3637eeefee843391ad4a7c3721c4632a6124d0f99e44b8a414a36086",
+  );
+  assert.equal(
+    sha256(signedBytes),
+    "8d30fd0e25e887c5ef73325df14759da460c2bb5173a08e853ba23e527ed73f9",
+  );
+  await withNativeSession(
+    application,
+    "external signed copy",
+    [[currentBank, bank("001")]],
+    async (command, { scratch, assertInputsUnchanged }) => {
+      const foreignPath = join(scratch, foreignName);
+      const signedPath = join(scratch, signedName);
+      await writeFile(foreignPath, foreignBytes, { flag: "wx" });
+      const assertFilesUnchanged = async () => {
+        await assertInputsUnchanged();
+        assert.deepEqual(await readFile(foreignPath), foreignBytes);
+      };
+      const assertSignedOutput = async () => {
+        assert.deepEqual(await readFile(signedPath), signedBytes);
+      };
+      await verifyExternalSigning({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        activeName: currentBank,
+        foreignName,
+        chooseSource: () => chooseGtkExternalSigningSource(foreignPath),
+        waitForSourceChooserReleased: waitForGtkExternalSourceChooserReleased,
+        chooseDestination: () => chooseGtkSignedCopyDestination(signedPath),
+        waitForDestinationChooserReleased: waitForGtkSignedCopyChooserReleased,
+        assertFilesUnchanged,
+        assertNoOutput: () =>
+          assert.rejects(lstat(signedPath), { code: "ENOENT" }),
+        assertSignedOutput,
+      });
+      await requestGtkWindowClose(closeSender);
+      await discardGtkDirtyClose();
+      await assertFilesUnchanged();
+      await assertSignedOutput();
+    },
   );
 }
 
