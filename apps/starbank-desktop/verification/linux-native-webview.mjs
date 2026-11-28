@@ -47,6 +47,7 @@ import {
   waitForWindowGone,
 } from "./linux-gtk-dialog.mjs";
 import {
+  verifyAutomaticInventoryMode,
   verifyManualRootSelection,
   verifyMissingManualCollectionRecovery,
   verifyRestoredManualCollection,
@@ -1254,6 +1255,31 @@ async function run(
           ),
         waitForChooserReleased: waitForGtkManualFolderChooserReleased,
         assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+      });
+      await verifyAutomaticInventoryMode({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+        selectAutomatic: true,
+      });
+      await requestGtkWindowClose(closeSender);
+      await waitForWindowGone("StarBank Reloaded");
+      await assertRecoveredCollectionUnchanged();
+    },
+    { configHome },
+  );
+  await withNativeSession(
+    application,
+    "automatic inventory mode after restart",
+    [],
+    async (command) => {
+      await verifyAutomaticInventoryMode({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+        selectAutomatic: false,
       });
       await requestGtkWindowClose(closeSender);
       await waitForWindowGone("StarBank Reloaded");

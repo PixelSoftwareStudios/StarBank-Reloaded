@@ -10,6 +10,8 @@ const selectedTab = 'button[role="tab"][aria-selected="true"]';
 const goldField = 'table input[aria-label="Gold value"]';
 const manualRequired =
   "Automatic bank discovery is unavailable. Select a folder.";
+const manualSidebarStatus =
+  "Automatic SC2 folder detection is unavailable. Select a folder to continue.";
 const missingFolder =
   "Select a StarCraft II folder or a folder containing banks.";
 const readyStatus = "Bank inventory ready.";
@@ -68,6 +70,7 @@ function inventoryReaders(evaluate) {
         })),
         accountSelectors: pane.querySelectorAll("select").length,
         queued: document.querySelectorAll(arguments[1]).length,
+        scanning: pane.querySelector('progress[aria-label="Inventory scan progress"]') !== null,
       };`,
       sidebar,
       queue,
@@ -466,5 +469,85 @@ export async function verifyMissingManualCollectionRecovery({
   await assertFilesUnchanged();
   stage(
     "Explicit folder selection recovered the collection without opening a bank.",
+  );
+}
+
+export async function verifyAutomaticInventoryMode({
+  command,
+  waitFor,
+  controls,
+  assertFilesUnchanged,
+  selectAutomatic,
+}) {
+  assert.equal(typeof selectAutomatic, "boolean");
+  const { click, clickButton, content, evaluate } = controls;
+  const { discovery, inventory } = inventoryReaders(evaluate);
+  const availableActions = ["Select Folder…", "Refresh"];
+  const hasOnlyAvailableActions = (buttons) =>
+    buttons.length === availableActions.length &&
+    availableActions.every((name) =>
+      buttons.some((button) => button.name === name && !button.disabled),
+    );
+  const rootlessInventory = async () => {
+    const listed = await inventory();
+    return (
+      listed?.roots.length === 0 &&
+      listed.statuses.length === 1 &&
+      listed.statuses[0] === manualSidebarStatus &&
+      hasOnlyAvailableActions(listed.buttons) &&
+      !listed.scanning &&
+      listed.accountSelectors === 0 &&
+      listed.maps === 0 &&
+      listed.bankLists === 0 &&
+      listed.banks.length === 0 &&
+      listed.queued === 0
+    );
+  };
+
+  await waitFor(
+    "the unopened welcome view before checking automatic mode",
+    async () =>
+      (await unopenedWelcome(content)) &&
+      (selectAutomatic || (await rootlessInventory())),
+  );
+  await assertPackagedLocation(command);
+  await assertFilesUnchanged();
+
+  await click('button[aria-label="Settings"]', null);
+  if (selectAutomatic) {
+    stage("Clearing the manual override with Use auto-detect.");
+    await click(settingsButtons, "Use auto-detect");
+  }
+  await waitFor(
+    "rootless Linux discovery in Settings and the sidebar",
+    async () => {
+      const state = await discovery();
+      return (
+        state?.root === null &&
+        state.statuses.length === 1 &&
+        state.statuses[0] === manualRequired &&
+        !state.scanning &&
+        state.accountSelectors === 0 &&
+        hasOnlyAvailableActions(state.buttons) &&
+        (await rootlessInventory()) &&
+        (await content(".document-editor")) === null
+      );
+    },
+  );
+  await assertFilesUnchanged();
+
+  await clickButton("Back to editor");
+  await waitFor(
+    "the unopened welcome view with no selected folder",
+    async () =>
+      (await content(settings)) === null &&
+      (await unopenedWelcome(content)) &&
+      (await rootlessInventory()),
+  );
+  await assertFilesUnchanged();
+  stage(
+    selectAutomatic
+      ? "Use auto-detect cleared the manual override. Linux still requires a folder selection."
+      : "Restart retained automatic mode. Linux still requires a folder selection.",
   );
 }
