@@ -33,6 +33,7 @@ import {
   waitForGtkExportChooserReleased,
   waitForGtkSaveAsChooserReleased,
 } from "./linux-gtk-dialog.mjs";
+import { verifySaveMenu } from "./linux-menus.mjs";
 import { verifyRawEditing } from "./linux-raw-editor.mjs";
 
 const loopback = "127.0.0.1";
@@ -482,6 +483,12 @@ async function verifyEditor(
 
   await openInitialBank(first, "001", 2);
   await focusGtkMainWindow();
+  await verifySaveMenu({
+    command,
+    waitFor,
+    controls: editorControls(command),
+    assertInputsUnchanged,
+  });
   await click(gold, null);
   await waitFor("the focused native Table field", () =>
     evaluate(
