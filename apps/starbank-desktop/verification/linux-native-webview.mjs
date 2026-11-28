@@ -31,6 +31,7 @@ import {
   waitForGtkExportChooserReleased,
   waitForGtkSaveAsChooserReleased,
 } from "./linux-gtk-dialog.mjs";
+import { verifyRawEditing } from "./linux-raw-editor.mjs";
 
 const loopback = "127.0.0.1";
 const commandTimeout = 5_000;
@@ -473,6 +474,15 @@ async function verifyEditor(
   }
 
   await openInitialBank(first, "001", 2);
+  await verifyRawEditing({
+    command,
+    waitFor,
+    controls: editorControls(command),
+    openingXml: bank("001").toString("utf8"),
+    editedXml: bank("4321").toString("utf8"),
+    assertInputsUnchanged,
+    expectedQueue: { name: second, label: secondQueued },
+  });
   await waitFor(
     "the second queued bank before editing",
     async () =>
