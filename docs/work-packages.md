@@ -201,6 +201,7 @@ Depends on: 12,13,14,15.
 - [x] Install the verified Noble x64/arm64 Debian packages, run the real editor and GTK dialogs headlessly from the installed binary, and verify owned purge. [Installed Linux qualification](verification/DISTRIBUTION.md#continuous-headless-package-qualification)
 - [x] Qualify the dormant Windows running-instance transport with five headless native probes. [Windows transport evidence](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#hosted-native-qualification)
 - [x] Wire Windows launch delivery into the guarded app queue and verify it with a real pipe and a windowless Tauri runtime. [Native app integration](../crates/platform/starbank-instance/verification/WINDOWS_INSTANCE.md#desktop-integration)
+- [x] Qualify exact-DEB dependency retrieval on fresh pinned Ubuntu 24.04 x64/arm64 containers: offline missing-dependency refusal, independent APT resolution, payload/loader checks and owned container-package purge. Both steps passed at `9b403fd`; the full matrix was pending. [Minimal Ubuntu evidence](verification/DISTRIBUTION.md#minimal-ubuntu-debian-dependency-qualification)
 - [ ] Verify signed packages, Windows Explorer Open With visibility and open flows, installed macOS open flows, and release licensing.
 - [ ] Implement and verify: REQ-DIST-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
