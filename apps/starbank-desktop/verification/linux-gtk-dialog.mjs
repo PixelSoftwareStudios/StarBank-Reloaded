@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const exportTitle = "Export bank copy";
+const saveAsTitle = "Save Bank As";
 const dirtyOpenTitle = "Save changes before opening another bank?";
 const dialogTimeout = 10_000;
 const commandTimeout = 3_000;
@@ -49,21 +50,25 @@ async function focusDialog(title) {
   return window;
 }
 
-/** Submits the unused fixture path in the real GTK chooser on the caller's Xvfb display. */
-export async function chooseGtkExportDestination(destination) {
-  assert(isAbsolute(destination), "The export destination must be absolute.");
+async function chooseGtkDestination(title, destination) {
+  assert(isAbsolute(destination), "The fixture destination must be absolute.");
   assert(
     !["\0", "\t", "\n", "\r"].some((key) => destination.includes(key)),
-    "The export path must be typed without keyboard control characters.",
+    "The fixture path must be typed without keyboard control characters.",
   );
   await assert.rejects(lstat(destination), { code: "ENOENT" });
 
-  const window = await focusDialog(exportTitle);
+  const window = await focusDialog(title);
   // Without a window argument, key and type send XTEST events to the focused chooser.
   await xdotool(["key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
   await xdotool(["type", "--clearmodifiers", "--", destination]);
   await requireFocus(window);
   await xdotool(["key", "--clearmodifiers", "Return"]);
+}
+
+/** Submits an unused fixture path in the real GTK Export Copy chooser. */
+export function chooseGtkExportDestination(destination) {
+  return chooseGtkDestination(exportTitle, destination);
 }
 
 async function respondToGtkDirtyOpen(...keys) {
@@ -94,4 +99,11 @@ export function discardGtkDirtyOpen() {
   // On Noble's GTK 3.24.41 this RFD dialog focuses its first button, Save.
   // Tab moves to Discard in the Save, Discard, Cancel order and Space activates it.
   return respondToGtkDirtyOpen("Tab", "space");
+}
+
+/** Selects Save on the GTK dirty-open prompt and supplies the new Save As path. */
+export async function saveGtkDirtyOpenAs(destination) {
+  // The exact three-button dialog on Noble's GTK 3.24.41 initially focuses Save.
+  await respondToGtkDirtyOpen("space");
+  await chooseGtkDestination(saveAsTitle, destination);
 }
