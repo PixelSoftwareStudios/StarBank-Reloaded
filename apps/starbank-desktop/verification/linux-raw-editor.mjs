@@ -75,6 +75,7 @@ export async function verifyRawEditing({
   const queueRetained = async () =>
     (await queuedName(expectedQueue.name)) === expectedQueue.label;
 
+  assert.equal(await tableValue(), openingValue);
   await clickTab("Raw View");
   await waitFor(
     "the opening XML in the editable native Raw view",
@@ -123,7 +124,6 @@ export async function verifyRawEditing({
   );
   assert.equal(await text(), brokenXml);
   assert.equal(await content(selectedTab), "Raw View");
-  assert.equal(await tableValue(), openingValue);
   assert.equal(await content(dirtyStatus), null);
   assert.equal(await hasHistory(), false);
   assert(await queueRetained());
