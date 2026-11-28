@@ -302,6 +302,23 @@ jobs:
         run: >-
           python3 apps/starbank-desktop/verification/verify_package.py
           target/debug/bundle "${{ runner.os }}" "${{ runner.arch }}"
+      - name: Install the verified Debian package
+        id: install_deb
+        if: runner.os == 'Linux'
+        run: |
+          if dpkg-query -W starbank-reloaded >/dev/null 2>&1; then
+            echo 'The test package must not already have a package record.' >&2
+            exit 1
+          fi
+          deb_version=$(node -p 'require("./apps/starbank-desktop/src-tauri/tauri.conf.json").version')
+          deb_arch=$(dpkg --print-architecture)
+          echo 'purge_owned=true' >> "$GITHUB_OUTPUT"
+          sudo dpkg --install "target/debug/bundle/deb/starbank-reloaded_${deb_version}_${deb_arch}.deb"
+          test "$(dpkg-query -W -f='${Status} ${Version} ${Architecture}' starbank-reloaded)" \
+            = "install ok installed $deb_version $deb_arch"
+          test -x /usr/bin/starbank-desktop
+          test "$(dpkg-query -S /usr/share/applications/starbank-reloaded.desktop)" \
+            = 'starbank-reloaded: /usr/share/applications/starbank-reloaded.desktop'
       - name: Install the pinned Linux WebView test driver
         if: runner.os == 'Linux'
         run: |
@@ -313,7 +330,7 @@ jobs:
         run: >-
           xvfb-run -a --server-args='-screen 0 1280x900x24'
           node apps/starbank-desktop/verification/linux-native-webview.mjs
-          target/debug/starbank-desktop
+          /usr/bin/starbank-desktop
       - name: Build the unsigned NSIS installer
         if: runner.os == 'Windows'
         run: pnpm --filter starbank-desktop exec tauri build --bundles nsis --no-sign --debug -- --locked
@@ -328,3 +345,11 @@ jobs:
           desktop::tests::distinguishes_interactive_webview_origins -- --exact
       - run: cargo clippy --locked -p starbank-desktop --no-default-features --features desktop --all-targets -- -D warnings
       - run: cargo test --locked -p starbank-desktop --no-default-features --features desktop
+      - name: Remove the installed test package
+        if: always() && runner.os == 'Linux' && steps.install_deb.outputs.purge_owned == 'true'
+        run: |
+          if dpkg-query -W starbank-reloaded >/dev/null 2>&1; then
+            sudo dpkg --purge starbank-reloaded
+          fi
+          test ! -e /usr/bin/starbank-desktop
+          test ! -e /usr/share/applications/starbank-reloaded.desktop
