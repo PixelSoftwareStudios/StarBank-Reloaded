@@ -21,6 +21,10 @@ const context = [
   ["Bank name without extension", "DigestBank"],
 ];
 
+function stage(message) {
+  console.log(`Linux native external signing: ${message}`);
+}
+
 export async function verifyExternalSigning({
   command,
   waitFor,
@@ -66,17 +70,25 @@ export async function verifyExternalSigning({
     (await editorRetained()) &&
     (await findControl(".document-editor button", "Undo"));
 
+  stage("Opening the queued active bank.");
   await openInitialBank(activeName, openingValue);
+  stage("Active Table opened. Turning off auto re-sign.");
   await disableAutoResign();
+  stage("Auto re-sign is off. Staging the active edit.");
   await stageGold(editedValue, { hasQueuedOpen: false });
+  stage("Active draft staged. Applying it.");
   await applyGold();
   await waitFor("the active dirty Gold bank and available Undo", undoRetained);
   await assertFilesUnchanged();
   await assertNoOutput();
 
+  stage("Active edit confirmed. Opening Tools.");
   await click(tools, null);
+  stage("Tools trigger clicked. Selecting external re-sign.");
   await click(`${toolsMenu} [role="menuitem"]`, "Re-sign external bank…");
+  stage("External re-sign selected. Submitting the GTK source path.");
   await chooseSource();
+  stage("Source path submitted. Waiting for the signing form.");
   await waitFor("the unsigned external bank in the signing form", () =>
     evaluate(
       `const [selector, name] = arguments;
@@ -89,7 +101,9 @@ export async function verifyExternalSigning({
       foreignName,
     ),
   );
+  stage("Unsigned signing form visible. Checking source chooser release.");
   await waitForSourceChooserReleased();
+  stage("Source chooser released. Entering signing context.");
   assert.deepEqual(
     await readContext(),
     context.map(([label]) => [label, ""]),
@@ -110,6 +124,7 @@ export async function verifyExternalSigning({
   }
   assert.deepEqual(await readContext(), context);
 
+  stage("Signing context confirmed. Checking the stored signature.");
   await click(`${dialog} button`, "Check signature");
   await waitFor(
     "the external bank's unsigned check result",
@@ -125,8 +140,11 @@ export async function verifyExternalSigning({
   await assertFilesUnchanged();
   await assertNoOutput();
 
+  stage("Unsigned check confirmed. Opening the signed-copy chooser.");
   await click(`${dialog} button`, "Save signed copy…");
+  stage("Save control clicked. Submitting the GTK destination path.");
   await chooseDestination();
+  stage("Destination path submitted. Waiting for the signed-copy result.");
   await waitFor("the verified signed-copy notice and closed signing form", () =>
     evaluate(
       `const [dialog, status, message] = arguments;
@@ -138,6 +156,7 @@ export async function verifyExternalSigning({
       `Saved verified signed copy ${outputName}.`,
     ),
   );
+  stage("Verified-copy notice visible. Checking destination chooser release.");
   await waitForDestinationChooserReleased();
   await assertSignedOutput();
   await assertFilesUnchanged();
@@ -146,17 +165,17 @@ export async function verifyExternalSigning({
     undoRetained,
   );
 
+  stage("Output and active edit confirmed. Reopening Settings.");
   await click('button[aria-label="Settings"]', null);
   await waitFor("the persisted disabled auto re-sign setting", () =>
     findControl(setting, autoResign, false),
   );
+  stage("Auto re-sign remains off. Returning to the editor.");
   await clickButton("Back to editor");
   await waitFor(
     "the unchanged active edit after checking Settings",
     undoRetained,
   );
   await assertFilesUnchanged();
-  console.log(
-    "Linux native external signing: unsigned check, verified new copy and retained active edit passed.",
-  );
+  stage("Unsigned check, verified new copy and retained active edit passed.");
 }

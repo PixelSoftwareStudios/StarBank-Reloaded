@@ -67,11 +67,23 @@ async function chooseGtkDestination(title, destination) {
 
 async function submitGtkPath(title, path) {
   const window = await focusDialog(title);
+  if (title === externalSourceTitle)
+    console.log("Linux native external source: focused before location keys.");
   // Without a window argument, key and type send XTEST events to the focused chooser.
   await xdotool(["key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
+  if (title === externalSourceTitle)
+    console.log(
+      "Linux native external source: location keys sent before typing.",
+    );
   await xdotool(["type", "--clearmodifiers", "--", path]);
   await requireFocus(window);
+  if (title === externalSourceTitle)
+    console.log(
+      "Linux native external source: typed and focused before Return.",
+    );
   await xdotool(["key", "--clearmodifiers", "Return"]);
+  if (title === externalSourceTitle)
+    console.log("Linux native external source: Return sent.");
 }
 
 /** Submits an unused fixture path in the real GTK Export Copy chooser. */
