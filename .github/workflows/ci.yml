@@ -331,9 +331,13 @@ jobs:
           cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
             apps/starbank-desktop/verification/linux-close-window.c \
             -o "$RUNNER_TEMP/starbank-close-window" -lX11
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
+            apps/starbank-desktop/verification/linux-clipboard-read.c \
+            -o "$RUNNER_TEMP/starbank-clipboard-read" -lX11
           xvfb-run -a --server-args='-screen 0 1280x900x24' \
             node apps/starbank-desktop/verification/linux-native-webview.mjs \
-            /usr/bin/starbank-desktop "$RUNNER_TEMP/starbank-close-window"
+            /usr/bin/starbank-desktop "$RUNNER_TEMP/starbank-close-window" \
+            "$RUNNER_TEMP/starbank-clipboard-read"
       - name: Build the unsigned NSIS installer
         if: runner.os == 'Windows'
         run: pnpm --filter starbank-desktop exec tauri build --bundles nsis --no-sign --debug -- --locked

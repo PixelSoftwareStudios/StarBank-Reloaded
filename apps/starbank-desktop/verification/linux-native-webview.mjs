@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
@@ -12,6 +12,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { promisify } from "node:util";
 import {
   cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
@@ -34,6 +35,8 @@ const cleanupTimeout = 2_000;
 const pollInterval = 100;
 const failureItemLimit = 8;
 const failureTextLimit = 1_000;
+const clipboardReadLimit = 4_096;
+const execFileAsync = promisify(execFile);
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 const controlKey = "\uE009";
 const backspaceKey = "\uE003";
@@ -371,6 +374,7 @@ async function verifyEditor(
     exportCopy,
     saveCopy,
     closeSender,
+    assertClipboard,
   },
 ) {
   const {
@@ -434,6 +438,7 @@ async function verifyEditor(
         0,
         "Copy reported success and opened a dialog.",
       );
+      await assertClipboard();
     } else {
       assert.equal(observed.dialogCount, 1);
       assert.equal(observed.title, clipboardDialogTitle);
@@ -774,7 +779,7 @@ async function withNativeSession(application, scenario, inputs, verify) {
   }
 }
 
-async function run(application, closeSender) {
+async function run(application, closeSender, clipboardReader) {
   const first = "First.SC2Bank";
   const second = "Second.SC2Bank";
   const third = "Third.SC2Bank";
@@ -797,6 +802,16 @@ async function run(application, closeSender) {
         third,
         closeSender,
         assertInputsUnchanged,
+        async assertClipboard() {
+          const { stdout } = await execFileAsync(clipboardReader, [], {
+            encoding: "buffer",
+            killSignal: "SIGKILL",
+            maxBuffer: clipboardReadLimit,
+            timeout: commandTimeout,
+          });
+          assert.deepEqual(stdout, expectedExport);
+          console.log("Linux native Copy: exact X11 clipboard bytes verified.");
+        },
         async exportCopy() {
           await chooseGtkExportDestination(exportDestination);
           await waitFor("the exported bank file", async () => {
@@ -852,7 +867,11 @@ assert.equal(
 assert(process.env.DISPLAY, "Start the check with xvfb-run.");
 assert.equal(
   process.argv.length,
-  4,
-  "Pass the packaged starbank-desktop executable and X11 close sender paths.",
+  5,
+  "Pass the packaged application, X11 close sender and clipboard reader paths.",
 );
-await run(resolve(process.argv[2]), resolve(process.argv[3]));
+await run(
+  resolve(process.argv[2]),
+  resolve(process.argv[3]),
+  resolve(process.argv[4]),
+);
