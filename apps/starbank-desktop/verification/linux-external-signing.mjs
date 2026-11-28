@@ -10,7 +10,11 @@ const editorStatus = ".editor-status";
 const setting = 'section[aria-label="Settings"] input[type="checkbox"]';
 const autoResign = "Auto re-sign banks on save";
 const formFields = `${dialog} fieldset input`;
+const signatureStatus = `${dialog} p[role="status"]`;
+const signatureAlert = `${dialog} p[role="alert"]`;
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
+const controlKey = "\uE009";
+const backspaceKey = "\uE003";
 const openingValue = "001";
 const editedValue = "1,234";
 const editedStatus = "Unsaved changes in 1 section";
@@ -20,6 +24,9 @@ const context = [
   ["Player handle", "1-S2-1-9922"],
   ["Bank name without extension", "DigestBank"],
 ];
+const malformedAuthor = "1-S2-X-9911";
+const malformedAuthorMessage =
+  "The bank operation was refused. invalid author handle";
 
 function stage(message) {
   console.log(`Linux native external signing: ${message}`);
@@ -58,6 +65,20 @@ export async function verifyExternalSigning({
         [field.labels?.[0]?.textContent.trim(), field.value]);`,
       formFields,
     );
+  const focusContextField = async (label) => {
+    const field = await waitFor(`the enabled ${label} field`, () =>
+      findControl(formFields, label),
+    );
+    assert.equal(
+      typeof field[elementKey],
+      "string",
+      "Missing WebDriver input ID.",
+    );
+    await click(formFields, label);
+    return field[elementKey];
+  };
+  const sendContextValue = (field, value) =>
+    command(`/element/${field}/value`, "POST", { text: value });
   const displayedGold = () =>
     evaluate(`
       const rows = Array.from(document.querySelectorAll(".document-editor table tbody tr"))
@@ -121,28 +142,65 @@ export async function verifyExternalSigning({
     await readContext(),
     context.map(([label]) => [label, ""]),
   );
-  for (const [label, value] of context) {
-    const field = await waitFor(`the enabled ${label} field`, () =>
-      findControl(formFields, label),
-    );
-    assert.equal(
-      typeof field[elementKey],
-      "string",
-      "Missing WebDriver input ID.",
-    );
-    await click(formFields, label);
-    await command(`/element/${field[elementKey]}/value`, "POST", {
-      text: value,
-    });
-  }
+  const [authorLabel, authorHandle] = context[0];
+  const malformedContext = [
+    [authorLabel, malformedAuthor],
+    ...context.slice(1),
+  ];
+  for (const [label, value] of malformedContext)
+    await sendContextValue(await focusContextField(label), value);
+  assert.deepEqual(await readContext(), malformedContext);
+
+  stage("Checking the malformed author handle.");
+  await click(`${dialog} button`, "Check signature");
+  await waitFor(
+    "the native rejection of the malformed author handle",
+    async () =>
+      (await content(signatureAlert)) === malformedAuthorMessage &&
+      (await findControl(`${dialog} button`, "Check signature")),
+  );
+  assert.equal(await content(signatureStatus), null);
+  assert.deepEqual(await readContext(), malformedContext);
+  assert(
+    await editorRetained(),
+    "Rejecting the author handle changed the active edit.",
+  );
+  await assertFilesUnchanged();
+  await assertNoOutput();
+
+  stage("Native author rejection confirmed. Repairing the author handle.");
+  const authorField = await focusContextField(authorLabel);
+  await command("/actions", "POST", {
+    actions: [
+      {
+        type: "key",
+        id: "signing-context-keyboard",
+        actions: [
+          { type: "keyDown", value: controlKey },
+          { type: "keyDown", value: "a" },
+          { type: "keyUp", value: "a" },
+          { type: "keyUp", value: controlKey },
+          { type: "keyDown", value: backspaceKey },
+          { type: "keyUp", value: backspaceKey },
+        ],
+      },
+    ],
+  });
+  await waitFor(
+    "the cleared author handle",
+    async () => (await readContext())[0]?.[1] === "",
+  );
+  await sendContextValue(authorField, authorHandle);
   assert.deepEqual(await readContext(), context);
+  assert.equal(await content(signatureAlert), null);
+  assert.equal(await content(signatureStatus), null);
 
   stage("Signing context confirmed. Checking the stored signature.");
   await click(`${dialog} button`, "Check signature");
   await waitFor(
     "the external bank's unsigned check result",
     async () =>
-      (await content(`${dialog} p[role="status"]`)) ===
+      (await content(signatureStatus)) ===
         "This bank has no stored signature." &&
       (await findControl(`${dialog} button`, "Save signed copy…")),
   );
