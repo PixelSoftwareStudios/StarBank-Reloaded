@@ -88,7 +88,28 @@ Startup timing begins before the WebDriver session POST and includes automation.
 
 The app closes normally and the leaf must become empty before successful session teardown. Cleanup verifies the original device/inode and empty membership before removing only that leaf, never killing processes. All trials, failures and not-run cases are retained. Complete JSON snapshots are published atomically before and after each trial, so an interruption preserves the last valid report. CI retains the reports as artifacts, including failed attempts, and removes its root-owned helper directory and installed test package.
 
-Twenty-two simulated-filesystem tests passed locally. They cover counter fields, process identity/membership changes, existing leaves, controller gaps, malformed data and refusal to remove populated groups. Strict C11 object compilation passed for Linux x86_64 and arm64 against glibc 2.39 headers; Node syntax, Biome and import-without-launch checks passed. **Real app admission and hosted measurements are pending.** These tests and static checks are not measured resource results. [Runner](linux-performance.mjs) · [Launcher](linux-app-launcher.c) · [Simulated tests](test_linux_cgroup.py)
+Twenty-two simulated-filesystem tests passed locally. They cover counter fields, process identity/membership changes, existing leaves, controller gaps, malformed data and refusal to remove populated groups. Strict C11 object compilation passed for Linux x86_64 and arm64 against glibc 2.39 headers; Node syntax, Biome and import-without-launch checks passed. Real app admission and the first hosted measurements passed at `2806e52`, as recorded below. These simulated tests and static compilation checks remain separate evidence. [Runner](linux-performance.mjs) · [Launcher](linux-app-launcher.c) · [Simulated tests](test_linux_cgroup.py)
+
+## Hosted Linux baseline at `2806e52`
+
+All eleven jobs passed in run `46108490128`. Each architecture completed all 15 real trials, five per scenario, with seven populated counter samples each. All 60 readiness/end membership snapshots contained exactly the installed app, WebKit Web process and WebKit Network process under effective UID 1001. Every input-byte check, empty-before-session-delete check, leaf removal, helper-directory removal and package purge passed. The source job separately passed 22 simulated filesystem tests. Native accessibility and all three functional sessions also passed. [Hosted run](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46108490128)
+
+The hosted environment used kernel `7.0.0-1020-azure`, four reported CPUs, Node 24.22.3, WebKitGTK `2.52.6-0ubuntu0.24.04.2` and Wry 0.57.2. Reports retain the exact installed binary/helper digests and package versions. These are unsigned debug builds with unflushed system caches, not release-performance or game-workload results.
+
+Medians below are across the five trials for each scenario. Memory is the kernel charged-memory watermark as of the early sampling window's end, in MiB (2^20 bytes). It includes startup and the admission launcher's final work, excludes services outside the group, and is not RSS. The CPU window begins approximately one second after readiness and lasts roughly 3.34 seconds; it is an **early no-input window**, not established steady-state idle utilization.
+
+| Architecture | Values | POST to enabled action, ms | Open click to Table, ms | Charged peak, MiB | Early CPU, % one core |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| x64 | 0 | 1,089.5 | — | 211.254 | 0.047 |
+| x64 | 32 | 1,200.9 | 172.2 | 241.102 | 52.987 |
+| x64 | 10,000 | 1,187.0 | 524.3 | 283.578 | 50.911 |
+| arm64 | 0 | 1,070.0 | — | 221.012 | 0.060 |
+| arm64 | 32 | 1,158.2 | 169.3 | 253.867 | 80.604 |
+| arm64 | 10,000 | 1,160.5 | 645.8 | 300.766 | 77.299 |
+
+Loaded-bank CPU began near zero, rose in the second sampling interval and stayed elevated through the final four intervals on both architectures. That observation does not locate the work or prove eventual steady-state behavior. The fixed empty/small/large trial order also confounds scenario and order. No app change or performance budget is justified by attribution guesses; a later window and per-process CPU deltas are the next measurements.
+
+The complete schema-v1 reports are retained as [x64 data](linux-x64-2806e52.json) and [arm64 data](linux-arm64-2806e52.json). Repository copies are whitespace-formatted; parsed JSON was checked equal to the downloaded originals. Original JSON SHA-256 values were `7dc904916e2d5944efe207cd919d0f8937b2149a36d58dfa0a6bdc9bddd78152` and `d0eac12a238b95cd41d8ea4f058d9f5304ae33c257eb93bd3bfd400ad2975bb6`. Current-version report fields must not be retroactively added to these observations. [Original x64 artifact](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46108490128/artifacts/15248787071) · [Original arm64 artifact](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46108490128/artifacts/15248219505)
 
 ## Reproduction
 
