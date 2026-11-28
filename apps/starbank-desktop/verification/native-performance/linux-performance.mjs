@@ -6,6 +6,7 @@ import {
   link,
   lstat,
   mkdtempDisposable,
+  readFile,
   rename,
   writeFile,
 } from "node:fs/promises";
@@ -16,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { requestGtkWindowClose } from "../linux-gtk-dialog.mjs";
 import { withNativeSession } from "../linux-native-webview.mjs";
+import { readReleaseDeb, releaseBuildCommand } from "./linux-release-build.mjs";
 
 const exec = promisify(execFile);
 const sudo = "/usr/bin/sudo";
@@ -57,6 +59,153 @@ const launcherEnvironment = [
   "XDG_DATA_HOME",
   "XDG_RUNTIME_DIR",
 ];
+
+const buildCommands = {
+  debug:
+    "pnpm --filter starbank-desktop exec tauri build --bundles deb --no-sign --debug -- --locked",
+  release: releaseBuildCommand.join(" "),
+};
+
+export function measurementArguments(args) {
+  assert(
+    args.length >= 3 && args.length <= 6,
+    "Pass tools, close sender, output JSON, optional debug|release, DEB path and build receipt path.",
+  );
+  const [
+    helpers,
+    closeSender,
+    output,
+    profile = "debug",
+    packagePath,
+    receiptPath,
+  ] = args;
+  assert(
+    Object.hasOwn(buildCommands, profile),
+    "Expected build profile debug or release.",
+  );
+  assert(
+    [helpers, closeSender, output].every(
+      (value) => typeof value === "string" && value.length > 0,
+    ),
+    "Expected nonempty measurement paths.",
+  );
+  assert(
+    packagePath === undefined ||
+      (typeof packagePath === "string" && packagePath.length > 0),
+    "Expected a nonempty DEB path.",
+  );
+  assert(
+    profile !== "release" || packagePath,
+    "Release measurement requires the exact verified DEB path.",
+  );
+  assert(
+    receiptPath === undefined ||
+      (profile === "release" &&
+        typeof receiptPath === "string" &&
+        receiptPath.length > 0),
+    "A build receipt path is only valid for release measurements.",
+  );
+  assert(
+    profile !== "release" || receiptPath,
+    "Release measurement requires the build receipt path.",
+  );
+  return {
+    helpers,
+    closeSender: resolve(closeSender),
+    output: resolve(output),
+    profile,
+    packagePath: packagePath === undefined ? undefined : resolve(packagePath),
+    receiptPath: receiptPath === undefined ? undefined : resolve(receiptPath),
+  };
+}
+
+export async function buildProvenance({ profile, packagePath, receiptPath }) {
+  assert(
+    Object.hasOwn(buildCommands, profile),
+    "Expected build profile debug or release.",
+  );
+  assert(
+    profile !== "release" || packagePath,
+    "Release measurement requires the exact verified DEB path.",
+  );
+  let artifact = null;
+  if (packagePath !== undefined) {
+    const deb = await readReleaseDeb(packagePath);
+    artifact = {
+      path: packagePath,
+      filename: deb.name,
+      bytes: deb.size,
+      sha256: deb.sha256,
+    };
+  }
+  let receipt = null;
+  if (profile === "release") {
+    assert(
+      typeof receiptPath === "string" && receiptPath.length > 0,
+      "Release measurement requires the build receipt path.",
+    );
+    const info = await lstat(receiptPath);
+    assert(
+      info.isFile() && info.size > 0 && info.size <= outputLimit,
+      "Expected a bounded regular build receipt.",
+    );
+    receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    assert.equal(
+      receipt?.schemaVersion,
+      1,
+      "Unsupported build receipt schema.",
+    );
+    assert.deepEqual(
+      receipt.deb,
+      {
+        name: artifact.filename,
+        size: artifact.bytes,
+        sha256: artifact.sha256,
+      },
+      "Build receipt DEB identity differs from the supplied artifact.",
+    );
+    assert.deepEqual(
+      receipt.buildCommand,
+      releaseBuildCommand,
+      "Build receipt command differs from the release command.",
+    );
+    assert(
+      receipt.cargoArtifact?.profile?.opt_level === "3" &&
+        receipt.cargoArtifact.profile.debug_assertions === false &&
+        receipt.cargoArtifact.profile.test === false &&
+        receipt.cargoArtifact.target?.name === "starbank-desktop" &&
+        Array.isArray(receipt.cargoArtifact.features) &&
+        receipt.cargoArtifact.features.includes("desktop") &&
+        receipt.cargoArtifact.features.includes("custom-protocol"),
+      "Build receipt must record the optimized desktop Cargo profile and features.",
+    );
+    const packaged = receipt.packagedExecutable;
+    assert(
+      packaged?.name === "starbank-desktop" &&
+        Number.isSafeInteger(packaged.size) &&
+        packaged.size > 0 &&
+        typeof packaged.sha256 === "string" &&
+        /^[0-9a-f]{64}$/.test(packaged.sha256) &&
+        Object.keys(packaged).sort().join(",") === "name,sha256,size",
+      "Expected an exact packaged executable identity in the build receipt.",
+    );
+  }
+  return {
+    declared_build_command: buildCommands[profile],
+    scope:
+      "The profile and command are CI declarations. Release receipts retain CI-recorded Cargo facts and packaged executable identity; hashes identify bytes rather than implying optimizer settings.",
+    artifact,
+    build_receipt: receipt,
+  };
+}
+
+export function verifyReleaseExecutable(expected, actual) {
+  assert.deepEqual(
+    actual,
+    expected,
+    "Installed executable differs from the packaged release payload.",
+  );
+}
 
 function syntheticBank(values) {
   const keys = Array.from({ length: values }, (_, index) => {
@@ -699,13 +848,20 @@ function snapshotWriter(output, scratch) {
   };
 }
 
-async function measure(helperDirectory, closeSender, output) {
+async function measure(
+  helperDirectory,
+  closeSender,
+  output,
+  profile,
+  provenance,
+) {
   const scenarios = makeScenarios();
   const report = {
     schema_version: 2,
     started_at: new Date().toISOString(),
-    build_scope:
-      "Installed unsigned Linux debug Debian package on a hosted Xvfb runner",
+    build_profile: profile,
+    build_scope: `Installed unsigned Linux ${profile} Debian package on a hosted Xvfb runner`,
+    build_provenance: provenance,
     accounting_scope:
       "Fresh cgroup v2 leaf containing the app and its descendants, including the final work of the admission launcher. Shared services outside the leaf are excluded. Memory counters are cgroup-charged bytes and kernel peak watermarks.",
     timing_scope:
@@ -764,6 +920,7 @@ async function measure(helperDirectory, closeSender, output) {
       physical_memory_bytes: totalmem(),
       executable_bytes: app.size,
       executable_sha256: await sha256(installedApp),
+      debian_package_sha256: provenance.artifact?.sha256 ?? null,
       launcher_sha256: await sha256(helpers.launcher),
       cgroup_helper_sha256: await sha256(helpers.cgroup),
       installed_packages: packageRows
@@ -771,6 +928,23 @@ async function measure(helperDirectory, closeSender, output) {
         .split("\n")
         .map((row) => row.split("\t")),
     };
+    if (profile === "release") {
+      report.release_executable_admission = {
+        status: "rejected",
+        expected: provenance.build_receipt.packagedExecutable,
+        actual: {
+          name: "starbank-desktop",
+          size: app.size,
+          sha256: report.environment.executable_sha256,
+        },
+      };
+      await persist(report);
+      verifyReleaseExecutable(
+        report.release_executable_admission.expected,
+        report.release_executable_admission.actual,
+      );
+      report.release_executable_admission.status = "matched";
+    }
     report.fixtures = scenarios.map(({ name, values, inputs }) => ({
       scenario: name,
       values,
@@ -827,6 +1001,8 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  const options = measurementArguments(process.argv.slice(2));
+  const provenance = await buildProvenance(options);
   assert.equal(
     process.platform,
     "linux",
@@ -840,12 +1016,14 @@ if (
     process.env.DISPLAY && process.env.DBUS_SESSION_BUS_ADDRESS,
     "Start the measurement under the fixture Xvfb and private D-Bus session.",
   );
-  assert.equal(
-    process.argv.length,
-    5,
-    "Pass the root-owned libexec directory, close sender and output JSON path.",
-  );
-  const [, , helpers, closeSender, output] = process.argv;
-  if (!(await measure(helpers, resolve(closeSender), resolve(output))))
+  if (
+    !(await measure(
+      options.helpers,
+      options.closeSender,
+      options.output,
+      options.profile,
+      provenance,
+    ))
+  )
     process.exitCode = 1;
 }
