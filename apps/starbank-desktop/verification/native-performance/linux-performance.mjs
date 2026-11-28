@@ -28,7 +28,8 @@ const webKitProcess = "WebKitWebProcess";
 const fileQueue = 'aside[aria-label="File open requests"]';
 const webdriverElement = "element-6066-11e4-a52e-4f735466cecf";
 const repetitions = 5;
-const settleMs = 1_000;
+const earlySettleMs = 1_000;
+const lateSettleMs = 15_000;
 const sampleCount = 7;
 const sampleIntervalMs = 500;
 const readinessTimeoutMs = 10_000;
@@ -39,6 +40,7 @@ const outputLimit = 128 * 1024;
 const maxMembers = 256;
 const maxDiagnosticChars = 1_000;
 const maxU64 = (1n << 64n) - 1n;
+const maxSafeInteger = BigInt(Number.MAX_SAFE_INTEGER);
 const launcherEnvironment = [
   "WEBKIT_INSPECTOR_SERVER",
   "GTK_OVERLAY_SCROLLING",
@@ -194,7 +196,7 @@ function cgroupCommands(helper) {
         assert(
           member &&
             Object.keys(member).sort().join(",") ===
-              "effective_uid,executable,pid,starttime_ticks",
+              "effective_uid,executable,pid,starttime_ticks,system_cpu_ticks,user_cpu_ticks",
           "Invalid cgroup member fields.",
         );
         assert(
@@ -202,6 +204,8 @@ function cgroupCommands(helper) {
             member.pid !== "0" &&
             canonicalUnsigned(member.starttime_ticks) &&
             canonicalUnsigned(member.effective_uid) &&
+            canonicalUnsigned(member.user_cpu_ticks) &&
+            canonicalUnsigned(member.system_cpu_ticks) &&
             typeof member.executable === "string" &&
             isAbsolute(member.executable),
           "Invalid cgroup member identity.",
@@ -321,7 +325,9 @@ async function observeReadiness(command, context, trial, file) {
     trial.timing.open_click_to_visible_table_ms = tableReadyAt - clickedAt;
     trial.timing.session_post_to_visible_table_ms =
       tableReadyAt - sessionStartedAt;
+    return tableReadyAt;
   }
+  return actionReadyAt;
 }
 
 function assertMeasuredMembers(members, uid) {
@@ -349,18 +355,123 @@ function assertMeasuredMembers(members, uid) {
   return application[0];
 }
 
-async function measureIdle(cgroup, leaf, trial, uid) {
-  trial.members_at_ready = await cgroup.members(leaf);
-  const readyApp = assertMeasuredMembers(trial.members_at_ready, uid);
-  await delay(settleMs);
-  trial.samples = [];
+function memberIdentity({ pid, starttime_ticks, executable, effective_uid }) {
+  return { pid, starttime_ticks, executable, effective_uid };
+}
+
+function sameMember(start, end) {
+  return (
+    start.pid === end.pid &&
+    start.starttime_ticks === end.starttime_ticks &&
+    start.executable === end.executable &&
+    start.effective_uid === end.effective_uid
+  );
+}
+
+async function captureMembers(cgroup, leaf, readyAt) {
+  const request_started_ms_after_readiness = performance.now() - readyAt;
+  let result;
+  try {
+    result = { members: await cgroup.members(leaf) };
+  } catch (error) {
+    result = { failure: describeError(error) };
+  }
+  return {
+    request_started_ms_after_readiness,
+    request_finished_ms_after_readiness: performance.now() - readyAt,
+    ...result,
+  };
+}
+
+function cpuTickDelta(start, end) {
+  const delta = BigInt(end) - BigInt(start);
+  assert(delta >= 0n, "A matched process CPU tick counter moved backwards.");
+  return delta;
+}
+
+function attributeCpu(start, end, ticksPerSecond) {
+  if (!start.members || !end.members) return { status: "unavailable" };
+  const startByPid = new Map(
+    start.members.map((member) => [member.pid, member]),
+  );
+  const endByPid = new Map(end.members.map((member) => [member.pid, member]));
+  const matched = [];
+  const startOnly = [];
+  const endOnly = [];
+  const midpoint = (request) =>
+    (request.request_started_ms_after_readiness +
+      request.request_finished_ms_after_readiness) /
+    2;
+  const duration = midpoint(end) - midpoint(start);
+  assert(duration > 0, "The membership sample window moved backwards.");
+  for (const member of start.members) {
+    const ending = endByPid.get(member.pid);
+    if (!ending || !sameMember(member, ending)) {
+      startOnly.push(memberIdentity(member));
+      continue;
+    }
+    const user = cpuTickDelta(member.user_cpu_ticks, ending.user_cpu_ticks);
+    const system = cpuTickDelta(
+      member.system_cpu_ticks,
+      ending.system_cpu_ticks,
+    );
+    const total = user + system;
+    assert(
+      total <= maxSafeInteger,
+      "A process CPU tick delta is out of range.",
+    );
+    const cpuMs = (Number(total) / ticksPerSecond) * 1_000;
+    const corePercent = (cpuMs / duration) * 100;
+    assert(
+      cpuMs <= Number.MAX_SAFE_INTEGER && Number.isFinite(corePercent),
+      "The process CPU delta cannot be safely represented.",
+    );
+    matched.push({
+      ...memberIdentity(member),
+      user_cpu_delta_ticks: Number(user),
+      system_cpu_delta_ticks: Number(system),
+      cpu_delta_ms: cpuMs,
+      cpu_percent_of_one_core: corePercent,
+    });
+  }
+  for (const member of end.members) {
+    const starting = startByPid.get(member.pid);
+    if (!starting || !sameMember(starting, member))
+      endOnly.push(memberIdentity(member));
+  }
+  return {
+    status:
+      startOnly.length || endOnly.length ? "partial" : "matched_endpoints",
+    membership_midpoint_span_ms: duration,
+    matched,
+    start_only: startOnly,
+    end_only: endOnly,
+  };
+}
+
+async function measureIdle(
+  cgroup,
+  leaf,
+  window,
+  readyAt,
+  settle,
+  ticksPerSecond,
+) {
+  const earliest = readyAt + settle;
+  while (performance.now() < earliest) {
+    const remaining = Math.ceil(earliest - performance.now());
+    if (remaining > 0) await delay(remaining);
+  }
+  window.members_at_start = await captureMembers(cgroup, leaf, readyAt);
+  window.samples = [];
   const started = performance.now();
+  window.samples_started_ms_after_readiness = started - readyAt;
   for (let index = 0; index < sampleCount; index++) {
     if (index > 0) await delay(sampleIntervalMs);
     const before = performance.now();
     const sample = await cgroup.sample(leaf);
     const after = performance.now();
-    trial.samples.push({
+    window.samples.push({
       request_midpoint_ms: (before + after) / 2 - started,
       request_duration_ms: after - before,
       ...sample,
@@ -370,27 +481,42 @@ async function measureIdle(cgroup, leaf, trial, uid) {
       "The app left the measurement leaf during the sample window.",
     );
   }
-  trial.members_at_idle_end = await cgroup.members(leaf);
-  const endingApp = assertMeasuredMembers(trial.members_at_idle_end, uid);
-  assert.deepEqual(
-    endingApp,
-    readyApp,
-    "The measured app changed during the idle interval.",
-  );
-  const first = trial.samples[0];
-  const last = trial.samples.at(-1);
+  window.members_at_end = await captureMembers(cgroup, leaf, readyAt);
+  const first = window.samples[0];
+  const last = window.samples.at(-1);
   const duration = last.request_midpoint_ms - first.request_midpoint_ms;
   const cpu = last.cpu_usage_usec - first.cpu_usage_usec;
   assert(
     duration > 0 && cpu >= 0,
     "The sample window or CPU counter moved backwards.",
   );
-  trial.idle = {
+  window.idle = {
     sample_midpoint_span_ms: duration,
     cpu_usage_delta_usec: cpu,
     cpu_percent_of_one_core: (cpu / (duration * 1_000)) * 100,
     final_memory_peak_bytes: last.memory_peak_bytes,
   };
+  window.attribution = attributeCpu(
+    window.members_at_start,
+    window.members_at_end,
+    ticksPerSecond,
+  );
+}
+
+function verifyTrialMembership(trial, uid) {
+  const snapshots = [
+    trial.members_at_start,
+    trial.members_at_end,
+    trial.late.members_at_start,
+    trial.late.members_at_end,
+  ];
+  let app;
+  for (const snapshot of snapshots) {
+    assert(snapshot.members, "A membership snapshot could not be captured.");
+    const observedApp = assertMeasuredMembers(snapshot.members, uid);
+    assert(!app || sameMember(app, observedApp), "The measured app changed.");
+    app = observedApp;
+  }
 }
 
 function describeError(error, depth = 0) {
@@ -424,11 +550,44 @@ function waitForLeafEmpty(cgroup, leaf) {
 }
 
 async function observeTrial(command, context, fixture) {
-  const { cgroup, leaf, scenario, trial, uid, closeSender } = fixture;
+  const {
+    cgroup,
+    leaf,
+    scenario,
+    trial,
+    uid,
+    closeSender,
+    ticksPerSecond,
+    checkpoint,
+  } = fixture;
   const errors = [];
   try {
-    await observeReadiness(command, context, trial, scenario.inputs.length > 0);
-    await measureIdle(cgroup, leaf, trial, uid);
+    const readyAt = await observeReadiness(
+      command,
+      context,
+      trial,
+      scenario.inputs.length > 0,
+    );
+    await measureIdle(
+      cgroup,
+      leaf,
+      trial,
+      readyAt,
+      earlySettleMs,
+      ticksPerSecond,
+    );
+    await checkpoint();
+    trial.late = {};
+    await measureIdle(
+      cgroup,
+      leaf,
+      trial.late,
+      readyAt,
+      lateSettleMs,
+      ticksPerSecond,
+    );
+    await checkpoint();
+    verifyTrialMembership(trial, uid);
   } catch (error) {
     recordFailure(trial, "observe", error);
     errors.push(error);
@@ -455,7 +614,8 @@ async function observeTrial(command, context, fixture) {
     );
 }
 
-async function runTrial(scenario, trial, shim, cgroup, uid, closeSender) {
+async function runTrial(scenario, trial, shim, observer) {
+  const { cgroup } = observer;
   trial.failures = [];
   trial.empty_before_session_delete = false;
   let leaf;
@@ -476,12 +636,10 @@ async function runTrial(scenario, trial, shim, cgroup, uid, closeSender) {
       scenario.inputs,
       (command, context) =>
         observeTrial(command, context, {
-          cgroup,
+          ...observer,
           leaf,
           scenario,
           trial,
-          uid,
-          closeSender,
         }),
       { applicationArgumentsPrefix: [leaf.token, leaf.device, leaf.inode] },
     );
@@ -543,16 +701,19 @@ function snapshotWriter(output, scratch) {
 async function measure(helperDirectory, closeSender, output) {
   const scenarios = makeScenarios();
   const report = {
-    schema_version: 1,
+    schema_version: 2,
     started_at: new Date().toISOString(),
     build_scope:
       "Installed unsigned Linux debug Debian package on a hosted Xvfb runner",
     accounting_scope:
       "Fresh cgroup v2 leaf containing the app and its descendants, including the final work of the admission launcher. Shared services outside the leaf are excluded. Memory counters are cgroup-charged bytes and kernel peak watermarks.",
     timing_scope:
-      "Fresh app and WebView processes launch with unflushed system caches. Startup includes automation from WebDriver session POST through observed UI readiness. Idle CPU spans first and last sample-command midpoints, with WebDriver idle throughout sampling.",
-    settle_ms: settleMs,
-    samples_per_trial: sampleCount,
+      "Fresh app and WebView processes launch with unflushed system caches. Startup includes automation from WebDriver session POST through observed UI readiness. Quiet CPU windows span first and last cgroup sample-command midpoints, with no WebDriver calls after readiness until both windows finish. The early window can include work deferred from startup.",
+    attribution_scope:
+      "Process CPU deltas use Linux clock ticks for matching PID, start time, executable and effective UID at each window's endpoints. Membership commands bracket the group samples and have a separate midpoint span. Processes missing at either endpoint or present only between endpoints can contribute to group totals without appearing in process deltas.",
+    settle_ms: earlySettleMs,
+    late_settle_ms: lateSettleMs,
+    samples_per_window: sampleCount,
     sample_interval_ms: sampleIntervalMs,
     trials: Array.from({ length: repetitions }, (_, index) =>
       scenarios.map((scenario) => ({
@@ -576,6 +737,13 @@ async function measure(helperDirectory, closeSender, output) {
       "Expected the native close sender executable.",
     );
     const uid = String(process.getuid());
+    const ticks = (await invoke("/usr/bin/getconf", ["CLK_TCK"])).trim();
+    assert(canonicalUnsigned(ticks), "Invalid Linux CLK_TCK value.");
+    const ticksPerSecond = Number(ticks);
+    assert(
+      Number.isSafeInteger(ticksPerSecond) && ticksPerSecond > 0,
+      "Linux CLK_TCK must be a positive safe integer.",
+    );
     const packageRows = await invoke("/usr/bin/dpkg-query", [
       "-W",
       `-f=\${Package}\t\${Version}\t\${Architecture}\n`,
@@ -590,6 +758,7 @@ async function measure(helperDirectory, closeSender, output) {
       kernel: release(),
       architecture: process.arch,
       node: process.version,
+      process_clock_ticks_per_second: ticksPerSecond,
       available_cpu_count: availableParallelism(),
       physical_memory_bytes: totalmem(),
       executable_bytes: app.size,
@@ -620,18 +789,18 @@ async function measure(helperDirectory, closeSender, output) {
       { flag: "wx", mode: 0o700 },
     );
     const cgroup = cgroupCommands(helpers.cgroup);
+    const observer = {
+      cgroup,
+      uid,
+      closeSender,
+      ticksPerSecond,
+      checkpoint: () => persist(report),
+    };
     for (const [index, trial] of report.trials.entries()) {
       const scenario = scenarios[index % scenarios.length];
       trial.status = "running";
       await persist(report);
-      const canContinue = await runTrial(
-        scenario,
-        trial,
-        shim,
-        cgroup,
-        uid,
-        closeSender,
-      );
+      const canContinue = await runTrial(scenario, trial, shim, observer);
       if (!canContinue) {
         report.stopped_after = {
           scenario: trial.scenario,
