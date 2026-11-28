@@ -87,6 +87,7 @@ declare const __STARBANK_PLATFORM_INFO__: SettingsPlatformInfo;
 
 const APP_NAME = "StarBank Reloaded";
 const REOPEN_REQUIRED = "Reopen the bank after the verified write.";
+const PROFILE_CONTEXT_REQUIRED = "profile_context_required";
 
 interface DesktopDocument {
   projection: BankEditorDocument;
@@ -126,6 +127,7 @@ function DesktopApp() {
       ? refreshRequest?.observed
       : undefined;
   const [profile, setProfile] = useState<EngineProfile>();
+  const [profileAuthorDocument, setProfileAuthorDocument] = useState<string>();
   const [hasDraft, setHasDraft] = useState(false);
   const currentDraft = useRef(false);
   const [nativeNotice, setNativeNotice] = useState<string>();
@@ -303,6 +305,19 @@ function DesktopApp() {
     const reply = decodeEngineReply(nativeReply.control, id);
     const error = engineReplyError(reply, scope);
     if (error) {
+      const active = currentDocument.current?.projection;
+      if (
+        command.kind === "profile_load" &&
+        command.payload.format === "legacy_yaml" &&
+        reply.result.kind === "error" &&
+        reply.result.payload.code === PROFILE_CONTEXT_REQUIRED &&
+        reply.document_id === target.id &&
+        reply.revision === target.revision &&
+        active?.id === target.id &&
+        active.revision === target.revision
+      ) {
+        setProfileAuthorDocument(target.id);
+      }
       if (error instanceof SnapshotRefreshRequired)
         rememberRefresh(error.target);
       throw error;
@@ -367,6 +382,9 @@ function DesktopApp() {
   }
 
   function publishDocument(next: DesktopDocument) {
+    if (currentDocument.current?.projection.id !== next.projection.id) {
+      setProfileAuthorDocument(undefined);
+    }
     currentDocument.current = next;
     setDocument(next);
     setRefreshRequest(undefined);
@@ -391,6 +409,8 @@ function DesktopApp() {
       throw new Error("The bank changed before its profile could be loaded.");
     }
     setProfile(reply.result.payload);
+    if (command.kind !== "profile_snapshot")
+      setProfileAuthorDocument(undefined);
   }
 
   function update(
@@ -868,17 +888,14 @@ function DesktopApp() {
         : undefined,
     profile: {
       current: profile ?? { status: "unloaded" },
-      requireAuthor: profile?.status === "missing_context",
+      requireAuthor:
+        profile?.status === "missing_context" ||
+        (profileAuthorDocument !== undefined &&
+          profileAuthorDocument === document?.projection.id),
       onLoad: (target, file, author) =>
         action(async () => {
-          if (!document || document.projection.id !== target.id) {
-            throw new Error("Open a bank before loading a profile.");
-          }
-          const payload = profileLoadForFile(
-            file,
-            document.projection.name,
-            author,
-          );
+          const { projection } = activeDocument(target);
+          const payload = profileLoadForFile(file, projection.name, author);
           const bytes = new Uint8Array(await file.arrayBuffer());
           await updateProfile(target, { kind: "profile_load", payload }, bytes);
           return { ok: true };

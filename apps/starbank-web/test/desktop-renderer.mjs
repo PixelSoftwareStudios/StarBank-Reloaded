@@ -10,6 +10,10 @@ import {
   configureDesktopClipboard,
   verifyDesktopClipboard,
 } from "./desktop-clipboard.mjs";
+import {
+  createDesktopProfileImportFixture,
+  verifyDesktopProfileImport,
+} from "./desktop-profile-import.mjs";
 import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
 import { verifySidebarResize } from "./sidebar-resize.mjs";
 import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
@@ -163,6 +167,7 @@ function createBridge(
   canOverwrite,
   copyCapability,
   sourceBank = initialBank,
+  profileImport,
 ) {
   const calls = [];
   const unexpected = [];
@@ -229,6 +234,9 @@ function createBridge(
   }
 
   function transformReply(request, reply) {
+    if (profileImport && request.command.kind === "profile_load") {
+      return profileImport.transformReply(request, reply);
+    }
     if (
       failedOpenTarget &&
       request.command.kind === "raw_text" &&
@@ -396,7 +404,9 @@ function createBridge(
         }
         openCount += 1;
         openName =
-          openCount === 1 ? initialName : `Replacement-${openCount}.SC2Bank`;
+          openCount === 1
+            ? (profileImport?.name ?? initialName)
+            : `Replacement-${openCount}.SC2Bank`;
         return acceptBankOpen(request, sourceBank);
       }
       case "active_backup_status":
@@ -1568,6 +1578,10 @@ async function verifyRenderer(
       : openRecovery === "clipboard_denied"
         ? "denied"
         : undefined;
+  const profileImport =
+    openRecovery === "legacy_profile"
+      ? createDesktopProfileImportFixture()
+      : undefined;
   const context = await browser.newContext({
     offline: true,
     serviceWorkers: "block",
@@ -1602,11 +1616,22 @@ async function verifyRenderer(
       engine,
       canOverwrite,
       copyCapability,
-      clipboardMode ? clipboardBank : initialBank,
+      profileImport?.bank ?? (clipboardMode ? clipboardBank : initialBank),
+      profileImport,
     );
     if (clipboardMode) await configureDesktopClipboard(page, clipboardMode);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (profileImport) {
+      await verifyDesktopProfileImport(page, engine, bridge, profileImport);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer retried legacy YAML with a scoped author after typed context refusal.`,
+      );
+      return;
+    }
     if (clipboardMode) {
       await openBank(page);
       await editGold(page, "002");
@@ -1735,6 +1760,7 @@ try {
   await verifyRenderer(browser, true, "close_probe");
   await verifyRenderer(browser, true, "structure_close");
   await verifyRenderer(browser, false, "sidebar_resize");
+  await verifyRenderer(browser, false, "legacy_profile");
   await verifyRenderer(browser, false, "clipboard_absent");
   await verifyRenderer(browser, false, "clipboard_denied");
   for (const capability of [
