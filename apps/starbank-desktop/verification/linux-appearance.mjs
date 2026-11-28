@@ -8,6 +8,11 @@ const dark = ["dark", "Dark"];
 const colorSchemes = { system: "light dark", light: "light", dark: "dark" };
 const compact = ["compact", "Compact"];
 const comfortable = ["comfortable", "Comfortable"];
+const small = ["small", "Small"];
+const normal = ["normal", "Normal"];
+const large = ["large", "Large"];
+const rootFontPx = { small: 14, normal: 16, large: 18 };
+const optionLabelRem = 0.8125;
 
 function stage(message) {
   console.log(`Linux native appearance: ${message}`);
@@ -36,6 +41,10 @@ export async function verifyAppearancePreferences({
         background: getComputedStyle(shells[0]).backgroundColor,
         prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
         density: shells[0].dataset.density,
+        textSize: html.dataset.starbankTextSize,
+        rootFontPx: Number.parseFloat(getComputedStyle(html).fontSize),
+        labelText: label.textContent.trim(),
+        labelFontPx: Number.parseFloat(getComputedStyle(label).fontSize),
         labelPadding: Number.parseFloat(getComputedStyle(label).paddingBlockStart),
       };`);
   const readSettings = (label = null, choice = null) =>
@@ -54,14 +63,16 @@ export async function verifyAppearancePreferences({
       }
       const theme = labelledSelect("Theme");
       const density = labelledSelect("Density");
-      if (!theme || !density) return null;
+      const textSize = labelledSelect("Text size");
+      if (!theme || !density || !textSize) return null;
       if (label !== null) {
-        const control = label === "Theme" ? theme : density;
+        const control = { Theme: theme, Density: density, "Text size": textSize }[label];
+        if (!control) return null;
         const options = Array.from(control.options)
           .filter((option) => option.value === choice[0] && option.text === choice[1] && !option.matches(":disabled"));
         return options.length === 1 ? options[0] : null;
       }
-      return [theme, density].map((field) => [field.value, field.selectedOptions[0]?.text]);`,
+      return [theme, density, textSize].map((field) => [field.value, field.selectedOptions[0]?.text]);`,
       settings,
       label,
       choice,
@@ -74,44 +85,49 @@ export async function verifyAppearancePreferences({
     assert.equal(typeof option?.[elementKey], "string", "Missing option ID.");
     await command(`/element/${option[elementKey]}/click`, "POST", {});
   }
-  async function applied(theme, density) {
+  async function applied(theme, density, textSize) {
     const appearance = await readApplied();
     return appearance?.theme === theme[0] &&
       appearance.colorScheme === colorSchemes[theme[0]] &&
       appearance.density === density[0] &&
+      appearance.textSize === textSize[0] &&
+      appearance.rootFontPx === rootFontPx[textSize[0]] &&
+      appearance.labelText === "Hide Blizzard maps" &&
+      appearance.labelFontPx === rootFontPx[textSize[0]] * optionLabelRem &&
       Number.isFinite(appearance.labelPadding)
       ? appearance
       : null;
   }
-  async function confirmedSettings(theme, density) {
+  async function confirmedSettings(theme, density, textSize) {
     const selected = await readSettings();
-    if (JSON.stringify(selected) !== JSON.stringify([theme, density]))
+    if (JSON.stringify(selected) !== JSON.stringify([theme, density, textSize]))
       return null;
-    return applied(theme, density);
+    return applied(theme, density, textSize);
   }
   async function selectTheme(choice) {
     stage(`Selecting ${choice[1]} on the real Theme control.`);
     await clickChoice("Theme", choice);
     return waitFor(
       `the confirmed ${choice[1]} theme and applied color scheme`,
-      () => confirmedSettings(choice, compact),
+      () => confirmedSettings(choice, compact, normal),
     );
   }
-  async function welcomeWithAppearance(theme, density) {
+  async function welcomeWithAppearance(theme, density, textSize) {
     if (
       (await content(settings)) !== null ||
       (await content(".editor-welcome h1")) !== "StarBank Reloaded" ||
       (await content('.editor-welcome p[role="status"]')) !== "No bank open."
     )
       return null;
-    return applied(theme, density);
+    return applied(theme, density, textSize);
   }
 
   const initialTheme = selectAppearance ? system : dark;
   const initialDensity = selectAppearance ? compact : comfortable;
+  const initialTextSize = selectAppearance ? normal : large;
   const initial = await waitFor(
     "the unopened welcome view with the expected applied appearance",
-    () => welcomeWithAppearance(initialTheme, initialDensity),
+    () => welcomeWithAppearance(initialTheme, initialDensity, initialTextSize),
   );
   const location = new URL(await command("/url"));
   assert.equal(location.protocol, "tauri:");
@@ -120,7 +136,7 @@ export async function verifyAppearancePreferences({
 
   await click('button[aria-label="Settings"]', null);
   await waitFor("the visible enabled Appearance selectors", () =>
-    confirmedSettings(initialTheme, initialDensity),
+    confirmedSettings(initialTheme, initialDensity, initialTextSize),
   );
   if (selectAppearance) {
     const lightAppearance = await selectTheme(light);
@@ -146,22 +162,39 @@ export async function verifyAppearancePreferences({
     stage("Selecting Comfortable on the real Density control.");
     await clickChoice("Density", comfortable);
     const updated = await waitFor("the confirmed Comfortable density", () =>
-      confirmedSettings(dark, comfortable),
+      confirmedSettings(dark, comfortable, normal),
     );
     assert(
       updated.labelPadding > initial.labelPadding,
       "Comfortable density must increase the Quick Options label padding.",
     );
+    let previousFont = initial.labelFontPx;
+    for (const choice of [small, large]) {
+      stage(`Selecting ${choice[1]} on the real Text size control.`);
+      await clickChoice("Text size", choice);
+      const typography = await waitFor(
+        `the confirmed ${choice[1]} text size and applied typography`,
+        () => confirmedSettings(dark, comfortable, choice),
+      );
+      assert(
+        choice === small
+          ? typography.labelFontPx < previousFont
+          : typography.labelFontPx > previousFont,
+        "Quick Options text must shrink for Small and grow for Large.",
+      );
+      previousFont = typography.labelFontPx;
+    }
   }
   await assertUnchanged();
   await clickButton("Back to editor");
-  await waitFor("the welcome view with Dark and Comfortable applied", () =>
-    welcomeWithAppearance(dark, comfortable),
+  await waitFor(
+    "the welcome view with Dark, Comfortable and Large applied",
+    () => welcomeWithAppearance(dark, comfortable, large),
   );
   await assertUnchanged();
   stage(
     selectAppearance
-      ? "Dark and Comfortable were selected and applied."
-      : "Dark and Comfortable were restored before opening Settings.",
+      ? "Dark, Comfortable and Large were selected and applied."
+      : "Dark, Comfortable and Large were restored before opening Settings.",
   );
 }
