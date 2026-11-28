@@ -5,6 +5,7 @@ import {
   Suspense,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,6 +17,7 @@ import {
 } from "../inventory/inventory-browser";
 import { resolveMapContext } from "../inventory/map-context";
 import {
+  type MapFilters,
   type MapInventory,
   type MapOptions,
   MapSidebar,
@@ -85,9 +87,24 @@ export function AppShell({
     MAP_PANE_WIDTH.initial,
   );
   const [previewWidth, setPreviewWidth] = useState<{ width: number }>();
+  const [pendingMapFilters, setPendingMapFilters] = useState<
+    Partial<Record<keyof MapFilters, { value: boolean }>>
+  >({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const previousFocus = useRef<HTMLElement | null>(null);
   const settings = preferences?.settings;
+  const hideBlizzardMaps =
+    pendingMapFilters.hideBlizzardMaps?.value ?? settings?.hideBlizzardMaps;
+  const hideMapsWithoutBanks =
+    pendingMapFilters.hideMapsWithoutBanks?.value ??
+    settings?.hideMapsWithoutBanks;
+  const mapFilterValues = useMemo(
+    () =>
+      hideBlizzardMaps === undefined || hideMapsWithoutBanks === undefined
+        ? undefined
+        : { hideBlizzardMaps, hideMapsWithoutBanks },
+    [hideBlizzardMaps, hideMapsWithoutBanks],
+  );
   const shownWidth =
     previewWidth?.width ?? settings?.mapPaneWidth ?? mapPaneWidth;
   const showSettings = settingsOpen && preferences !== undefined;
@@ -124,6 +141,26 @@ export function AppShell({
     );
   }
 
+  function changeMapFilter(key: keyof MapFilters, value: boolean) {
+    if (!preferences || preferences.readOnly) return;
+    const pending = { value };
+    setPendingMapFilters((current) => ({ ...current, [key]: pending }));
+    function settle() {
+      setPendingMapFilters((current) =>
+        current[key] === pending ? { ...current, [key]: undefined } : current,
+      );
+    }
+    void Promise.resolve(preferences.change(key, value)).then(settle, settle);
+  }
+
+  const mapFilters =
+    preferences && mapFilterValues
+      ? {
+          values: mapFilterValues,
+          onChange: changeMapFilter,
+          disabled: preferences.readOnly,
+        }
+      : undefined;
   const onOpenSettings = preferences
     ? openSettings
     : mapOptions?.onOpenSettings;
@@ -135,11 +172,7 @@ export function AppShell({
           onChange: (value) => preferences.change("autoResignOnSave", value),
           disabled: preferences.readOnly,
         },
-        filters: {
-          values: preferences.settings,
-          onChange: (key, value) => preferences.change(key, value),
-          disabled: preferences.readOnly,
-        },
+        filters: mapFilters,
         onOpenSettings,
       }
     : mapOptions;
@@ -188,6 +221,7 @@ export function AppShell({
             <Suspense fallback={<p role="status">Loading settings…</p>}>
               <SettingsPage
                 settings={preferences.settings}
+                mapFilters={mapFilters}
                 inventory={inventory}
                 accountScope={accountScope}
                 onChange={preferences.change}

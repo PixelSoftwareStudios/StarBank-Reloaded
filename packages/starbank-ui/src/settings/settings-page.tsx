@@ -4,7 +4,7 @@ import {
   type AccountScopeSelection,
   InventoryActions,
 } from "../inventory/inventory-browser";
-import type { MapInventory } from "../inventory/map-sidebar";
+import type { MapInventory, MapOptions } from "../inventory/map-sidebar";
 import { type AppSettings, MAP_PANE_WIDTH } from "./settings";
 import {
   settingsButtonClasses,
@@ -43,6 +43,10 @@ export interface SettingsDiscoveryControls {
 
 export interface SettingsPageProps {
   readonly settings: AppSettings;
+  readonly mapFilters?: Pick<
+    NonNullable<MapOptions["filters"]>,
+    "values" | "onChange"
+  >;
   readonly onChange: ChangeSetting;
   readonly onBack: () => void;
   readonly discovery?: SettingsDiscoveryControls;
@@ -99,6 +103,7 @@ const MAP_INDEX_WORKERS: readonly Choice<AppSettings["mapIndexWorkers"]>[] = [
 
 export function SettingsPage({
   settings,
+  mapFilters,
   onChange,
   onBack,
   discovery,
@@ -117,6 +122,8 @@ export function SettingsPage({
   const back = useRef<HTMLButtonElement>(null);
   const [pendingWidth, setPendingWidth] = useState<{ width: number }>();
   const mapPaneWidth = pendingWidth?.width ?? settings.mapPaneWidth;
+  const filterValues = mapFilters?.values ?? settings;
+  const changeMapFilter = mapFilters?.onChange ?? onChange;
   useEffect(() => {
     if (focusOnMount) back.current?.focus();
   }, [focusOnMount]);
@@ -185,14 +192,14 @@ export function SettingsPage({
           </p>
         )}
         <Toggle
-          checked={settings.hideBlizzardMaps}
-          onChange={(value) => onChange("hideBlizzardMaps", value)}
+          checked={filterValues.hideBlizzardMaps}
+          onChange={(value) => changeMapFilter("hideBlizzardMaps", value)}
         >
           Hide Blizzard maps
         </Toggle>
         <Toggle
-          checked={settings.hideMapsWithoutBanks}
-          onChange={(value) => onChange("hideMapsWithoutBanks", value)}
+          checked={filterValues.hideMapsWithoutBanks}
+          onChange={(value) => changeMapFilter("hideMapsWithoutBanks", value)}
         >
           Hide maps without bank files
         </Toggle>

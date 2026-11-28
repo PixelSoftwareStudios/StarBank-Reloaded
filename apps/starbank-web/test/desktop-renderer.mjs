@@ -19,6 +19,7 @@ import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
 import { verifySidebarResize } from "./sidebar-resize.mjs";
 import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
 import { verifyVerifiedNeedsReopen } from "./verified-needs-reopen.mjs";
+import { verifyVisibilityFilters } from "./visibility-filters.mjs";
 
 const dist = fileURLToPath(
   new URL("../../starbank-desktop/dist", import.meta.url),
@@ -109,6 +110,28 @@ const blockedInventory = {
   maps: [],
   banks: [],
 };
+const inventoryWithFilterExamples = {
+  ...inventory,
+  banks: inventory.banks.map((bank) => ({
+    ...bank,
+    mapIds: [...bank.mapIds, "map-official"],
+  })),
+  maps: [
+    ...inventory.maps,
+    {
+      ...inventory.maps[0],
+      id: "map-official",
+      name: "Synthetic Blizzard Map",
+      isBlizzard: true,
+    },
+    {
+      ...inventory.maps[0],
+      id: "map-empty",
+      name: "Synthetic Empty Map",
+      hasBankFiles: false,
+    },
+  ],
+};
 const backups = {
   records: [
     {
@@ -197,6 +220,7 @@ function createBridge(
   let inventoryResponse = canOverwrite ? blockedInventory : inventory;
   let preferences = { ...settings };
   const heldWidthWrites = [];
+  const heldFilterWrites = [];
 
   function settingsSnapshot() {
     return {
@@ -351,13 +375,20 @@ function createBridge(
       case "read_settings":
         return settingsSnapshot();
       case "change_setting":
-        if (args.change.key === "mapPaneWidth") {
+        if (
+          args.change.key === "mapPaneWidth" ||
+          isMapFilter(args.change.key)
+        ) {
+          const { key, value } = args.change;
+          const writes =
+            key === "mapPaneWidth" ? heldWidthWrites : heldFilterWrites;
+          if (isMapFilter(key)) assert.equal(typeof value, "boolean");
           const finish = (error) => {
             if (error) return { error };
-            preferences = { ...preferences, mapPaneWidth: args.change.value };
+            preferences = { ...preferences, [key]: value };
             return settingsSnapshot();
           };
-          return heldWidthWrites.shift()?.then(finish) ?? finish();
+          return writes.shift()?.then(finish) ?? finish();
         }
         assert.equal(args.change.key, "mapIndexWorkers");
         assert(["auto", "1", "2", "3", "4"].includes(args.change.value));
@@ -583,6 +614,18 @@ function createBridge(
       heldWidthWrites.push(promise);
       return resolve;
     },
+    holdNextFilterWrite() {
+      const { promise, resolve } = Promise.withResolvers();
+      heldFilterWrites.push(promise);
+      return resolve;
+    },
+    setStoredFilter(key, value) {
+      assert(isMapFilter(key) && typeof value === "boolean");
+      preferences = { ...preferences, [key]: value };
+    },
+    presentInventoryFilterExamples() {
+      inventoryResponse = inventoryWithFilterExamples;
+    },
     setStoredWidth(mapPaneWidth) {
       preferences = { ...preferences, mapPaneWidth };
     },
@@ -612,6 +655,10 @@ function createBridge(
   };
 }
 
+function isMapFilter(key) {
+  return key === "hideBlizzardMaps" || key === "hideMapsWithoutBanks";
+}
+
 async function bindRenderer(page, bridge) {
   await page.exposeFunction("invokeDesktopFixture", bridge.invoke);
   await page.addInitScript(() => {
@@ -620,6 +667,8 @@ async function bindRenderer(page, bridge) {
     window.fixtureNavigationReplies = 0;
     window.fixtureWidthRequests = 0;
     window.fixtureWidthReplies = 0;
+    window.fixtureFilterRequests = 0;
+    window.fixtureFilterReplies = 0;
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
     window.__TAURI_INTERNALS__ = {
       transformCallback(callback) {
@@ -647,12 +696,18 @@ async function bindRenderer(page, bridge) {
           window.fixtureRequestedCloseTicket = args.report.ticket;
         const changingWidth =
           command === "change_setting" && args.change.key === "mapPaneWidth";
+        const changingFilter =
+          command === "change_setting" &&
+          (args.change.key === "hideBlizzardMaps" ||
+            args.change.key === "hideMapsWithoutBanks");
         if (changingWidth) window.fixtureWidthRequests += 1;
+        if (changingFilter) window.fixtureFilterRequests += 1;
         const reply = await window.invokeDesktopFixture(
           command,
           binary ? Array.from(args) : args,
         );
         if (changingWidth) window.fixtureWidthReplies += 1;
+        if (changingFilter) window.fixtureFilterReplies += 1;
         if (command === "confirm_bank_navigation")
           window.fixtureNavigationReplies += 1;
         if (command === "can_create_bank_copy")
@@ -1767,6 +1822,8 @@ async function verifyRenderer(
             : initialBank),
       profileImport,
     );
+    if (openRecovery === "visibility_filters")
+      bridge.presentInventoryFilterExamples();
     if (clipboardMode || nativeClipboard)
       await configureDesktopClipboard(page, clipboardMode ?? "denied");
     await bindRenderer(page, bridge);
@@ -1849,6 +1906,16 @@ async function verifyRenderer(
       );
       return;
     }
+    if (openRecovery === "visibility_filters") {
+      await verifyVisibilityFilters(page, bridge);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer preserved rapid visibility filter reversals through delayed settings writes.`,
+      );
+      return;
+    }
     if (openRecovery) {
       await verifyAcceptedOpen(page, bridge, canOverwrite);
       const currentName = "Replacement-2.SC2Bank";
@@ -1910,6 +1977,7 @@ try {
   await verifyRenderer(browser, true, "close_probe");
   await verifyRenderer(browser, true, "structure_close");
   await verifyRenderer(browser, false, "sidebar_resize");
+  await verifyRenderer(browser, false, "visibility_filters");
   await verifyRenderer(browser, false, "legacy_profile");
   await verifyRenderer(browser, false, "clipboard_absent");
   await verifyRenderer(browser, false, "clipboard_denied");
