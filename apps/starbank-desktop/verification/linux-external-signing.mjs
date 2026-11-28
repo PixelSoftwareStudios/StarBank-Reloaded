@@ -24,6 +24,11 @@ const context = [
   ["Player handle", "1-S2-1-9922"],
   ["Bank name without extension", "DigestBank"],
 ];
+const cancelledContext = [
+  ["Map author handle", "1-S2-1-7711"],
+  ["Player handle", "1-S2-1-7722"],
+  ["Bank name without extension", "CancelledBank"],
+];
 const malformedAuthor = "1-S2-X-9911";
 const malformedAuthorMessage =
   "The bank operation was refused. invalid author handle";
@@ -103,6 +108,32 @@ export async function verifyExternalSigning({
     (await editorRetained()) &&
     (await tableValue()) === editedValue &&
     (await findControl(".document-editor button", "Undo"));
+  async function openUnsignedSource() {
+    await click(tools, null);
+    stage("Tools trigger clicked. Selecting external re-sign.");
+    await click(`${toolsMenu} [role="menuitem"]`, "Re-sign external bank…");
+    stage("External re-sign selected. Submitting the GTK source path.");
+    await chooseSource();
+    stage("Source path submitted. Waiting for the signing form.");
+    await waitFor("the unsigned external bank in the signing form", () =>
+      evaluate(
+        `const [selector, name] = arguments;
+        const dialog = document.querySelector(selector);
+        const label = dialog?.getAttribute("aria-labelledby");
+        const summary = dialog?.getAttribute("aria-describedby");
+        return document.getElementById(label)?.textContent.trim() === "Re-sign external bank" &&
+          document.getElementById(summary)?.firstElementChild?.textContent.trim() === name + " · Unsigned";`,
+        dialog,
+        foreignName,
+      ),
+    );
+    stage("Unsigned signing form visible. Checking source chooser release.");
+    await waitForSourceChooserReleased();
+    assert.deepEqual(
+      await readContext(),
+      context.map(([label]) => [label, ""]),
+    );
+  }
 
   stage("Opening the queued active bank.");
   await openInitialBank(activeName, openingValue);
@@ -117,31 +148,23 @@ export async function verifyExternalSigning({
   await assertNoOutput();
 
   stage("Active edit confirmed. Opening Tools.");
-  await click(tools, null);
-  stage("Tools trigger clicked. Selecting external re-sign.");
-  await click(`${toolsMenu} [role="menuitem"]`, "Re-sign external bank…");
-  stage("External re-sign selected. Submitting the GTK source path.");
-  await chooseSource();
-  stage("Source path submitted. Waiting for the signing form.");
-  await waitFor("the unsigned external bank in the signing form", () =>
-    evaluate(
-      `const [selector, name] = arguments;
-      const dialog = document.querySelector(selector);
-      const label = dialog?.getAttribute("aria-labelledby");
-      const summary = dialog?.getAttribute("aria-describedby");
-      return document.getElementById(label)?.textContent.trim() === "Re-sign external bank" &&
-        document.getElementById(summary)?.firstElementChild?.textContent.trim() === name + " · Unsigned";`,
-      dialog,
-      foreignName,
-    ),
+  await openUnsignedSource();
+  stage("Source chooser released. Entering context to discard.");
+  for (const [label, value] of cancelledContext)
+    await sendContextValue(await focusContextField(label), value);
+  assert.deepEqual(await readContext(), cancelledContext);
+  stage("Entered context confirmed. Cancelling the signing form.");
+  await click(`${dialog} button`, "Cancel");
+  await waitFor(
+    "the closed signing form and editable dirty bank with Undo after Cancel",
+    async () => (await content(dialog)) === null && (await undoRetained()),
   );
-  stage("Unsigned signing form visible. Checking source chooser release.");
-  await waitForSourceChooserReleased();
-  stage("Source chooser released. Entering signing context.");
-  assert.deepEqual(
-    await readContext(),
-    context.map(([label]) => [label, ""]),
-  );
+  await assertFilesUnchanged();
+  await assertNoOutput();
+
+  stage("Cancel retained the active edit. Opening Tools again.");
+  await openUnsignedSource();
+  stage("Reopened signing form is empty. Entering signing context.");
   const [authorLabel, authorHandle] = context[0];
   const malformedContext = [
     [authorLabel, malformedAuthor],
