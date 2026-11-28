@@ -319,6 +319,15 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 5
         run: python3 -B crates/vendor/verification/rfd/run_ownership.py
+      - name: Verify case-insensitive GTK bank Open filtering
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: >-
+          xvfb-run -a dbus-run-session -- env G_DEBUG=fatal-criticals
+          cargo test --locked -p starbank-desktop --bin starbank-desktop
+          --no-default-features --features desktop
+          selection::tests::gtk_open_filter_matches_all_ascii_casings --
+          --ignored --exact --test-threads=1
       - name: Install the verified Debian package
         id: install_deb
         if: runner.os == 'Linux'
