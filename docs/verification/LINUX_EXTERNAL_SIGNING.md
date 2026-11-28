@@ -78,3 +78,21 @@ All eleven jobs passed at `cc57b12` and its documentation-only repeat `dd9b46f`.
 The `da404e3` fixture enters the nonempty malformed author handle `1-S2-X-9911` with the valid player and bank stem above. Check signature must return exactly `The bank operation was refused. invalid author handle`, with no signature status or output. Both source files and the active dirty edit must remain intact. The fixture then repairs the real author input using Ctrl+A, Backspace and WebDriver text input, confirms the error cleared and the exact valid context returned, and continues through the unsigned check and byte-exact signed-copy assertions.
 
 All eleven jobs passed in [run 46123116220](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46123116220). Both installed Linux WebView steps executed the rejection, keyboard repair and signed-copy checks, including final file comparisons after discard-close. Both named GTK filter tests, native tests, resource measurements and owned package cleanup passed. This records a native rejection-and-repair case, not a broader claim about every malformed context.
+
+## Cancellation and reopen
+
+The `d458b9a` fixture, included in `3208117`, fills the first signing form with a distinct context and reads all three fields back before selecting Cancel:
+
+| Form field | Cancelled value |
+| --- | --- |
+| Map author handle | `1-S2-1-7711` |
+| Player handle | `1-S2-1-7722` |
+| Bank name without extension | `CancelledBank` |
+
+No signature check or export is requested for that context. After Cancel, the fixture requires the signing form to close and the original `Current.SC2Bank` to remain editable with Gold `1,234`, unsaved changes in one section, enabled Undo, no draft and no queued foreign bank. Both sources remain byte exact and the output is absent.
+
+The fixture then opens the real GTK source chooser again and selects the same unsigned foreign bank. All three fields in the reopened form must be blank. It continues through the malformed-author rejection, keyboard repair, unsigned check and independent 170-byte signed-copy comparison described above. The settings opt-out, active dirty edit and post-Discard source/output checks remain required.
+
+All eleven jobs passed in [run 46124016561 at `3208117`](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46124016561). Both installed Linux architectures executed this entered-context Cancel/reopen sequence and the subsequent complete signing case. Both named GTK filter tests, native tests, resource measurements, owned helper cleanup and package purge passed.
+
+This UI evidence shows that the cancelled form values were discarded and the reopened form started blank. It does not independently establish native source-ID revocation; [registry tests](../../apps/starbank-desktop/src-tauri/src/external_sign/tests.rs) cover revoked and cross-window sources separately. It does not qualify cancellation during an in-flight check/export, every Cancel path or ordinary GTK keyboard timing.
