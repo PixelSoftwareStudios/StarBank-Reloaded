@@ -26,6 +26,8 @@ jobs:
       - name: Check GTK ownership fixture formatting
         run: rustfmt --check --edition 2021 crates/vendor/verification/rfd/ownership.rs
       - run: python3 docs/verification/scripts/validate.py
+      - name: Test isolated Linux resource counter bookkeeping
+        run: python3 -B apps/starbank-desktop/verification/native-performance/test_linux_cgroup.py
       - run: python3 -B apps/starbank-desktop/verification/test_verify_package.py
       - name: Verify the pinned GLib security backport
         run: |

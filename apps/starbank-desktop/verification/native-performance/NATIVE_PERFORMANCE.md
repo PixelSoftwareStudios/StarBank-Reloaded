@@ -74,6 +74,12 @@ provides no verified attribution for WebKit helpers. Total desktop
 resource usage remains unqualified. These measurements apply to one
 host and this isolated build configuration.
 
+## Linux group-accounting preparation
+
+`linux-cgroup.py` prepares one fresh `starbank-perf-<random token>` cgroup v2 leaf under the existing CI root. Setup requires memory accounting already enabled and empty zero counters; it never enables ancestor controllers or changes their permissions. Samples preserve kernel CPU microseconds and current/peak charged memory bytes. These counters are not RSS, and the kernel watermark is reported without normalizing concurrent current/peak observations. Cleanup verifies the original device/inode and empty membership before removing only that leaf; it never kills processes.
+
+Twelve simulated-filesystem tests passed locally. CI runs them in the source job. They cover accounting fields, identity changes, existing leaves, controller gaps, malformed counters and refusal to remove populated groups. No real cgroup or app measurement has run through this helper. A supported app admission path, complete WebKit membership validation and hosted measurements remain required. Chowning only a destination `cgroup.procs` is insufficient for runner self-migration; the common ancestor's permissions also apply. The helper does not implement that ineffective approach. [Kernel cgroup v2 contract](https://docs.kernel.org/admin-guide/cgroup-v2.html) · [Kernel watermark update](https://github.com/torvalds/linux/blob/v6.14/mm/page_counter.c) · [Simulated tests](test_linux_cgroup.py)
+
 ## Reproduction
 
 The exact measured revision no longer resolves in the local checkout after the history rewrite. The archive command identifies the original input. Record a new run and its actual revision for a current measurement under the applicable testing policy. [Historical evidence](../../../../docs/verification/VERIFICATION_REGISTER.md#historical-evidence)
