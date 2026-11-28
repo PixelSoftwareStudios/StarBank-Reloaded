@@ -90,6 +90,7 @@ Depends on: 04,05.
 Depends on: 02.
 
 - [x] Implement prioritized candidates, Linux manual mode, scoped inventory and signing hints. [Implementation evidence](verification/IMPLEMENTATION.md)
+- [x] Verify installed Linux folder Cancel, nested loose-collection import and explicit Refresh, retaining the dirty editor and exact source bytes. All eleven jobs passed at `f67a74d`. [Manual collection evidence](verification/IMPLEMENTATION.md#installed-linux-manual-collection)
 - [ ] Verify real platform paths, player display names and UI integration for REQ-PATH-01, REQ-PATH-02 and REQ-MAP-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
