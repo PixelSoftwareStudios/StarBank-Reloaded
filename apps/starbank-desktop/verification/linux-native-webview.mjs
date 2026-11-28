@@ -25,6 +25,7 @@ import {
   discardGtkDirtyClose,
   discardGtkDirtyOpen,
   discardGtkDraftClose,
+  focusGtkMainWindow,
   requestGtkWindowClose,
   saveGtkDirtyCloseAs,
   saveGtkDirtyOpenAs,
@@ -42,6 +43,7 @@ const pollInterval = 100;
 const failureItemLimit = 8;
 const failureTextLimit = 1_000;
 const clipboardReadLimit = 4_096;
+const accessibilityOutputLimit = 4_096;
 const execFileAsync = promisify(execFile);
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 const controlKey = "\uE009";
@@ -384,6 +386,7 @@ async function verifyEditor(
     saveCopy,
     closeSender,
     assertClipboard,
+    assertAccessible,
   },
 ) {
   const {
@@ -477,6 +480,15 @@ async function verifyEditor(
   }
 
   await openInitialBank(first, "001", 2);
+  await focusGtkMainWindow();
+  await click(gold, null);
+  await waitFor("the focused native Table field", () =>
+    evaluate(
+      "return document.activeElement === document.querySelector(arguments[0]);",
+      gold,
+    ),
+  );
+  await assertAccessible("Gold value", "single-line", "001");
   await verifyRawEditing({
     command,
     waitFor,
@@ -485,6 +497,7 @@ async function verifyEditor(
     editedXml: bank("4321").toString("utf8"),
     assertInputsUnchanged,
     expectedQueue: { name: second, label: secondQueued },
+    assertAccessible,
   });
   await waitFor(
     "the second queued bank before editing",
@@ -845,7 +858,12 @@ async function withNativeSession(
   }
 }
 
-async function run(application, closeSender, clipboardReader) {
+async function run(
+  application,
+  closeSender,
+  clipboardReader,
+  accessibilityProbe,
+) {
   await using sharedConfig = await mkdtempDisposable(
     join(tmpdir(), "starbank-linux-preferences-"),
   );
@@ -871,6 +889,17 @@ async function run(application, closeSender, clipboardReader) {
         third,
         closeSender,
         assertInputsUnchanged,
+        async assertAccessible(name, lines, text) {
+          await execFileAsync(accessibilityProbe, [name, lines, text], {
+            encoding: "utf8",
+            killSignal: "SIGKILL",
+            maxBuffer: accessibilityOutputLimit,
+            timeout: commandTimeout,
+          });
+          console.log(
+            `Linux native AT-SPI: focused ${name} states and exact text verified.`,
+          );
+        },
         async assertClipboard() {
           const { stdout } = await execFileAsync(clipboardReader, [], {
             encoding: "buffer",
@@ -938,11 +967,12 @@ assert.equal(
 assert(process.env.DISPLAY, "Start the check with xvfb-run.");
 assert.equal(
   process.argv.length,
-  5,
-  "Pass the packaged application, X11 close sender and clipboard reader paths.",
+  6,
+  "Pass the packaged application, X11 close sender, clipboard reader and AT-SPI probe paths.",
 );
 await run(
   resolve(process.argv[2]),
   resolve(process.argv[3]),
   resolve(process.argv[4]),
+  resolve(process.argv[5]),
 );

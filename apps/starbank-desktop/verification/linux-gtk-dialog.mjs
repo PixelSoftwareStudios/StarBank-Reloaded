@@ -188,6 +188,11 @@ export async function cancelGtkSaveAsOnOpen() {
   await cancelGtkDestination(saveAsTitle);
 }
 
+/** Focuses this fixture's exact main X11 window before accessibility checks. */
+export function focusGtkMainWindow() {
+  return focusDialog(mainWindowTitle);
+}
+
 /** Sends ICCCM WM_DELETE_WINDOW to this fixture's exact main X11 window. */
 export async function requestGtkWindowClose(sender, expectedWindow) {
   const window = await focusDialog(mainWindowTitle);
