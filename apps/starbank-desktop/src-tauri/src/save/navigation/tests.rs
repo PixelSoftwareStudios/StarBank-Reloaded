@@ -77,7 +77,6 @@ fn dirty_engine_without_file_authority_offers_no_save_but_can_issue_scoped_disca
 	Ok(())
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn a_selected_bank_without_an_overwrite_fingerprint_retains_normal_save_as_navigation()
 -> Result<(), Box<dyn Error>> {
@@ -107,6 +106,68 @@ fn a_selected_bank_without_an_overwrite_fingerprint_retains_normal_save_as_navig
 			.fingerprint
 			.is_none()
 	);
+	Ok(())
+}
+
+#[test]
+fn unavailable_save_and_cancel_preserve_the_dirty_document_and_source() -> Result<(), Box<dyn Error>>
+{
+	let (folder, mut session, path) = fixture(true)?;
+	let before = session
+		.editor
+		.native_active_target()
+		.expect("dirty document");
+	let probe =
+		navigation_state(&session, &target(&session, "refused"), false).map_err(native_error)?;
+	assert!(probe.dirty);
+	assert!(!probe.offer_save);
+	assert!(matches!(
+		finish_navigation(
+			&mut session,
+			active_target(&before, "refused"),
+			CloseChoice::Save,
+			probe.offer_save
+		),
+		Err(CommandError::Unavailable)
+	));
+	assert!(matches!(
+		finish_navigation(
+			&mut session,
+			active_target(&before, "cancelled"),
+			CloseChoice::Cancel,
+			probe.offer_save
+		),
+		Ok(CloseChoice::Cancel)
+	));
+	assert!(session.discard.is_none());
+	assert_eq!(
+		session.editor.native_active_target().as_ref(),
+		Some(&before)
+	);
+	assert_eq!(fs::read(path)?, ORIGINAL);
+	assert_eq!(
+		fs::read_dir(folder.path())?.count(),
+		1,
+		"no destination or stage was created"
+	);
+	Ok(())
+}
+
+#[test]
+fn a_changed_revision_cannot_authorize_save_after_the_prompt() -> Result<(), Box<dyn Error>> {
+	let (_folder, mut session, path) = fixture(true)?;
+	let current = target(&session, "save-pending");
+	let probe = navigation_state(&session, &current, true).map_err(native_error)?;
+	assert!(probe.offer_save);
+	edit(&mut session, b"<Bank><Section name='Later'/></Bank>");
+	let after = session
+		.editor
+		.native_active_target()
+		.expect("newer revision");
+	assert!(finish_navigation(&mut session, current, CloseChoice::Save, probe.offer_save).is_err());
+	assert!(session.discard.is_none());
+	assert_eq!(session.editor.native_active_target().as_ref(), Some(&after));
+	assert_eq!(fs::read(path)?, ORIGINAL);
 	Ok(())
 }
 

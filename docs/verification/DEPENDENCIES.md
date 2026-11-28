@@ -1,5 +1,7 @@
 # Locked dependency checks
 
+The Windows Save As navigation/close integration enables `common-controls-v6` on the existing pinned RFD 0.17.2 dependency. Locked Windows feature-graph inspection and cross-target Clippy confirmed the feature; Cargo.lock is unchanged. RFD uses native TaskDialog custom labels with the Common Controls v6 manifest already supplied by tauri-build. This is a feature change rather than a package upgrade and leaves Linux GTK selection intact. Windows native test linkage and packaged build/install checks remain pending. [Implementation and scope](IMPLEMENTATION.md#windows-save-as-before-navigation-or-close)
+
 On 2026-11-27, cargo-audit 0.22.2 used RustSec database commit `c5279d0b0c9e8b70df666eb6d1edbabcfd1176bd` (1,571 advisories). Node 24.22.3 and pnpm 12.23.0 checked the frontend lockfile. These are scoped dependency checks, not release or licensing approval.
 
 | Input | Executed check | Result |

@@ -258,6 +258,8 @@ jobs:
       - name: Install pinned Playwright browsers and dependencies
         run: pnpm --filter starbank-web exec playwright install --with-deps chromium firefox webkit
       - name: Test the production desktop renderer with synthetic IPC
+        env:
+          TAURI_ENV_PLATFORM: windows
         run: |
           pnpm --filter starbank-desktop run build:webview
           pnpm --filter starbank-web test:desktop-renderer

@@ -10,6 +10,7 @@ import {
   configureDesktopClipboard,
   verifyDesktopClipboard,
 } from "./desktop-clipboard.mjs";
+import { verifyCreateOnlyClose } from "./desktop-create-only-guard.mjs";
 import {
   createDesktopProfileImportFixture,
   verifyDesktopProfileImport,
@@ -868,6 +869,7 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   const open = button(page, "Open Bank…");
   const saveCommand = canOverwrite ? "save_active_bank" : "save_bank_as";
   const otherSaveCommand = canOverwrite ? "save_bank_as" : "save_active_bank";
+  const savesBeforeNavigation = bridge.callsFor(saveCommand).length;
   async function choose(choice, outcome) {
     bridge.choose(choice, outcome);
     const count = bridge.callsFor("confirm_bank_navigation").length;
@@ -877,6 +879,10 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
       count + 1,
     );
     await open.click({ trial: true });
+    assert.equal(
+      bridge.callsFor("confirm_bank_navigation").at(-1).canSave,
+      true,
+    );
   }
 
   for (const [choice, outcome, savedAttempts] of [
@@ -891,7 +897,10 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
         .filter({ hasText: storageRefusal })
         .waitFor();
     }
-    assert.equal(bridge.callsFor(saveCommand).length, savedAttempts);
+    assert.equal(
+      bridge.callsFor(saveCommand).length,
+      savesBeforeNavigation + savedAttempts,
+    );
     assert.equal(bridge.callsFor("open_bank").length, 1);
     assert.equal(await goldField(page).inputValue(), "002");
     assert(await button(page, "Undo").isEnabled());
@@ -900,7 +909,7 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   await choose("save", "success");
   await page.getByRole("heading", { name: "Replacement-2.SC2Bank" }).waitFor();
   assert.equal(await goldField(page).inputValue(), "001");
-  const saves = bridge.callsFor(saveCommand);
+  const saves = bridge.callsFor(saveCommand).slice(savesBeforeNavigation);
   assert.equal(saves.length, 3);
   assert.deepEqual(bridge.callsFor(otherSaveCommand), []);
   assert(
@@ -919,7 +928,7 @@ async function verifyBankNavigation(page, bridge, canOverwrite) {
   await choose("discard");
   await page.getByRole("heading", { name: "Replacement-3.SC2Bank" }).waitFor();
   assert.equal(await goldField(page).inputValue(), "001");
-  assert.equal(bridge.callsFor(saveCommand).length, 3);
+  assert.equal(bridge.callsFor(saveCommand).length, savesBeforeNavigation + 3);
   const discarded = JSON.parse(bridge.callsFor("open_bank").at(-1).control);
   const approval = bridge.callsFor("confirm_bank_navigation").at(-1);
   assert.equal(approval.canSave, true);
@@ -1476,28 +1485,31 @@ async function verifyCreateOnlyRenderer(page, bridge, canCreateCopy) {
   }
   await button(settingsPanel, "Back to editor").click();
 
-  const open = button(page, "Open Bank…");
-  bridge.choose("save", "success");
-  await open.click();
-  await page.waitForFunction(() => window.fixtureNavigationReplies === 1);
-  await open.click({ trial: true });
-  assert.equal(bridge.callsFor("confirm_bank_navigation")[0].canSave, false);
-  assert.equal(bridge.callsFor("open_bank").length, 1);
+  if (!canCreateCopy) {
+    const open = button(page, "Open Bank…");
+    bridge.choose("save", "success");
+    await open.click();
+    await page.waitForFunction(() => window.fixtureNavigationReplies === 1);
+    await open.click({ trial: true });
+    assert.equal(bridge.callsFor("confirm_bank_navigation")[0].canSave, false);
+    assert.equal(bridge.callsFor("open_bank").length, 1);
 
-  bridge.chooseClose("save");
-  await page.waitForFunction(
-    () => typeof window.fixtureCloseProbe === "function",
-  );
-  await page.evaluate(() => window.fixtureCloseProbe({ ticket: 1 }));
-  await open.click({ trial: true });
-  const [{ report }] = bridge.callsFor("confirm_window_close");
-  assert.equal(report.canSave, false);
-  assert.equal(report.hasDraft, false);
-  assert.deepEqual(bridge.callsFor("complete_window_close"), [
-    { ticket: 1, draftGeneration: report.draftGeneration, proceed: false },
-  ]);
-  assert.deepEqual(bridge.callsFor("save_bank_as"), []);
-  assert.equal(await goldField(page).inputValue(), "002");
+    bridge.chooseClose("save");
+    await page.waitForFunction(
+      () => typeof window.fixtureCloseProbe === "function",
+    );
+    await page.evaluate(() => window.fixtureCloseProbe({ ticket: 1 }));
+    await page.waitForFunction(() => window.fixtureCompletedCloseTicket === 1);
+    await open.click({ trial: true });
+    const [{ report }] = bridge.callsFor("confirm_window_close");
+    assert.equal(report.canSave, false);
+    assert.equal(report.hasDraft, false);
+    assert.deepEqual(bridge.callsFor("complete_window_close"), [
+      { ticket: 1, draftGeneration: report.draftGeneration, proceed: false },
+    ]);
+    assert.deepEqual(bridge.callsFor("save_bank_as"), []);
+    assert.equal(await goldField(page).inputValue(), "002");
+  }
 
   assert.equal(await button(page, "Save").count(), 0);
   assert.equal(await button(page, "Save As…").count(), Number(canCreateCopy));
@@ -1538,6 +1550,18 @@ async function verifyCreateOnlyRenderer(page, bridge, canCreateCopy) {
   }
   if (canCreateCopy) {
     await verifyCreateOnlyCopyActions(page, bridge, toolsMenu, external);
+    await page.getByRole("tab", { name: "Table View", exact: true }).click();
+    await goldField(page).focus();
+    await editGold(page, "002");
+    await verifyBankNavigation(page, bridge, false);
+    const closeValue = "004";
+    await editGold(page, closeValue);
+    await verifyCreateOnlyClose(page, bridge, {
+      bankName: "Replacement-3.SC2Bank",
+      savedName: savedCopyName,
+      value: closeValue,
+      refusal: storageRefusal,
+    });
   } else {
     await page.keyboard.press("Escape");
     await goldField(page).press("Control+s");

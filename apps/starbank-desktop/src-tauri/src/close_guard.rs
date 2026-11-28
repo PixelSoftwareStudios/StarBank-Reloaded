@@ -102,6 +102,11 @@ impl Guard {
 			.filter(|attempt| attempt.ticket == ticket)
 	}
 
+	fn take_attempt(&mut self, ticket: u32) -> Option<Attempt> {
+		self.attempt(ticket)?;
+		self.pending.take()
+	}
+
 	fn clear(&mut self, ticket: u32) {
 		if self.attempt(ticket).is_some() {
 			self.pending = None;
@@ -261,8 +266,9 @@ pub(crate) fn complete_window_close(
 	// Consume the decision even when a newly started operation prevents closing.
 	let attempt = {
 		let mut state = guard.0.lock().map_err(|_| CommandError::Unavailable)?;
-		state.attempt(ticket).ok_or(CommandError::Unavailable)?;
-		state.pending.take().ok_or(CommandError::Unavailable)?
+		state
+			.take_attempt(ticket)
+			.ok_or(CommandError::Unavailable)?
 	};
 	if !proceed {
 		return Ok(());
@@ -332,7 +338,7 @@ async fn ask(window: &WebviewWindow, dirty: bool, has_draft: bool, can_save: boo
 	if !dirty && !has_draft {
 		return CloseChoice::Discard;
 	}
-	let offer_save = can_save && !has_draft && cfg!(any(target_os = "macos", target_os = "linux"));
+	let offer_save = offers_save(has_draft, can_save);
 	let description = if has_draft {
 		"The editor has unapplied changes. To save them, cancel and apply the draft first."
 	} else {
@@ -344,6 +350,10 @@ async fn ask(window: &WebviewWindow, dirty: bool, has_draft: bool, can_save: boo
 		"Discard changes and close?"
 	};
 	ask_unsaved(window, title, description, offer_save).await
+}
+
+fn offers_save(has_draft: bool, can_save: bool) -> bool {
+	can_save && !has_draft && crate::export::can_create_bank_copy()
 }
 
 #[cfg(target_os = "macos")]
@@ -368,97 +378,4 @@ pub(crate) fn menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 }
 
 #[cfg(test)]
-mod tests {
-	use starbank_core::Revision;
-
-	use super::*;
-
-	fn target(id: &str, revision: &str, dirty: bool) -> NativeActiveTarget {
-		NativeActiveTarget {
-			document_id: id.to_owned(),
-			revision: revision.parse::<Revision>().expect("synthetic revision"),
-			dirty,
-		}
-	}
-
-	#[test]
-	fn discard_requires_current_bank_and_draft_generation() {
-		let active = target("bank-1", "4", true);
-		let mut guard = Guard::default();
-		let probe = guard
-			.begin(Intent::Window, Some(active.clone()))
-			.expect("new probe");
-		let attempt = guard.attempt(probe.ticket).expect("pending");
-		assert!(!attempt.permits(Some(&active), 7));
-		attempt.phase = Phase::Approved {
-			choice: CloseChoice::Discard,
-			draft_generation: 7,
-		};
-		assert!(attempt.permits(Some(&active), 7));
-		assert!(!attempt.permits(Some(&active), 8));
-		assert!(!attempt.permits(Some(&target("bank-1", "5", true)), 7));
-		assert!(!attempt.permits(Some(&target("bank-2", "4", true)), 7));
-		assert!(!attempt.permits(None, 7));
-	}
-
-	#[test]
-	fn save_requires_a_clean_checkpoint_after_confirmation() {
-		let active = target("bank-1", "4", true);
-		let attempt = Attempt {
-			ticket: 1,
-			intent: Intent::Window,
-			captured: Some(active.clone()),
-			phase: Phase::Approved {
-				choice: CloseChoice::Save,
-				draft_generation: 7,
-			},
-		};
-		assert!(!attempt.permits(Some(&active), 7));
-		assert!(attempt.permits(Some(&target("bank-1", "5", false)), 7));
-		assert!(!attempt.permits(Some(&target("bank-1", "6", true)), 7));
-		assert!(!attempt.permits(Some(&target("bank-2", "5", false)), 7));
-		assert!(!attempt.permits(Some(&target("bank-1", "5", false)), 8));
-	}
-
-	#[test]
-	fn no_engine_still_requires_approval_and_an_unchanged_draft() {
-		let mut guard = Guard::default();
-		let probe = guard.begin(Intent::Window, None).expect("new probe");
-		let attempt = guard.attempt(probe.ticket).expect("pending");
-		assert!(!attempt.permits(None, 7));
-		attempt.phase = Phase::Approved {
-			choice: CloseChoice::Cancel,
-			draft_generation: 7,
-		};
-		assert!(!attempt.permits(None, 7));
-		attempt.phase = Phase::Approved {
-			choice: CloseChoice::Discard,
-			draft_generation: 7,
-		};
-		assert!(attempt.permits(None, 7));
-		assert!(!attempt.permits(None, 8));
-		assert!(!attempt.permits(Some(&target("late-bank", "0", false)), 7));
-		attempt.phase = Phase::Approved {
-			choice: CloseChoice::Save,
-			draft_generation: 7,
-		};
-		assert!(!attempt.permits(None, 7));
-		assert!(!attempt.permits(Some(&target("late-bank", "0", false)), 7));
-	}
-
-	#[test]
-	fn retried_probes_cannot_reuse_previous_approvals() {
-		let active = target("bank-1", "4", true);
-		let mut guard = Guard::default();
-		let first = guard.begin(Intent::Window, Some(active.clone())).unwrap();
-		let second = guard.begin(Intent::Exit(0), Some(active.clone())).unwrap();
-		assert_ne!(first.ticket, second.ticket);
-		assert!(guard.attempt(first.ticket).is_none());
-		guard.attempt(second.ticket).unwrap().phase = Phase::Prompt;
-		assert!(guard.begin(Intent::Window, Some(active)).is_none());
-		guard.clear(first.ticket);
-		assert!(guard.attempt(second.ticket).is_some());
-		guard.clear(second.ticket);
-		assert!(guard.pending.is_none());
-	}
-}
+mod tests;

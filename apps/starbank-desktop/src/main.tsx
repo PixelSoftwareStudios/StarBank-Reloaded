@@ -157,7 +157,7 @@ function DesktopApp() {
   );
   const saveBeforeLeaving = overwriteAvailable
     ? "overwrite"
-    : legacyExportAvailable && createCopyAvailable
+    : createCopyAvailable
       ? "new"
       : undefined;
 

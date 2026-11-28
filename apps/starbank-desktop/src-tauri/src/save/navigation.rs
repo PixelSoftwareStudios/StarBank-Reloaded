@@ -4,6 +4,7 @@ use tauri::{State, WebviewWindow};
 use crate::{
 	close_guard::{CloseChoice, ask_unsaved},
 	commands::{CommandError, DesktopEngine},
+	export::can_create_bank_copy,
 };
 
 use super::{ActiveTarget, DesktopSession};
@@ -27,9 +28,7 @@ fn navigation_state(
 	let active = session.engine_for(target)?;
 	Ok(NavigationState {
 		dirty: active.dirty,
-		offer_save: can_save
-			&& session.selected_for(target).is_ok()
-			&& cfg!(any(target_os = "macos", target_os = "linux")),
+		offer_save: can_save && session.selected_for(target).is_ok() && can_create_bank_copy(),
 	})
 }
 

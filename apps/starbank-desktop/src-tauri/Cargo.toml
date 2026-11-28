@@ -36,7 +36,7 @@ custom-protocol = ["desktop", "tauri/custom-protocol"]
 
 [dependencies]
 sc2bank = { path = "../../../crates/formats/sc2bank", optional = true }
-rfd = { version = "=0.17.2", default-features = false, features = ["gtk3"], optional = true }
+rfd = { version = "=0.17.2", default-features = false, features = ["common-controls-v6", "gtk3"], optional = true }
 starbank-fs = { path = "../../../crates/platform/starbank-fs", optional = true }
 starbank-editor = { path = "../../../crates/domain/starbank-editor", optional = true }
 starbank-backup = { path = "../../../crates/domain/starbank-backup", optional = true }
