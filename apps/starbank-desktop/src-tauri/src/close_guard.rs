@@ -1,6 +1,5 @@
 use std::sync::Mutex;
 
-use rfd::{AsyncMessageDialog, MessageButtons, MessageDialogResult, MessageLevel};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use starbank_editor::{NativeActiveTarget, PROTOCOL_VERSION};
@@ -8,12 +7,13 @@ use tauri::{AppHandle, Emitter as _, Manager as _, RunEvent, State, WebviewWindo
 
 use crate::commands::{CommandError, DesktopEngine};
 
+mod unsaved;
+
+pub(crate) use unsaved::ask_unsaved;
+
 const MAIN_WINDOW: &str = "main";
 const REQUEST_EVENT: &str = "bank-close-requested";
 const REQUEST_ID: &str = "native-close";
-const SAVE_LABEL: &str = "Save";
-const DISCARD_LABEL: &str = "Discard";
-const CANCEL_LABEL: &str = "Cancel";
 #[cfg(target_os = "macos")]
 const QUIT_ITEM: &str = "starbank-guarded-quit";
 
@@ -344,39 +344,6 @@ async fn ask(window: &WebviewWindow, dirty: bool, has_draft: bool, can_save: boo
 		"Discard changes and close?"
 	};
 	ask_unsaved(window, title, description, offer_save).await
-}
-
-pub(crate) async fn ask_unsaved(
-	window: &WebviewWindow,
-	title: &str,
-	description: &str,
-	offer_save: bool,
-) -> CloseChoice {
-	let buttons = if offer_save {
-		MessageButtons::YesNoCancelCustom(
-			SAVE_LABEL.into(),
-			DISCARD_LABEL.into(),
-			CANCEL_LABEL.into(),
-		)
-	} else {
-		MessageButtons::OkCancel
-	};
-	let prompt = AsyncMessageDialog::new()
-		.set_parent(window)
-		.set_title(title)
-		.set_description(description)
-		.set_level(MessageLevel::Warning)
-		.set_buttons(buttons);
-	match prompt.show().await {
-		MessageDialogResult::Custom(label) if offer_save && label == SAVE_LABEL => {
-			CloseChoice::Save
-		}
-		MessageDialogResult::Custom(label) if offer_save && label == DISCARD_LABEL => {
-			CloseChoice::Discard
-		}
-		MessageDialogResult::Ok if !offer_save => CloseChoice::Discard,
-		_ => CloseChoice::Cancel,
-	}
 }
 
 #[cfg(target_os = "macos")]
