@@ -74,11 +74,16 @@ export function chooseGtkExportDestination(destination) {
   return chooseGtkDestination(exportTitle, destination);
 }
 
-async function waitForWindowGone(title) {
+async function waitForWindowGone(title, { visibleOnly = false } = {}) {
   const deadline = performance.now() + dialogTimeout;
   do {
     try {
-      await xdotool(["search", "--name", titlePattern(title)]);
+      await xdotool([
+        "search",
+        ...(visibleOnly ? ["--onlyvisible"] : []),
+        "--name",
+        titlePattern(title),
+      ]);
     } catch (error) {
       // xdotool search exits 1 without output when no window matches.
       if (error.code === 1 && !error.stdout && !error.stderr) return;
@@ -148,7 +153,10 @@ export async function discardGtkDraftClose() {
 
 export async function cancelGtkSaveAsOnClose() {
   await respondToGtkPrompt(dirtyCloseTitle, "space");
-  await respondToGtkPrompt(saveAsTitle, "Escape");
+  await focusDialog(saveAsTitle);
+  await xdotool(["key", "--clearmodifiers", "alt+c"]);
+  // GTK hides its native chooser before finalizing the underlying child window.
+  await waitForWindowGone(saveAsTitle, { visibleOnly: true });
 }
 
 export async function saveGtkDirtyCloseAs(destination) {
