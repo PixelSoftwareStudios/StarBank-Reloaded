@@ -10,6 +10,7 @@ const exportTitle = "Export bank copy";
 const saveAsTitle = "Save Bank As";
 const externalSourceTitle = "Open Bank";
 const signedCopyTitle = "Save Signed Bank Copy";
+const manualFolderTitle = "Select SC2 Bank Folder";
 const dirtyOpenTitle = "Save changes before opening another bank?";
 const dirtyCloseTitle = "Save changes before closing?";
 const draftCloseTitle = "Discard changes and close?";
@@ -94,35 +95,62 @@ export async function chooseGtkExternalSigningSource(
     info.isFile() && !info.isSymbolicLink(),
     "The fixture source must be an existing regular, non-symlink file.",
   );
+  await submitGtkLocationPath(
+    externalSourceTitle,
+    source,
+    assertLocationText,
+    "external source",
+  );
+}
+
+/** Selects an existing synthetic bank directory in the real GTK folder chooser. */
+export async function chooseGtkManualCollectionDirectory(
+  directory,
+  assertLocationText,
+) {
+  assert(isAbsolute(directory), "The fixture directory must be absolute.");
+  assert(
+    !/\p{Cc}/u.test(directory),
+    "The fixture path must be typed without keyboard control characters.",
+  );
+  const info = await lstat(directory);
+  assert(
+    info.isDirectory() && !info.isSymbolicLink(),
+    "The fixture directory must be an existing non-symlink directory.",
+  );
+  await submitGtkLocationPath(
+    manualFolderTitle,
+    directory,
+    assertLocationText,
+    "manual folder",
+  );
+}
+
+async function submitGtkLocationPath(title, path, assertLocationText, label) {
   assert.equal(
     typeof assertLocationText,
     "function",
     "A native Location text observer is required.",
   );
-  const window = await focusDialog(externalSourceTitle);
-  console.log(
-    "Linux native external source: focused before the slash shortcut.",
-  );
-  // GTK's Open chooser handles a leading slash as Location popup input. The
-  // handler seeds the entry with the slash and positions the caret after it.
+  const window = await focusDialog(title);
+  const stage = (message) => console.log(`Linux native ${label}: ${message}`);
+  stage("focused before the slash shortcut.");
+  // The GTK Location popup handler seeds its entry with the leading slash
+  // and positions the caret after it.
   const shortcutErrors = [];
   try {
     await xdotool(["keydown", "--clearmodifiers", "slash"]);
-    console.log(
-      "Linux native external source: Slash pressed. Checking mapped Location.",
-    );
+    stage("Slash pressed. Checking mapped Location.");
     await assertLocationText("/");
     await requireFocus(window);
-    console.log(
-      "Linux native external source: mapped Location confirmed before Slash release.",
-    );
+    stage("mapped Location confirmed before Slash release.");
   } catch (error) {
     shortcutErrors.push(error);
   } finally {
     try {
-      console.log("Linux native external source: Releasing Slash.");
+      stage("Releasing Slash.");
       await xdotool(["keyup", "slash"]);
-      console.log("Linux native external source: Slash released.");
+      stage("Slash released.");
     } catch (error) {
       shortcutErrors.push(error);
     }
@@ -135,18 +163,15 @@ export async function chooseGtkExternalSigningSource(
     );
   await assertLocationText("/");
   await requireFocus(window);
-  console.log(
-    "Linux native external source: Slash confirmed. Typing the remaining path.",
-  );
-  await xdotool(["type", "--clearmodifiers", "--", source.slice(1)]);
-  console.log("Linux native external source: Path typed. Checking Location.");
-  await assertLocationText(source);
+  stage("Slash confirmed. Typing the remaining path.");
+  if (path.length > 1)
+    await xdotool(["type", "--clearmodifiers", "--", path.slice(1)]);
+  stage("Path typed. Checking Location.");
+  await assertLocationText(path);
   await requireFocus(window);
-  console.log(
-    "Linux native external source: exact path confirmed before Return.",
-  );
+  stage("exact path confirmed before Return.");
   await xdotool(["key", "--clearmodifiers", "Return"]);
-  console.log("Linux native external source: Return sent.");
+  stage("Return sent.");
 }
 
 /** Submits an unused fixture path in the real GTK signed-copy chooser. */
@@ -247,10 +272,19 @@ export function waitForGtkSignedCopyChooserReleased() {
   return waitForWindowGone(signedCopyTitle);
 }
 
+export function waitForGtkManualFolderChooserReleased() {
+  return waitForWindowGone(manualFolderTitle);
+}
+
 async function respondToGtkPrompt(title, ...keys) {
   await focusDialog(title);
   await xdotool(["key", "--clearmodifiers", ...keys]);
   await waitForWindowGone(title);
+}
+
+/** Cancels the real GTK manual-folder chooser and waits for release. */
+export function cancelGtkManualFolderSelection() {
+  return respondToGtkPrompt(manualFolderTitle, "Escape");
 }
 
 /** Cancels the real GTK dirty-document Open confirmation on the caller's Xvfb display. */
