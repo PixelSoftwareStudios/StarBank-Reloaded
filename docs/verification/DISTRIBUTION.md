@@ -57,3 +57,15 @@ The [Windows desktop CI job](../../.github/workflows/ci.yml) builds an unsigned 
 Local validation passed with actionlint, the PowerShell 7.5.4 parser, and PSScriptAnalyzer 1.24.0. Synthetic probes covered the marker change, path guards, failure reporting, and cleanup.
 
 On November 27, 2026, run 45984131228 at `4143952` built `StarBank Reloaded_0.1.0_x64-setup.exe` and passed the silent install and uninstall check on its fresh Windows Server 2025 x64 runner (image `windows-2025-vs2026 20261116.315.1`). The harness verified the quoted Open With registration, removal of the owned registration and executable files, preservation of the synthetic default handler and bank bytes, and the expected installed executable SHA-256. The job later failed a separate desktop test. This check exercised the installer and uninstaller without launching the application or Explorer. Explorer open flows, native Windows writes, signed release artifacts, and final rights and license approval remain open. [Windows desktop job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/45984131228/job/140455268670) · [Hosted workflow evidence](IMPLEMENTATION.md#hosted-ci-at-4143952)
+
+
+## Remaining release inputs and acceptance
+
+Green headless runs establish their recorded cases. Required release dependencies still include:
+
+- Owner approval of the release license and distribution notices under REQ-MIG-02, and approved performance budgets under REQ-PERF-01.
+- Documented SC2-generated captures with build details, actual game-profile identity evidence and the remaining game acceptance described in the verification register.
+- A selected static hosting destination and deployment access, plus configured package-signing access for the intended release targets.
+- Remaining installed-platform, assistive-technology, physical-input and durability acceptance in the register. Their open status records missing evidence; environment availability still needs to be established where relevant.
+
+These inputs do not replace the remaining engineering and qualification work. Review every Required acceptance row before a feature-parity release; exceptions require explicit owner approval. Deferred and Proposed scope remains separate. [Requirements](../REQUIREMENTS.md) · [Acceptance register](ACCEPTANCE_REGISTER.md) · [Verification obligations](VERIFICATION_REGISTER.md) · [Work-package scope](../work-packages.md)
