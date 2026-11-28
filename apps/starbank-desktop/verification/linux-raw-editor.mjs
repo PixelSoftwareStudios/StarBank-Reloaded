@@ -85,7 +85,8 @@ export async function verifyRawEditing({
   );
   await click(editableRaw, null);
   await waitFor("keyboard focus in the editable Raw view", rawFocused);
-  await assertAccessible("Bank XML", "multi-line", openingXml);
+  // WebKit's native innerText includes the trailing block boundary of .cm-line.
+  await assertAccessible("Bank XML", "multi-line", `${openingXml}\n`);
   // Edit the existing attribute by keyboard so CodeMirror's tag completion does
   // not transform a newly typed copy of the XML document.
   const moveToValue = Array.from({ length: trailingXml.length }, () =>
