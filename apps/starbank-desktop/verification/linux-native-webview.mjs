@@ -896,7 +896,6 @@ async function run(
   closeSender,
   clipboardReader,
   accessibilityProbe,
-  signingDiagnosticApplication = application,
 ) {
   await using sharedConfig = await mkdtempDisposable(
     join(tmpdir(), "starbank-linux-preferences-"),
@@ -1062,12 +1061,8 @@ async function run(
     sha256(signedBytes),
     "8d30fd0e25e887c5ef73325df14759da460c2bb5173a08e853ba23e527ed73f9",
   );
-  if (signingDiagnosticApplication !== application)
-    console.log(
-      "Linux native external signing: debugger replay enabled; ordinary acceptance remains pending.",
-    );
   await withNativeSession(
-    signingDiagnosticApplication,
+    application,
     "external signed copy",
     [[currentBank, bank("001")]],
     async (command, { scratch, assertInputsUnchanged }) => {
@@ -1087,7 +1082,23 @@ async function run(
         controls: editorControls(command),
         activeName: currentBank,
         foreignName,
-        chooseSource: () => chooseGtkExternalSigningSource(foreignPath),
+        chooseSource: () =>
+          chooseGtkExternalSigningSource(foreignPath, async (text) => {
+            const { stdout } = await execFileAsync(
+              accessibilityProbe,
+              ["--gtk-open-location", text],
+              {
+                encoding: "utf8",
+                killSignal: "SIGKILL",
+                maxBuffer: accessibilityOutputLimit,
+                timeout: commandTimeout,
+              },
+            );
+            console.log(stdout.trim());
+            console.log(
+              "Linux native external source: focused Location text verified through AT-SPI.",
+            );
+          }),
         waitForSourceChooserReleased: waitForGtkExternalSourceChooserReleased,
         chooseDestination: () => chooseGtkSignedCopyDestination(signedPath),
         waitForDestinationChooserReleased: waitForGtkSignedCopyChooserReleased,
@@ -1114,15 +1125,15 @@ if (
     "Run the native WebView check on Linux under Xvfb.",
   );
   assert(process.env.DISPLAY, "Start the check with xvfb-run.");
-  assert(
-    process.argv.length === 6 || process.argv.length === 7,
-    "Pass the packaged application, X11 close sender, clipboard reader, AT-SPI probe and optional signing diagnostic wrapper paths.",
+  assert.equal(
+    process.argv.length,
+    6,
+    "Pass the packaged application, X11 close sender, clipboard reader and AT-SPI probe paths.",
   );
   await run(
     resolve(process.argv[2]),
     resolve(process.argv[3]),
     resolve(process.argv[4]),
     resolve(process.argv[5]),
-    process.argv[6] === undefined ? undefined : resolve(process.argv[6]),
   );
 }

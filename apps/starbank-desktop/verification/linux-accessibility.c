@@ -35,6 +35,10 @@ static const struct object_reference REGISTRY_ROOT = {
 	"org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root",
 };
 static const char WINDOW_TITLE[] = "StarBank Reloaded";
+static const char GTK_OPEN_WINDOW_TITLE[] = "Open Bank";
+static const char GTK_OPEN_LOCATION_OPTION[] = "--gtk-open-location";
+static const char GTK_LOCATION_PLACEHOLDER[] = "Location";
+static const char PLACEHOLDER_ATTRIBUTE[] = "placeholder-text";
 static const char ACCESSIBLE_INTERFACE[] = "org.a11y.atspi.Accessible";
 static const char TEXT_INTERFACE[] = "org.a11y.atspi.Text";
 static const char NULL_PATH[] = "/org/a11y/atspi/null";
@@ -45,14 +49,21 @@ enum tree_scope {
 	APPLICATION_WINDOW,
 	FRAME_CONTENT,
 	WEB_CONTENT,
+	GTK_CHOOSER_CONTENT,
+};
+
+enum probe_mode {
+	WEBVIEW_ENTRY,
+	GTK_OPEN_LOCATION,
 };
 
 struct scan {
+	enum probe_mode mode;
 	const char *control_name;
 	GDBusConnection *bus;
 	gint64 deadline;
 	unsigned visited;
-	bool frame_found;
+	bool window_found;
 	bool document_found;
 	GVariant *entry;
 	GError *rpc_error;
@@ -67,6 +78,7 @@ struct scan {
 	ENTRY(GET_NAME, "Accessible.Name") \
 	ENTRY(GET_CHILDREN, "Accessible.GetChildren") \
 	ENTRY(GET_STATES, "Accessible.GetState") \
+	ENTRY(GET_ATTRIBUTES, "Accessible.GetAttributes") \
 	ENTRY(GET_INTERFACES, "Accessible.GetInterfaces") \
 	ENTRY(GET_CHARACTER_COUNT, "Text.CharacterCount") \
 	ENTRY(GET_DIAGNOSTIC_TEXT, "Text.GetText after a CharacterCount mismatch") \
@@ -200,6 +212,24 @@ static struct object_reference read_reference(GVariant *reference)
 	return object;
 }
 
+static bool gtk_location_entry(struct scan *scan, struct object_reference object)
+{
+	GVariant *reply = query(scan, scan->bus, object, GET_ATTRIBUTES, ACCESSIBLE_INTERFACE,
+		"GetAttributes", NULL, G_VARIANT_TYPE("(a{ss})"));
+	if (!reply)
+		return false;
+	GVariant *attributes = g_variant_get_child_value(reply, 0);
+	g_variant_unref(reply);
+	const char *placeholder;
+	bool matches = false;
+	if (g_variant_n_children(attributes) > MAX_VISITED_NODES)
+		scan->failure = "The GTK entry returned too many AT-SPI attributes.";
+	else if (g_variant_lookup(attributes, PLACEHOLDER_ATTRIBUTE, "&s", &placeholder))
+		matches = strcmp(placeholder, GTK_LOCATION_PLACEHOLDER) == 0;
+	g_variant_unref(attributes);
+	return matches;
+}
+
 static void visit(struct scan *scan, GVariant *reference, enum tree_scope scope, unsigned depth)
 {
 	if (depth > MAX_TREE_DEPTH || scan->visited >= MAX_VISITED_NODES) {
@@ -236,14 +266,22 @@ static void visit(struct scan *scan, GVariant *reference, enum tree_scope scope,
 		children = APPLICATION_WINDOW;
 		break;
 	case APPLICATION_WINDOW:
-		if (role != ATSPI_ROLE_FRAME || !name_matches(scan, object, WINDOW_TITLE))
-			return;
-		if (scan->frame_found) {
-			scan->failure = "The fixture has more than one matching AT-SPI frame.";
+		if (scan->mode == GTK_OPEN_LOCATION) {
+			if (role != ATSPI_ROLE_FILE_CHOOSER || !name_matches(scan, object, GTK_OPEN_WINDOW_TITLE))
+				return;
+			children = GTK_CHOOSER_CONTENT;
+		} else {
+			if (role != ATSPI_ROLE_FRAME || !name_matches(scan, object, WINDOW_TITLE))
+				return;
+			children = FRAME_CONTENT;
+		}
+		if (scan->window_found) {
+			scan->failure = scan->mode == GTK_OPEN_LOCATION ?
+				"The fixture has more than one Open Bank AT-SPI file chooser." :
+				"The fixture has more than one matching AT-SPI frame.";
 			return;
 		}
-		scan->frame_found = true;
-		children = FRAME_CONTENT;
+		scan->window_found = true;
 		break;
 	case FRAME_CONTENT:
 		if (role == ATSPI_ROLE_DOCUMENT_WEB) {
@@ -259,6 +297,23 @@ static void visit(struct scan *scan, GVariant *reference, enum tree_scope scope,
 			}
 			scan->entry = g_variant_ref(reference);
 		}
+		break;
+	case GTK_CHOOSER_CONTENT:
+		// GTK exposes the visible GtkEntry as TEXT and its Location placeholder as an attribute.
+		if (role == ATSPI_ROLE_TEXT) {
+			if (gtk_location_entry(scan, object)) {
+				if (scan->entry)
+					scan->failure = "The Open Bank chooser exposed more than one AT-SPI location entry.";
+				else
+					scan->entry = g_variant_ref(reference);
+			}
+			return;
+		}
+		// The location entry is in the header. Do not enumerate file or sidebar rows.
+		if (role == ATSPI_ROLE_SCROLL_PANE || role == ATSPI_ROLE_TABLE || role == ATSPI_ROLE_TREE_TABLE ||
+			role == ATSPI_ROLE_TREE || role == ATSPI_ROLE_LIST || role == ATSPI_ROLE_LIST_BOX ||
+			role == ATSPI_ROLE_DOCUMENT_WEB)
+			return;
 		break;
 	}
 
@@ -291,7 +346,7 @@ static bool exposes_text(struct scan *scan, struct object_reference object)
 	g_variant_unref(reply);
 	bool found = false;
 	if (g_variant_n_children(interfaces) > MAX_VISITED_NODES) {
-		scan->failure = "The WebView entry returned too many AT-SPI interfaces.";
+		scan->failure = "The entry returned too many AT-SPI interfaces.";
 	} else {
 		GVariantIter iter;
 		g_variant_iter_init(&iter, interfaces);
@@ -303,7 +358,7 @@ static bool exposes_text(struct scan *scan, struct object_reference object)
 			}
 		}
 		if (!found)
-			scan->failure = "The WebView entry does not expose the AT-SPI Text interface.";
+			scan->failure = "The entry does not expose the AT-SPI Text interface.";
 	}
 	g_variant_unref(interfaces);
 	return found;
@@ -384,7 +439,7 @@ static bool verify_focused_entry(struct scan *scan, bool multiline, const char *
 	g_variant_unref(reply);
 	guint32 low, high;
 	if (g_variant_n_children(states) != STATE_WORD_COUNT) {
-		scan->failure = "The WebView entry did not return two AT-SPI state words.";
+		scan->failure = "The entry did not return two AT-SPI state words.";
 		g_variant_unref(states);
 		return false;
 	}
@@ -405,6 +460,24 @@ static bool verify_focused_entry(struct scan *scan, bool multiline, const char *
 	return verify_text(scan, object, expected);
 }
 
+static bool report_gtk_location_name(struct scan *scan)
+{
+	const struct object_reference object = read_reference(scan->entry);
+	GVariant *value = property(scan, object, GET_NAME, ACCESSIBLE_INTERFACE, "Name", G_VARIANT_TYPE_STRING);
+	if (!value)
+		return false;
+	gsize length;
+	const char *name = g_variant_get_string(value, &length);
+	char *bounded = g_strndup(name, MAX_CONTROL_NAME_BYTES);
+	char *escaped = g_strescape(bounded, NULL);
+	printf("GTK Open Bank location entry exposed AT-SPI role TEXT and name \"%s\"%s.\n",
+		escaped, length > MAX_CONTROL_NAME_BYTES ? " (truncated)" : "");
+	g_free(escaped);
+	g_free(bounded);
+	g_variant_unref(value);
+	return next_timeout(scan) > 0;
+}
+
 static bool find_control(struct scan *scan, bool multiline, const char *expected)
 {
 	const char *pending = "The fixture AT-SPI desktop was unavailable.";
@@ -412,15 +485,23 @@ static bool find_control(struct scan *scan, bool multiline, const char *expected
 	bool matched = false;
 	while (next_timeout(scan) > 0) {
 		scan->visited = 0;
-		scan->frame_found = false;
+		scan->window_found = false;
 		scan->document_found = false;
 		visit(scan, root, DESKTOP, 0);
 		if (scan->entry)
 			matched = verify_focused_entry(scan, multiline, expected);
-		pending = !scan->frame_found ? "The fixture AT-SPI frame was not exposed." :
-			!scan->document_found ? "The fixture WebView document was not exposed." :
-			!scan->entry ? "The named AT-SPI entry was not exposed." :
-			"The named AT-SPI entry was not focused.";
+		if (scan->mode == GTK_OPEN_LOCATION) {
+			if (matched)
+				matched = report_gtk_location_name(scan);
+			pending = !scan->window_found ? "The Open Bank AT-SPI file chooser was not exposed." :
+				!scan->entry ? "The Open Bank AT-SPI location entry was not exposed." :
+				"The Open Bank AT-SPI location entry was not focused.";
+		} else {
+			pending = !scan->window_found ? "The fixture AT-SPI frame was not exposed." :
+				!scan->document_found ? "The fixture WebView document was not exposed." :
+				!scan->entry ? "The named AT-SPI entry was not exposed." :
+				"The named AT-SPI entry was not focused.";
+		}
 		g_clear_pointer(&scan->entry, g_variant_unref);
 		if (matched || scan->failure || scan->rpc_error)
 			break;
@@ -459,7 +540,13 @@ static bool valid_text(const char *value, size_t maximum)
 
 int main(int argc, char **argv)
 {
-	if (argc != 4 || !valid_text(argv[1], MAX_CONTROL_NAME_BYTES) ||
+	const bool gtk_open_location = argc > 1 && strcmp(argv[1], GTK_OPEN_LOCATION_OPTION) == 0;
+	if (gtk_open_location) {
+		if (argc != 3 || !valid_text(argv[2], MAX_EXPECTED_TEXT_BYTES)) {
+			fputs("Expected --gtk-open-location and exact fixture text.\n", stderr);
+			return EXIT_FAILURE;
+		}
+	} else if (argc != 4 || !valid_text(argv[1], MAX_CONTROL_NAME_BYTES) ||
 		(strcmp(argv[2], "single-line") != 0 && strcmp(argv[2], "multi-line") != 0) ||
 		!valid_text(argv[3], MAX_EXPECTED_TEXT_BYTES)) {
 		fputs("Expected a control name, single-line or multi-line, and exact fixture text.\n", stderr);
@@ -479,7 +566,8 @@ int main(int argc, char **argv)
 	}
 	alarm(PROBE_WATCHDOG_SECONDS);
 	struct scan scan = {
-		.control_name = argv[1],
+		.mode = gtk_open_location ? GTK_OPEN_LOCATION : WEBVIEW_ENTRY,
+		.control_name = gtk_open_location ? NULL : argv[1],
 		.deadline = g_get_monotonic_time() + PROBE_BUDGET_MS * G_TIME_SPAN_MILLISECOND,
 	};
 	GDBusConnection *session = connect_bus(&scan, CONNECT_SESSION, bus);
@@ -493,7 +581,9 @@ int main(int argc, char **argv)
 			g_variant_unref(reply);
 		}
 	}
-	const bool matched = scan.bus && find_control(&scan, strcmp(argv[2], "multi-line") == 0, argv[3]);
+	const bool multiline = !gtk_open_location && strcmp(argv[2], "multi-line") == 0;
+	const char *expected = gtk_open_location ? argv[2] : argv[3];
+	const bool matched = scan.bus && find_control(&scan, multiline, expected);
 	const struct operation_description operation = observed_operation();
 	enter_operation(matched ? DISCONNECT_AFTER_MATCH : DISCONNECT_AFTER_FAILURE);
 	g_clear_object(&scan.bus);

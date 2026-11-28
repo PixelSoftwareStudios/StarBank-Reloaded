@@ -67,23 +67,11 @@ async function chooseGtkDestination(title, destination) {
 
 async function submitGtkPath(title, path) {
   const window = await focusDialog(title);
-  if (title === externalSourceTitle)
-    console.log("Linux native external source: focused before location keys.");
   // Without a window argument, key and type send XTEST events to the focused chooser.
   await xdotool(["key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
-  if (title === externalSourceTitle)
-    console.log(
-      "Linux native external source: location keys sent before typing.",
-    );
   await xdotool(["type", "--clearmodifiers", "--", path]);
   await requireFocus(window);
-  if (title === externalSourceTitle)
-    console.log(
-      "Linux native external source: typed and focused before Return.",
-    );
   await xdotool(["key", "--clearmodifiers", "Return"]);
-  if (title === externalSourceTitle)
-    console.log("Linux native external source: Return sent.");
 }
 
 /** Submits an unused fixture path in the real GTK Export Copy chooser. */
@@ -92,7 +80,10 @@ export function chooseGtkExportDestination(destination) {
 }
 
 /** Selects an existing synthetic bank in the real GTK external-signing chooser. */
-export async function chooseGtkExternalSigningSource(source) {
+export async function chooseGtkExternalSigningSource(
+  source,
+  assertLocationText,
+) {
   assert(isAbsolute(source), "The fixture source must be absolute.");
   assert(
     !/\p{Cc}/u.test(source),
@@ -103,7 +94,33 @@ export async function chooseGtkExternalSigningSource(source) {
     info.isFile() && !info.isSymbolicLink(),
     "The fixture source must be an existing regular, non-symlink file.",
   );
-  await submitGtkPath(externalSourceTitle, source);
+  assert.equal(
+    typeof assertLocationText,
+    "function",
+    "A native Location text observer is required.",
+  );
+  const window = await focusDialog(externalSourceTitle);
+  console.log(
+    "Linux native external source: focused before the slash shortcut.",
+  );
+  // GTK's Open chooser handles a leading slash as Location popup input. The
+  // handler seeds the entry with the slash and positions the caret after it.
+  await xdotool(["key", "--clearmodifiers", "slash"]);
+  console.log("Linux native external source: Slash sent. Checking Location.");
+  await assertLocationText("/");
+  await requireFocus(window);
+  console.log(
+    "Linux native external source: Slash confirmed. Typing the remaining path.",
+  );
+  await xdotool(["type", "--clearmodifiers", "--", source.slice(1)]);
+  console.log("Linux native external source: Path typed. Checking Location.");
+  await assertLocationText(source);
+  await requireFocus(window);
+  console.log(
+    "Linux native external source: exact path confirmed before Return.",
+  );
+  await xdotool(["key", "--clearmodifiers", "Return"]);
+  console.log("Linux native external source: Return sent.");
 }
 
 /** Submits an unused fixture path in the real GTK signed-copy chooser. */
