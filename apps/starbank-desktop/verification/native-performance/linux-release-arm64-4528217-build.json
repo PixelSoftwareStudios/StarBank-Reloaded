@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "buildCommand": [
+    "pnpm",
+    "--filter",
+    "starbank-desktop",
+    "exec",
+    "tauri",
+    "build",
+    "--bundles",
+    "deb",
+    "--no-sign",
+    "--",
+    "--locked",
+    "--message-format=json-render-diagnostics"
+  ],
+  "cargoArtifact": {
+    "manifest_path": "/home/runner/work/StarBank-Reloaded/StarBank-Reloaded/apps/starbank-desktop/src-tauri/Cargo.toml",
+    "target": {
+      "kind": ["bin"],
+      "crate_types": ["bin"],
+      "name": "starbank-desktop",
+      "src_path": "/home/runner/work/StarBank-Reloaded/StarBank-Reloaded/apps/starbank-desktop/src-tauri/src/main.rs",
+      "edition": "2024",
+      "required-features": ["desktop"],
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/home/runner/work/StarBank-Reloaded/StarBank-Reloaded/target/release/starbank-desktop",
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 0,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": ["custom-protocol", "default", "desktop"]
+  },
+  "deb": {
+    "name": "starbank-reloaded_0.1.0_arm64.deb",
+    "size": 5263582,
+    "sha256": "02a9e28bfd91e85382ba197033340259bddef6607145a89601001823c00eac45"
+  },
+  "packagedExecutable": {
+    "name": "starbank-desktop",
+    "size": 17282040,
+    "sha256": "df60e86d5eb8a78ca3b51f99964ae68efc60511f4a3695bebedaf025cd001d55"
+  },
+  "bundleNote": "Tauri can patch the executable with the bundle type before packaging and restore the Cargo output afterward."
+}

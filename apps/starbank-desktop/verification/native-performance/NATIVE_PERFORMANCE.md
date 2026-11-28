@@ -139,7 +139,7 @@ Most matched CPU time in the early loaded-bank windows belonged to the WebKit We
 | arm64        |     32 |                    1,133.2 |                   165.7 |                           255.812 |
 | arm64        | 10,000 |                    1,159.2 |                   633.5 |                           299.289 |
 
-Charged-memory peaks include startup and post-admission launcher work, exclude services outside the leaf and are not RSS. Medians across different hosted machines and runs are observations, not controlled speed or memory comparisons. Representative real workloads, release builds, other operating systems' helper accounting, longer-term behavior and owner-approved budgets remain open.
+Charged-memory peaks include startup and post-admission launcher work, exclude services outside the leaf and are not RSS. Medians across different hosted machines and runs are observations, not controlled speed or memory comparisons. The later Linux release measurement is recorded below. Representative real workloads, other operating systems' helper accounting, longer-term behavior and owner-approved budgets remain open.
 
 Complete schema-v2 [x64 data](linux-x64-6c68a33.json) and [arm64 data](linux-arm64-6c68a33.json) are preserved with whitespace formatting only; parsed JSON equality was checked against the downloaded originals. Original JSON SHA-256 values were `d46d93446fd3474d7005e7b6500c4f7545e50e9d07e852ddeb2a0b879ad1dd3e` and `48cdc228836cac9b7c0c576c03681c1f6714535be33c2d9e734e296d30bf8c87`. [Original x64 artifact](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46110611436/artifacts/15249443910) · [Original arm64 artifact](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46110611436/artifacts/15249093759)
 
@@ -181,10 +181,51 @@ and runner use `_ticks`. The underlying counter values are unchanged.
 
 ## Linux release measurement gate
 
-The [release workflow](../../../../.github/workflows/linux-release-performance.yml) adds separate Ubuntu x64 and arm64 jobs for an unsigned optimized desktop package. Its first hosted execution is pending; the existing measurements below retain their original profile and environment labels.
+The [release workflow](../../../../.github/workflows/linux-release-performance.yml) adds separate Ubuntu x64 and arm64 jobs for an unsigned optimized desktop package. Its first hosted execution passed at `4528217`; the earlier debug measurements retain their original profile and environment labels.
 
 The build runs `pnpm --filter starbank-desktop exec tauri build --bundles deb --no-sign -- --locked --message-format=json-render-diagnostics`. The [receipt checker](linux-release-build.mjs) requires exactly one desktop binary compiler artifact with optimization level 3, debug assertions and test mode off, and desktop/custom-protocol features. The receipt records the exact read-only DEB and extracted packaged executable hashes. Tauri may patch the packaged executable's bundle marker, so compiler output bytes are not assumed to equal packaged bytes.
 
 After payload verification and minimal-Ubuntu dependency qualification, installation must match the receipt's DEB hash. The measurement observer requires the installed executable to match the packaged name, size and SHA-256 before any trial. It then reuses the existing fifteen cgroup trials, readiness checks, early and later windows, byte-preservation checks and owned cleanup. The extended invocation is `node linux-performance.mjs <root-owned-tools> <close-sender> <report.json> release <readonly-deb> <build-receipt.json>`; the original three-argument debug invocation remains supported.
 
-The workflow retains the mixed Cargo build log, compiler/package receipt and incremental measurement report. Only completed trials with matching executable admission and confirmed cleanup qualify as results. A hard runner timeout can interrupt cleanup and does not establish success. These synthetic, automation-inclusive, unflushed-cache observations will not establish real-workload budgets or a controlled comparison with separately hosted debug runs. Twenty-eight local Node helper tests passed before integration; actual release builds and measurements still require hosted execution.
+The workflow retains the mixed Cargo build log, compiler/package receipt and incremental measurement report. Only completed trials with matching executable admission and confirmed cleanup qualify as results. A hard runner timeout can interrupt cleanup and does not establish success. These synthetic, automation-inclusive, unflushed-cache observations will not establish real-workload budgets or a controlled comparison with separately hosted debug runs. Twenty-eight local Node helper tests passed before integration; the first actual release results follow.
+
+## Installed Linux release results at 4528217
+
+All thirteen jobs passed at `4528217` in [run 46139770215](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46139770215), including the [x64 release job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46139770215/job/140962891887) and [arm64 release job](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46139770215/job/140962891966). Each architecture completed all fifteen trials: five each for the empty welcome view, 32-value bank (1,557 bytes) and 10,000-value bank (488,953 bytes).
+
+The Cargo receipts record optimization level 3, debug assertions off, test mode off and the expected `desktop`/`custom-protocol` features. Each CI chain checked the DEB hash before installation and admitted the measured installed executable only when its name, byte length and SHA-256 matched the extracted packaged executable. The downloaded receipt and report independently agreed on those identities and DEB hashes. The DEBs themselves were not retained or independently downloaded for this review. Compiler metadata identifies the build profile; packaged and installed hashes establish executable identity after Tauri's bundle-marker patch. [x64 report](linux-release-x64-4528217.json) · [x64 build receipt](linux-release-x64-4528217-build.json) · [arm64 report](linux-release-arm64-4528217.json) · [arm64 build receipt](linux-release-arm64-4528217-build.json)
+
+Both runners reported four CPUs, Node 24.22.3 and WebKitGTK/WebKit driver `2.52.6-0ubuntu0.24.04.2`. The x64 kernel was `7.0.0-1018-aws`; arm64 used `7.0.0-1020-azure`. Each architecture recorded sixty process-membership snapshots and thirty windows with matched endpoint CPU attribution. All early and later windows contained seven populated samples; synthetic input-byte checks, natural window close before session deletion, empty-leaf proof and leaf removal passed. Both jobs also removed their owned helpers and purged their installed package.
+
+Each cell below gives the median followed by the full five-trial minimum–maximum range. Enabled Open timing begins at WebDriver session POST; bank-open timing begins at the queued Open click and ends at the visible Table. The arm64 empty-start maximum of 4,950.6ms is retained. With five trials, nearest-rank p95 is the maximum; these ranges do not establish a stable tail percentile.
+
+| Architecture | Values | Session POST → enabled Open (ms) | Open click → visible Table (ms) |
+| ------------ | -----: | -------------------------------: | ------------------------------: |
+| x64          |      0 |             948.4 (930.2–1662.3) |                               — |
+| x64          |     32 |           1053.5 (1037.2–1054.8) |             163.9 (119.2–201.2) |
+| x64          | 10,000 |           1045.2 (1028.7–1049.5) |             182.5 (172.6–229.9) |
+| arm64        |      0 |           1029.7 (1008.2–4950.6) |                               — |
+| arm64        |     32 |           1124.8 (1119.0–1257.4) |             165.6 (120.7–193.3) |
+| arm64        | 10,000 |           1140.0 (1127.4–1145.1) |             208.0 (206.2–218.8) |
+
+| Architecture | Values | Early group CPU (% one core) | Later group CPU (% one core) | Later current charged memory (MiB) | Later lifetime peak (MiB) |
+| ------------ | -----: | ---------------------------: | ---------------------------: | ---------------------------------: | ------------------------: |
+| x64          |      0 |          0.056 (0.048–0.059) |          0.043 (0.034–0.050) |                204.8 (204.6–243.0) |       210.4 (210.0–248.7) |
+| x64          |     32 |       44.041 (38.313–44.413) |          0.036 (0.031–0.038) |                233.8 (231.2–234.8) |       243.7 (240.7–244.4) |
+| x64          | 10,000 |       39.803 (36.578–42.033) |          0.013 (0.012–0.015) |                251.4 (249.4–252.2) |       277.8 (276.3–280.4) |
+| arm64        |      0 |          0.052 (0.048–0.060) |          0.038 (0.035–0.053) |                215.2 (214.6–254.8) |       220.0 (219.4–257.9) |
+| arm64        |     32 |       77.337 (75.600–81.111) |          0.037 (0.030–0.078) |                245.2 (244.3–260.3) |       253.5 (252.3–265.7) |
+| arm64        | 10,000 |       73.259 (72.196–74.757) |          0.018 (0.014–0.025) |                279.6 (276.4–281.2) |       289.4 (288.2–291.0) |
+
+Early windows start at least one second after readiness; later windows start at least fifteen seconds after readiness. CPU percentages use one core as the denominator. Current memory uses the final sample of each later window. Memory is cgroup-charged bytes converted to MiB, not RSS; later lifetime peaks include startup and earlier work. The leaf includes the app, its WebKit descendants and final admission-launcher work, while services outside the leaf are excluded. These are synthetic, automation-inclusive, unflushed-cache observations on different hosted machines. They do not establish controlled debug/release speed changes, real-corpus performance, long-term steady state or owner-approved budgets. Other operating systems' helper accounting and live visual acceptance remain separate obligations.
+
+The durable JSON files were formatted without changing their parsed content. Original downloaded report and receipt hashes are recorded below; these are not the hashes of the reformatted files. The downloaded ZIPs independently matched the API hashes before extraction: [x64 artifact 15260883410](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46139770215/artifacts/15260883410) and [arm64 artifact 15261657884](https://github.com/PixelSoftwareStudios/StarBank-Reloaded/actions/runs/46139770215/artifacts/15261657884).
+
+| Architecture | Original file      | SHA-256                                                            |
+| ------------ | ------------------ | ------------------------------------------------------------------ |
+| x64          | Measurement report | `2f4cca6ccb2650509e5e4e6cf2d9e2b39ba2d53492b94bb7d44a4428ae40beb6` |
+| x64          | Build receipt      | `cdcb3e355d4ad6bbe615ecdd22719658314fe74563deec3baffedd6644a045f6` |
+| arm64        | Measurement report | `e643415c9b13f853433239f2c445e4405945d8c29848f67a7c555b27067ab0a9` |
+| arm64        | Build receipt      | `0d8220f7513d270f79a99a169d2631acff6ebc993107d7540ca4c2d5b3381b23` |
+| x64          | Artifact ZIP       | `92ff7c0ffcb9ef9f8256190513d550ff36db2d28aa2c12c5f79c079143afb502` |
+| arm64        | Artifact ZIP       | `1c8184acd8b0226d21b6fb0579abd96e785150e5047ba5e555364d2d6f32b958` |

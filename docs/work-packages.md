@@ -212,7 +212,7 @@ Depends on: 03–16.
 
 - [x] Record a repeatable Chromium startup and interaction baseline and run the bounded XML sanitizer and Miri checks. [Browser timing](verification/BROWSER_PERFORMANCE.md) · [Miri evidence](../crates/formats/sc2bank/verification/MIRI.md)
 - [x] Measure macOS app-host startup and resources, and check the bounded save-and-restore model. [macOS timing](../apps/starbank-desktop/verification/native-performance/NATIVE_PERFORMANCE.md) · [Save and backup model](../crates/platform/starbank-fs/verification/save-backup-model/README.md)
-- [ ] Execute the optimized Linux x64/arm64 desktop resource gate with compiler receipts and exact package-to-installed-executable identity. The new release workflow is implemented; its first hosted measurements remain pending. [Release protocol](../apps/starbank-desktop/verification/native-performance/NATIVE_PERFORMANCE.md#linux-release-measurement-gate)
+- [x] Execute the optimized Linux x64/arm64 desktop resource gate with compiler receipts and exact package-to-installed-executable identity: fifteen trials per architecture, process-group accounting, byte preservation and owned cleanup. All thirteen jobs passed at `4528217`; real-workload budgets and other-platform helper accounting remain open. [Release results](../apps/starbank-desktop/verification/native-performance/NATIVE_PERFORMANCE.md#installed-linux-release-results-at-4528217)
 - [ ] Ongoing from first WP; report actual tests, fault injection, corpus parity, measured budgets and formal coverage.
 - [ ] Implement and verify: REQ-PERF-01, REQ-QA-01.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
