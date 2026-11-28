@@ -58,16 +58,29 @@ export async function verifyExternalSigning({
         [field.labels?.[0]?.textContent.trim(), field.value]);`,
       formFields,
     );
+  const displayedGold = () =>
+    evaluate(`
+      const rows = Array.from(document.querySelectorAll(".document-editor table tbody tr"))
+        .filter((row) => row.querySelector('th[scope="row"]')?.textContent.trim() === "Gold");
+      if (rows.length !== 1) return null;
+      const cell = rows[0].lastElementChild;
+      if (cell?.tagName !== "TD") return null;
+      const field = cell.querySelector('input[aria-label="Gold value"]');
+      if (field) return field.value;
+      const value = cell.firstElementChild;
+      return cell.children.length === 1 && value?.tagName === "SPAN" ? value.textContent : null;
+    `);
   const editorRetained = async () =>
     (await content(heading)) === activeName &&
     (await content(selectedTab)) === "Table View" &&
-    (await tableValue()) === editedValue &&
+    (await displayedGold()) === editedValue &&
     (await content(".editor-dirty-status")) === editedStatus &&
     (await content(".editor-draft-actions")) === null &&
     !(await content(`${queue} p[title]`)) &&
     (await hasHistory());
   const undoRetained = async () =>
     (await editorRetained()) &&
+    (await tableValue()) === editedValue &&
     (await findControl(".document-editor button", "Undo"));
 
   stage("Opening the queued active bank.");
