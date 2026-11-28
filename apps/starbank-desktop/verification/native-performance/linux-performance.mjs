@@ -12,6 +12,7 @@ import {
 import { availableParallelism, release, tmpdir, totalmem } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { requestGtkWindowClose } from "../linux-gtk-dialog.mjs";
 import { withNativeSession } from "../linux-native-webview.mjs";
@@ -389,7 +390,7 @@ function cpuTickDelta(start, end) {
   return delta;
 }
 
-function attributeCpu(start, end, ticksPerSecond) {
+export function attributeCpu(start, end, ticksPerSecond) {
   if (!start.members || !end.members) return { status: "unavailable" };
   const startByPid = new Map(
     start.members.map((member) => [member.pid, member]),
@@ -822,20 +823,29 @@ async function measure(helperDirectory, closeSender, output) {
   );
 }
 
-assert.equal(process.platform, "linux", "Use an isolated hosted Linux runner.");
-assert(
-  process.getuid() > 0 && process.geteuid() === process.getuid(),
-  "Run the measurement observer as the non-root runner.",
-);
-assert(
-  process.env.DISPLAY && process.env.DBUS_SESSION_BUS_ADDRESS,
-  "Start the measurement under the fixture Xvfb and private D-Bus session.",
-);
-assert.equal(
-  process.argv.length,
-  5,
-  "Pass the root-owned libexec directory, close sender and output JSON path.",
-);
-const [, , helpers, closeSender, output] = process.argv;
-if (!(await measure(helpers, resolve(closeSender), resolve(output))))
-  process.exitCode = 1;
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  assert.equal(
+    process.platform,
+    "linux",
+    "Use an isolated hosted Linux runner.",
+  );
+  assert(
+    process.getuid() > 0 && process.geteuid() === process.getuid(),
+    "Run the measurement observer as the non-root runner.",
+  );
+  assert(
+    process.env.DISPLAY && process.env.DBUS_SESSION_BUS_ADDRESS,
+    "Start the measurement under the fixture Xvfb and private D-Bus session.",
+  );
+  assert.equal(
+    process.argv.length,
+    5,
+    "Pass the root-owned libexec directory, close sender and output JSON path.",
+  );
+  const [, , helpers, closeSender, output] = process.argv;
+  if (!(await measure(helpers, resolve(closeSender), resolve(output))))
+    process.exitCode = 1;
+}
