@@ -156,6 +156,7 @@ Depends on: 11,12.
 - [x] Verify the installed Linux auto re-sign preference survives a fresh process restart and controls exact unsigned Save As output. [Restart evidence](verification/IMPLEMENTATION.md#installed-linux-preference-restart)
 - [x] Verify installed Linux Use auto-detect clears the recovered manual override and a fresh process retains the exact rootless manual-required state with unchanged fixture bytes. All eleven jobs passed at `6138424`. [Override-clear evidence](verification/IMPLEMENTATION.md#installed-linux-manual-override-clearing-across-restart)
 - [x] Verify installed Linux welcome-view Dark theme and Comfortable density through real Settings controls and restore both before Settings in a fresh process sharing only config. All eleven jobs passed at `b6e960c`. [Appearance restart](verification/IMPLEMENTATION.md#installed-linux-welcome-appearance-across-restart)
+- [x] Verify installed Linux Light/System/Dark welcome palettes through real controls: distinct Light/Dark backgrounds and System matching the preference observed in the same snapshot. All eleven jobs passed at `7ba66c7`; both OS preference branches and live OS changes are not implied. [Palette evidence](verification/IMPLEMENTATION.md#installed-linux-welcome-palette-selection)
 - [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
