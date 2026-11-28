@@ -127,7 +127,7 @@ Depends on: 02,08.
 - [x] Implement and browser-check the resizable map list, search, filters, selection and Quick Options using synthetic inventory. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Wire discovery, settings, breadcrumbs, menus, map metadata and bank choice. Verify responsive behavior and editor shortcuts. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Verify installed Linux sidebar keyboard resizing through 20%, 50% and 48%, with focused ARIA values and actual geometry agreeing. All eleven jobs passed at `da3737e`. [Sidebar evidence](verification/IMPLEMENTATION.md#installed-linux-sidebar-keyboard-layout-across-restart)
-- [x] Verify installed Linux mouse-pointer capture, held 40% preview, release and Settings acknowledgement from 48%, then restore 40% before Settings in a fresh process. Both installed Linux steps passed at `56e6a3c`; the full matrix was pending. [Pointer evidence](verification/IMPLEMENTATION.md#installed-linux-sidebar-pointer-layout-across-restart)
+- [x] Verify installed Linux mouse-pointer capture, held 40% preview, release and Settings acknowledgement from 48%, then restore 40% before Settings in a fresh process. All eleven jobs passed at `56e6a3c`. [Pointer evidence](verification/IMPLEMENTATION.md#installed-linux-sidebar-pointer-layout-across-restart)
 - [ ] Verify the remaining native visual and accessibility cases for REQ-UI-01, REQ-UI-02, REQ-UI-03 and REQ-UI-04.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -162,6 +162,7 @@ Depends on: 11,12.
 - [x] Verify a fresh installed Linux process applies the saved 48% sidebar before Settings, with Dark/Comfortable retained and no repeated resize. All eleven jobs passed at `da3737e`. [Sidebar restart](verification/IMPLEMENTATION.md#installed-linux-sidebar-keyboard-layout-across-restart)
 - [x] Preserve rapid Settings width increments through pending native replies and restore the refreshed value on failure. The focused held-reply regression passed in three headless browser engines at `7ce7b6a`. [Slider evidence](verification/IMPLEMENTATION.md#settings-slider-input-during-pending-saves)
 - [x] Preserve rapid visibility-filter reversals across Quick Options and Settings, including older replies, independent pending filters and failure read-back. Focused regressions passed in three headless engines at `be1ed19`. [Filter evidence](verification/IMPLEMENTATION.md#map-visibility-filters-during-pending-saves)
+- [x] Preserve rapid presentation-checkbox reversals through older settings replies and restore confirmed values after failure. Three controls passed focused regressions in three headless engines at `0fa7fc4`. [Presentation evidence](verification/IMPLEMENTATION.md#presentation-checkbox-input-during-pending-saves)
 - [ ] Complete installed native picker and platform acceptance for REQ-UI-09.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
