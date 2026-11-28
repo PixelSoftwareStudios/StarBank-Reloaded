@@ -112,16 +112,30 @@ int main(int argc, char **argv)
 	}
 	XSetErrorHandler(record_x11_error);
 
-	const Atom selection = XInternAtom(display, CLIPBOARD_SELECTION, True);
-	const Atom target = XInternAtom(display, target_name, True);
-	const Atom property = XInternAtom(display, RESULT_PROPERTY, False);
-	const Window owner = selection == None ? None : XGetSelectionOwner(display, selection);
 	Window requestor = None;
 	unsigned char *bytes = NULL;
 	unsigned long length = 0;
 	const char *failure = NULL;
-	if (selection == None || target == None || property == None || owner == None) {
-		failure = "The fixture clipboard owner or requested text target is unavailable.";
+
+	const Atom selection = XInternAtom(display, CLIPBOARD_SELECTION, True);
+	if (selection == None) {
+		failure = "The fixture clipboard selection does not exist.";
+		goto cleanup;
+	}
+	const Window owner = XGetSelectionOwner(display, selection);
+	if (owner == None) {
+		failure = "The fixture clipboard selection has no owner.";
+		goto cleanup;
+	}
+	// A selection owner can register a GDK target before it has an X server atom.
+	const Atom target = XInternAtom(display, target_name, False);
+	if (target == None) {
+		failure = "Could not intern the requested clipboard target.";
+		goto cleanup;
+	}
+	const Atom property = XInternAtom(display, RESULT_PROPERTY, False);
+	if (property == None) {
+		failure = "Could not intern the clipboard reply property.";
 		goto cleanup;
 	}
 
