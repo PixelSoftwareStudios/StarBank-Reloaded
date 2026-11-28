@@ -3,6 +3,7 @@ import { execFile, spawn } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
+  mkdtempDisposable,
   readdir,
   readFile,
   rm,
@@ -676,9 +677,10 @@ async function verifySaveAsOnClose(
 ) {
   const {
     applyGold,
+    click,
+    clickButton,
     clickTab,
     content,
-    disableAutoResign,
     findControl,
     openInitialBank,
     stageGold,
@@ -692,7 +694,11 @@ async function verifySaveAsOnClose(
     (await findControl("button", "Undo"));
 
   await openInitialBank(name, "010");
-  await disableAutoResign();
+  await click('button[aria-label="Settings"]', null);
+  await waitFor("the persisted auto re-sign preference after restart", () =>
+    findControl(settingsCheckbox, autoResignLabel, false),
+  );
+  await clickButton("Back to editor");
   await waitFor(
     "the opening Table value after Settings",
     async () =>
@@ -727,7 +733,13 @@ function bank(value) {
   );
 }
 
-async function withNativeSession(application, scenario, inputs, verify) {
+async function withNativeSession(
+  application,
+  scenario,
+  inputs,
+  verify,
+  { configHome } = {},
+) {
   const scratch = await mkdtemp(join(tmpdir(), "starbank-linux-webview-"));
   let driver;
   let session;
@@ -744,8 +756,11 @@ async function withNativeSession(application, scenario, inputs, verify) {
       LC_ALL: "C.UTF-8",
     };
     for (const directory of ["CONFIG", "CACHE", "DATA"]) {
-      const path = join(scratch, directory.toLowerCase());
-      await mkdir(path);
+      const path =
+        directory === "CONFIG" && configHome
+          ? configHome
+          : join(scratch, directory.toLowerCase());
+      await mkdir(path, { recursive: true });
       environment[`XDG_${directory}_HOME`] = path;
     }
     for (const [name, bytes] of inputs)
@@ -818,6 +833,9 @@ async function withNativeSession(application, scenario, inputs, verify) {
 }
 
 async function run(application, closeSender, clipboardReader) {
+  await using sharedConfig = await mkdtempDisposable(
+    join(tmpdir(), "starbank-linux-preferences-"),
+  );
   const first = "First.SC2Bank";
   const second = "Second.SC2Bank";
   const third = "Third.SC2Bank";
@@ -867,6 +885,7 @@ async function run(application, closeSender, clipboardReader) {
       assert.deepEqual(await readFile(exportDestination), expectedExport);
       assert.deepEqual(await readFile(saveDestination), bank("2345"));
     },
+    { configHome: sharedConfig.path },
   );
   console.log(
     "Linux native editing, Copy XML, GTK export, navigation Cancel/Discard/Save As, and window close Cancel/Discard passed.",
@@ -891,9 +910,10 @@ async function run(application, closeSender, clipboardReader) {
     [[save, bank("010")]],
     (command, context) =>
       verifySaveAsOnClose(command, { ...context, name: save, closeSender }),
+    { configHome: sharedConfig.path },
   );
   console.log(
-    "Linux native Save As chooser Cancel and verified Save before close passed.",
+    "Linux native auto re-sign preference persisted across restart, and Save As chooser Cancel and verified Save before close passed.",
   );
 }
 
