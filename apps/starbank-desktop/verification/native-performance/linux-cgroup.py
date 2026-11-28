@@ -1,12 +1,12 @@
 """Manage one fresh cgroup v2 leaf for hosted Linux resource measurements.
 
 Setup requires an existing root with memory accounting enabled. Pass its leaf
-handle as JSON to sample and cleanup. App admission and timing belong to the
-measurement harness.
+handle as JSON to sample, members, and cleanup. App admission and timing belong
+to the measurement harness.
 """
 
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass
 import json
 import os
@@ -18,12 +18,21 @@ import sys
 
 
 ROOT = Path("/sys/fs/cgroup")
+PROC_ROOT = Path("/proc")
 PREFIX = "starbank-perf-"
 TOKEN_BYTES = 16
 TOKEN = re.compile(r"[0-9a-f]{32}")
 UNSIGNED = re.compile(r"0|[1-9][0-9]{0,19}")
 U64_MAX = (1 << 64) - 1
 MAX_CONTROL_BYTES = 4_096
+MAX_MEMBER_COUNT = 256
+MAX_PID = (1 << 31) - 1
+MAX_UID = (1 << 32) - 2
+MAX_PROC_STATUS_BYTES = 64 * 1024
+MAX_EXE_BYTES = 4_096
+# /proc/<pid>/stat starttime is field 22, with state (field 3) first in the tail.
+STARTTIME_INDEX = 22 - 3
+MIN_STAT_TAIL_FIELDS = 52 - 2
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 FILE_FLAGS = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
 
@@ -71,15 +80,19 @@ def directory(path, *, parent=None):
         os.close(descriptor)
 
 
-def control(leaf, name):
-    descriptor = os.open(name, FILE_FLAGS, dir_fd=leaf)
+def read_bounded(parent, name, limit):
+    descriptor = os.open(name, FILE_FLAGS, dir_fd=parent)
     with os.fdopen(descriptor, "rb") as stream:
         if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
-            raise ValueError(f"Expected a regular cgroup file: {name}")
-        contents = stream.read(MAX_CONTROL_BYTES + 1)
-    if len(contents) > MAX_CONTROL_BYTES:
-        raise ValueError(f"Oversized cgroup file: {name}")
-    return contents.decode("ascii")
+            raise ValueError(f"Expected a regular kernel file: {name}")
+        contents = stream.read(limit + 1)
+    if len(contents) > limit:
+        raise ValueError(f"Oversized kernel file: {name}")
+    return contents
+
+
+def control(leaf, name):
+    return read_bounded(leaf, name, MAX_CONTROL_BYTES).decode("ascii")
 
 
 def uint(text, name):
@@ -184,6 +197,93 @@ def sample(root, handle):
         return asdict(counters(leaf))
 
 
+def member_pids(leaf):
+    contents = control(leaf, "cgroup.procs")
+    if contents and not contents.endswith("\n"):
+        raise ValueError("Incomplete cgroup.procs record")
+    entries = contents[:-1].split("\n") if contents else []
+    if len(entries) > MAX_MEMBER_COUNT:
+        raise ValueError("Cgroup member count exceeds the snapshot limit")
+    pids = {uint(entry, "cgroup.procs PID") for entry in entries}
+    if any(not 0 < pid <= MAX_PID for pid in pids):
+        raise ValueError("Invalid PID in cgroup.procs")
+    return pids
+
+
+def verify_member(process, pid, expected):
+    if control(process, "cgroup") != expected:
+        raise ValueError(f"PID {pid} is outside the identified cgroup leaf")
+
+
+def starttime_ticks(process, pid):
+    contents = read_bounded(process, "stat", MAX_CONTROL_BYTES)
+    # The parenthesized process name can itself contain spaces and parentheses.
+    prefix = f"{pid} (".encode("ascii")
+    tail = contents.rfind(b") ")
+    if not contents.startswith(prefix) or tail < len(prefix) or not contents.endswith(b"\n"):
+        raise ValueError(f"Invalid stat identity for PID {pid}")
+    fields = contents[tail + 2:].split()
+    if len(fields) < MIN_STAT_TAIL_FIELDS or len(fields[0]) != 1:
+        raise ValueError(f"Missing stat starttime for PID {pid}")
+    return uint(fields[STARTTIME_INDEX].decode("ascii"), f"PID {pid} starttime")
+
+
+def effective_uid(process, pid):
+    contents = read_bounded(process, "status", MAX_PROC_STATUS_BYTES)
+    fields = [line[4:].split() for line in contents.splitlines() if line.startswith(b"Uid:")]
+    if len(fields) != 1 or len(fields[0]) != 4:
+        raise ValueError(f"Invalid Uid field for PID {pid}")
+    ids = [uint(text.decode("ascii"), f"PID {pid} Uid") for text in fields[0]]
+    if any(uid > MAX_UID for uid in ids):
+        raise ValueError(f"Invalid Uid range for PID {pid}")
+    return ids[1]
+
+
+def executable_path(process, pid):
+    path = os.readlink("exe", dir_fd=process)
+    if (
+        not path.startswith("/")
+        or path.endswith(" (deleted)")
+        or len(path.encode("utf-8")) > MAX_EXE_BYTES
+        or any(ord(char) < 32 or ord(char) == 127 for char in path)
+    ):
+        raise ValueError(f"Invalid executable path for PID {pid}")
+    return path
+
+
+def members(root, handle, *, proc_root=PROC_ROOT):
+    with open_leaf(root, handle) as leaf:
+        pids = member_pids(leaf)
+        observed = []
+        if pids:
+            expected = f"0::/{handle.name}\n"
+            with directory(proc_root) as proc, ExitStack() as process_directories:
+                snapshots = []
+                for pid in sorted(pids):
+                    process = process_directories.enter_context(
+                        directory(str(pid), parent=proc)
+                    )
+                    verify_member(process, pid, expected)
+                    starttime = starttime_ticks(process, pid)
+                    observed.append({
+                        "pid": str(pid),
+                        "starttime_ticks": str(starttime),
+                        "executable": executable_path(process, pid),
+                        "effective_uid": str(effective_uid(process, pid)),
+                    })
+                    snapshots.append((pid, process, starttime))
+
+                for pid, process, starttime in snapshots:
+                    if starttime_ticks(process, pid) != starttime:
+                        raise ValueError(f"Process identity changed for PID {pid}")
+                    verify_member(process, pid, expected)
+
+        if member_pids(leaf) != pids or populated(leaf) != bool(pids):
+            raise ValueError(f"Cgroup membership changed while reading {handle.name}")
+        verify_identity(os.stat(handle.name, dir_fd=root, follow_symlinks=False), handle)
+    return {"members": observed}
+
+
 def cleanup(root, handle):
     with open_leaf(root, handle) as leaf:
         remove_empty(root, leaf, handle)
@@ -193,7 +293,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("setup")
-    for command in ("sample", "cleanup"):
+    for command in ("sample", "members", "cleanup"):
         commands.add_parser(command).add_argument("leaf", type=parse_leaf)
     try:
         args = parser.parse_args()
@@ -204,6 +304,8 @@ def main():
                 print(json.dumps(setup(root)))
             elif args.command == "sample":
                 print(json.dumps(sample(root, args.leaf)))
+            elif args.command == "members":
+                print(json.dumps(members(root, args.leaf)))
             else:
                 cleanup(root, args.leaf)
     except (OSError, ValueError) as error:

@@ -18,6 +18,8 @@ sys.modules[SPEC.name] = cgroup
 SPEC.loader.exec_module(cgroup)
 
 TOKEN = "0123456789abcdef" * 2
+APP_PATH = "/usr/bin/starbank-desktop"
+WEBKIT_PATH = "/usr/lib/webkit2gtk-4.1/WebKitWebProcess"
 BASELINE = {
     "cpu.stat": "usage_usec 0\nuser_usec 0\nsystem_usec 0\n",
     "memory.current": "0\n",
@@ -35,12 +37,14 @@ ROOT_CONTROLS = {
 class LinuxCgroupTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.proc_root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         for name, value in ROOT_CONTROLS.items():
             (self.root / name).write_text(value, encoding="ascii")
         self.root_fd = self.enterContext(cgroup.directory(self.root))
         self.leaf_path = self.root / (cgroup.PREFIX + TOKEN)
         self.initial_controls = BASELINE.copy()
         mkdir, rmdir = os.mkdir, os.rmdir
+        self.mkdir_process_fixture = mkdir
 
         def kernel_mkdir(path, mode, *, dir_fd=None):
             self.assertEqual((path, dir_fd), (self.leaf_path.name, self.root_fd))
@@ -78,6 +82,28 @@ class LinuxCgroupTests(unittest.TestCase):
 
     def set_control(self, name, contents):
         (self.leaf_path / name).write_text(contents, encoding="ascii")
+
+    def set_members(self, pids):
+        self.set_control("cgroup.procs", "".join(f"{pid}\n" for pid in pids))
+        self.set_control("cgroup.events", f"populated {int(bool(pids))}\nfrozen 0\n")
+
+    def snapshot_members(self, handle):
+        return cgroup.members(self.root_fd, handle, proc_root=self.proc_root)
+
+    def process_fixture(self, handle, pid, executable=APP_PATH, starttime=87):
+        process = self.proc_root / str(pid)
+        self.mkdir_process_fixture(process)
+        # Include an internal ') ' and a byte outside ASCII in the comm field.
+        before = b" ".join([b"S", *([b"0"] * 18)])
+        tail = b" 0" * 30
+        (process / "stat").write_bytes(
+            f"{pid} (name".encode("ascii") + b") odd\xff) " + before
+            + f" {starttime}".encode("ascii") + tail + b"\n"
+        )
+        (process / "status").write_bytes(b"Name:\ttest\xff\nUid:\t1000\t1001\t1002\t1003\n")
+        (process / "cgroup").write_text(f"0::/{handle.name}\n", encoding="ascii")
+        (process / "exe").symlink_to(executable)
+        return process
 
     def test_samples_owned_leaf_and_removes_it_only_after_empty(self):
         handle = self.create()
@@ -213,6 +239,160 @@ class LinuxCgroupTests(unittest.TestCase):
         wire = json.dumps(leaf.to_json_fields())
         self.assertIn('"inode": "18446744073709551615"', wire)
         self.assertEqual(cgroup.parse_leaf(wire), leaf)
+
+    def test_members_only_reads_listed_processes_and_deduplicates(self):
+        handle = self.create()
+        first, second, unrelated = 41, 42, 43
+        self.set_members([second, first, second])
+        self.process_fixture(handle, first, starttime=(1 << 53) + 1)
+        self.process_fixture(handle, second, WEBKIT_PATH)
+        # Missing metadata for this unrelated PID must have no effect.
+        self.mkdir_process_fixture(self.proc_root / str(unrelated))
+        self.assertEqual(
+            self.snapshot_members(handle),
+            {
+                "members": [
+                    {
+                        "pid": "41",
+                        "starttime_ticks": "9007199254740993",
+                        "executable": APP_PATH,
+                        "effective_uid": "1001",
+                    },
+                    {
+                        "pid": "42",
+                        "starttime_ticks": "87",
+                        "executable": WEBKIT_PATH,
+                        "effective_uid": "1001",
+                    },
+                ],
+            },
+        )
+
+    def test_members_empty_when_leaf_is_empty_and_refuses_partial_membership(self):
+        handle = self.create()
+        self.assertEqual(self.snapshot_members(handle), {"members": []})
+        self.set_control("cgroup.events", "populated 1\nfrozen 0\n")
+        with self.assertRaisesRegex(ValueError, "membership changed"):
+            self.snapshot_members(handle)
+
+    def test_members_refuses_malformed_or_excessive_pid_lists(self):
+        handle = self.create()
+        invalid = (
+            "0\n", "2147483648\n", "-5\n", "01\n", "+4\n", "4\r\n", "4",
+            "../41\n", "41 42\n", "41\n" * (cgroup.MAX_MEMBER_COUNT + 1),
+        )
+        for contents in invalid:
+            with self.subTest(contents=contents[:80]):
+                self.set_control("cgroup.procs", contents)
+                with self.assertRaises(ValueError):
+                    self.snapshot_members(handle)
+
+    def test_members_rejects_outside_process_before_other_metadata_reads(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        process = self.process_fixture(handle, pid)
+        (process / "cgroup").write_text("0::/unrelated\n", encoding="ascii")
+        (process / "stat").unlink()
+        with self.assertRaisesRegex(ValueError, "outside the identified cgroup leaf"):
+            self.snapshot_members(handle)
+
+    def test_members_rejects_missing_or_symlinked_process_directory(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        with self.assertRaises(FileNotFoundError):
+            self.snapshot_members(handle)
+        process = self.process_fixture(handle, pid)
+        renamed = process.rename(self.proc_root / "unrelated")
+        process.symlink_to(renamed, target_is_directory=True)
+        with self.assertRaises(OSError):
+            self.snapshot_members(handle)
+
+    def test_members_rejects_nonmatching_stat_identity_and_malformed_uid(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        process = self.process_fixture(handle, pid)
+        status = process / "status"
+        original = status.read_bytes()
+        for contents in (
+            b"Uid:\t1000\t1001\t1002\n",
+            b"Uid:\t1000\t4294967295\t1002\t1003\n",
+            original + b"Uid:\t1000\t1009\t1002\t1003\n",
+        ):
+            with self.subTest(contents=contents), self.assertRaisesRegex(ValueError, "Uid"):
+                status.write_bytes(contents)
+                self.snapshot_members(handle)
+        status.write_bytes(original)
+        stat = process / "stat"
+        stat.write_bytes(stat.read_bytes().replace(b"41 (", b"52 (", 1))
+        with self.assertRaisesRegex(ValueError, "Invalid stat identity"):
+            self.snapshot_members(handle)
+
+    def test_members_rejects_abnormal_executable_links(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        process = self.process_fixture(handle, pid)
+        executable = process / "exe"
+        for target in ("starbank-desktop", APP_PATH + " (deleted)", "/name\ninjected"):
+            with self.subTest(target=target):
+                executable.unlink()
+                executable.symlink_to(target)
+                with self.assertRaisesRegex(ValueError, "Invalid executable path"):
+                    self.snapshot_members(handle)
+
+    def test_members_rejects_pid_reuse_between_metadata_passes(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        process = self.process_fixture(handle, pid)
+        stat = process / "stat"
+        readlink = os.readlink
+
+        def replace_process(name, *, dir_fd):
+            result = readlink(name, dir_fd=dir_fd)
+            stat.write_bytes(stat.read_bytes().replace(b" 87 ", b" 99 ", 1))
+            return result
+
+        with patch.object(cgroup.os, "readlink", side_effect=replace_process):
+            with self.assertRaisesRegex(ValueError, "Process identity changed"):
+                self.snapshot_members(handle)
+
+    def test_members_rejects_process_migration_or_group_membership_change(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        process = self.process_fixture(handle, pid)
+        readlink = os.readlink
+
+        def migrate_process(name, *, dir_fd):
+            result = readlink(name, dir_fd=dir_fd)
+            (process / "cgroup").write_text("0::/unrelated\n", encoding="ascii")
+            return result
+
+        with patch.object(cgroup.os, "readlink", side_effect=migrate_process):
+            with self.assertRaisesRegex(ValueError, "outside the identified cgroup leaf"):
+                self.snapshot_members(handle)
+        (process / "cgroup").write_text(f"0::/{handle.name}\n", encoding="ascii")
+
+        def add_group_member(name, *, dir_fd):
+            result = readlink(name, dir_fd=dir_fd)
+            self.set_members([pid, 42])
+            return result
+
+        with patch.object(cgroup.os, "readlink", side_effect=add_group_member):
+            with self.assertRaisesRegex(ValueError, "membership changed"):
+                self.snapshot_members(handle)
+
+    def test_members_rejects_replaced_leaf_identity_before_proc_reads(self):
+        handle = self.create()
+        self.leaf_path.rename(self.root / "original")
+        cgroup.setup(self.root_fd)
+        self.set_members([41])
+        with self.assertRaisesRegex(ValueError, "identity changed"):
+            self.snapshot_members(handle)
 
 
 if __name__ == "__main__":
