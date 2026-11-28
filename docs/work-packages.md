@@ -19,6 +19,7 @@ Depends on: 01.
 - [x] Pass the hosted source, wasm32 and frontend checks and the Linux and macOS jobs at `4143952`. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-4143952)
 - [x] Run the pinned local Rust and frontend advisory checks and collect installed frontend dependency license inventories. [Dependency checks](verification/DEPENDENCIES.md)
 - [x] Pass all 11 hosted CI jobs at `e4385da`, including the Linux arm64 desktop leg, both advisory checks and the previously failing Windows probes. [Hosted evidence](verification/IMPLEMENTATION.md#hosted-ci-at-e4385da)
+- [ ] Fix the pinned RFD GTK native-chooser reference leak and qualify repeated async picker teardown. [Dependency ownership review](verification/DEPENDENCIES.md#gtk-native-chooser-reference-under-review)
 - [ ] Complete production dependency and capability qualification for REQ-ENG-01, REQ-ENG-02 and REQ-SCOPE-01. Verify later revisions in their own hosted runs.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
 
@@ -58,6 +59,7 @@ Depends on: 05.
 
 - [x] Implement versioned schema, compatible legacy migration, explicit identity matching and exact atomic dependent edits in the engine.
 - [x] Wire Simple View and verify synthetic profile selection, dependent changes and one-step undo. [Implementation evidence](verification/IMPLEMENTATION.md)
+- [x] Allow first legacy YAML import to request a scoped manual-author retry; verify stale-scope refusal and unchanged bank bytes/revision. [Import evidence](verification/IMPLEMENTATION.md#first-legacy-profile-import-without-inferred-author)
 - [ ] Qualify actual game profiles and their identity evidence.
 - [ ] Implement and verify: REQ-PROF-01, REQ-PROF-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
@@ -73,6 +75,7 @@ Depends on: 04,05.
 - [x] Qualify the Windows local NTFS create-only transaction under a reduced token, including collisions, process interruption, real staging disk-full rejection and explicit verified retry. [Windows create evidence](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md)
 - [x] Verify Windows public CLI copy/adjacent-backup writes and native Save As, export and external-signing callbacks without launching dialogs. [Windows integration evidence](../crates/platform/starbank-fs/verification/WINDOWS_CREATE_QUALIFICATION.md#qualified-transaction-and-create-only-activation)
 - [x] Verify installed Linux x64/arm64 real GTK Export Copy and Save As before queued navigation, with exact outputs and unchanged source banks. [Native chooser evidence](verification/IMPLEMENTATION.md#native-unsaved-dialog-response-compatibility)
+- [x] Offer Windows create-only Save As before navigation/close with verified-checkpoint guards, native filesystem tests and Windows-labelled renderer checks. Actual Windows dialogs remain unverified. [Guarded Save As](verification/IMPLEMENTATION.md#windows-save-as-before-navigation-or-close)
 - [ ] Qualify Windows replacement separately, Linux replacement with hidden metadata and physical power-loss recovery. [Native replacement evidence](../crates/platform/starbank-fs/verification/NATIVE_REPLACEMENT_QUALIFICATION.md)
 - [ ] Implement and verify: REQ-SAVE-01, REQ-SAVE-02, REQ-BACKUP-01, REQ-BACKUP-02.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
@@ -125,6 +128,7 @@ Depends on: 05,06,07,10,11.
 - [x] Implement controlled Table and CodeMirror Raw views, same-value bulk editing, draft safeguards and callback-driven file actions.
 - [x] Bind live Table, Raw, and Simple View and qualify the supported local save, backup and restore flows with synthetic banks. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Preserve numeric pointer selections when entering exact values and provide bounded, advisory Raw syntax hints. Verify both in all three headless browser engines. [Editor evidence](verification/IMPLEMENTATION.md#req-ui-06-editor-input-follow-ups)
+- [x] Verify installed Linux unapplied-draft close protection, cancelled/verified Save As on close and independent exact X11 clipboard readback under Xvfb. [Native evidence](verification/IMPLEMENTATION.md#native-unsaved-dialog-response-compatibility)
 - [ ] Complete the installed native platform and assistive technology matrix. Keep writes scoped to qualified storage.
 - [ ] Complete installed native and assistive-technology acceptance for REQ-UI-05, REQ-UI-06, REQ-UI-07 and REQ-UI-08.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).

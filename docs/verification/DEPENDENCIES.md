@@ -1,6 +1,6 @@
 # Locked dependency checks
 
-The Windows Save As navigation/close integration enables `common-controls-v6` on the existing pinned RFD 0.17.2 dependency. Locked Windows feature-graph inspection and cross-target Clippy confirmed the feature; Cargo.lock is unchanged. RFD uses native TaskDialog custom labels with the Common Controls v6 manifest already supplied by tauri-build. This is a feature change rather than a package upgrade and leaves Linux GTK selection intact. Windows native test linkage and packaged build/install checks remain pending. [Implementation and scope](IMPLEMENTATION.md#windows-save-as-before-navigation-or-close)
+The Windows Save As navigation/close integration enables `common-controls-v6` on the existing pinned RFD 0.17.2 dependency. Locked Windows feature-graph inspection and cross-target Clippy confirmed the feature; Cargo.lock is unchanged. RFD uses native TaskDialog custom labels with the Common Controls v6 manifest already supplied by tauri-build. This is a feature change rather than a package upgrade and leaves Linux GTK selection intact. Windows native test linkage, all 109 desktop tests and silent NSIS build/install/uninstall checks passed at `6998624`; actual Windows dialogs remain unverified. [Implementation and scope](IMPLEMENTATION.md#windows-save-as-before-navigation-or-close)
 
 On 2026-11-27, cargo-audit 0.22.2 used RustSec database commit `c5279d0b0c9e8b70df666eb6d1edbabcfd1176bd` (1,571 advisories). Node 24.22.3 and pnpm 12.23.0 checked the frontend lockfile. These are scoped dependency checks, not release or licensing approval.
 
@@ -10,6 +10,12 @@ On 2026-11-27, cargo-audit 0.22.2 used RustSec database commit `c5279d0b0c9e8b70
 | Patched Cargo.lock SHA-256 `3573522707dda0e0acf8088f070e225e1bd2b244d6ca06dbe3a4f6fd579c9589` | Same database and tool, no ignored advisories | No vulnerability entries; unmaintained chrono RUSTSEC-2026-0543 and proc-macro-error RUSTSEC-2024-0370 warnings remain. |
 | pnpm-lock.yaml SHA-256 `f4c357f904793787ccb6133a7c1220c54e96a09f11ed39ab286075583f0ba1c9` | `pnpm audit --json` | Registry response reported 224 dependencies and zero advisories at every severity. |
 | Selected Cargo graph with all workspace features | `cargo deny --all-features list --format json --layout crate`, cargo-deny 0.20.2 | 478 inventory entries; no detected license for 18 authored packages. The remaining entries have detected expressions, not an approved distribution policy. |
+
+## GTK native chooser reference under review
+
+Pinned RFD 0.17.2 destroys its `GtkFileChooserNative` in `Drop` but does not release the constructor's owned GObject reference. GTK documents that native-dialog destroy does not release references; chooser finalization destroys the retained child window. This is a source-level ownership leak, distinct from a measured heap-growth claim. The hidden title observed in the failed cancellation fixture led to this review. [GTK constructor ownership](https://docs.gtk.org/gtk3/ctor.FileChooserNative.new.html) · [Destroy contract](https://docs.gtk.org/gtk3/method.NativeDialog.destroy.html)
+
+Released RFD 0.18.0 at `2d35d7d` still omits that unref; its returned-filename/list fixes do not solve the native-dialog reference. At inspection, upstream fix [PR 366](https://github.com/PolyMeilex/rfd/pull/366), head `eedc63964337fef1f49dd043cc4e52a93dc96c9e`, was open, unmerged and unreviewed. No upgrade or patch is applied yet. A narrow backport to the pinned version requires a reproducible source check and repeated async Accept/Cancel teardown qualification on both Linux architectures. The current tests establish user-visible cancellation and process cleanup, not bounded per-picker memory growth.
 
 ## Installed frontend license inventory
 
