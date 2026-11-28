@@ -101,13 +101,13 @@ The hosted environment used kernel `7.0.0-1020-azure`, four reported CPUs, Node 
 Medians below are across the five trials for each scenario. Memory is the kernel charged-memory watermark as of the early sampling window's end, in MiB (2^20 bytes). It includes startup and the admission launcher's final work, excludes services outside the group, and is not RSS. The CPU window begins approximately one second after readiness and lasts roughly 3.34 seconds; it is an **early no-input window**, not established steady-state idle utilization.
 
 | Architecture | Values | POST to enabled action, ms | Open click to Table, ms | Charged peak, MiB | Early CPU, % one core |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| x64 | 0 | 1,089.5 | — | 211.254 | 0.047 |
-| x64 | 32 | 1,200.9 | 172.2 | 241.102 | 52.987 |
-| x64 | 10,000 | 1,187.0 | 524.3 | 283.578 | 50.911 |
-| arm64 | 0 | 1,070.0 | — | 221.012 | 0.060 |
-| arm64 | 32 | 1,158.2 | 169.3 | 253.867 | 80.604 |
-| arm64 | 10,000 | 1,160.5 | 645.8 | 300.766 | 77.299 |
+| ------------ | -----: | -------------------------: | ----------------------: | ----------------: | --------------------: |
+| x64          |      0 |                    1,089.5 |                       — |           211.254 |                 0.047 |
+| x64          |     32 |                    1,200.9 |                   172.2 |           241.102 |                52.987 |
+| x64          | 10,000 |                    1,187.0 |                   524.3 |           283.578 |                50.911 |
+| arm64        |      0 |                    1,070.0 |                       — |           221.012 |                 0.060 |
+| arm64        |     32 |                    1,158.2 |                   169.3 |           253.867 |                80.604 |
+| arm64        | 10,000 |                    1,160.5 |                   645.8 |           300.766 |                77.299 |
 
 Loaded-bank CPU began near zero, rose in the second sampling interval and stayed elevated through the final four intervals on both architectures. That observation does not locate the work or prove eventual steady-state behavior. The fixed empty/small/large trial order also confounds scenario and order. No app change or performance budget is justified by attribution guesses; a later window and per-process CPU deltas are the next measurements.
 
