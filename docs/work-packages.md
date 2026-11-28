@@ -41,6 +41,8 @@ Depends on: 03.
 - [x] Implement signature computation, verification and lossless in-memory re-signing for the intended destination context. Verify independent synthetic digests and native/WASM/CLI agreement. [Adapter parity](verification/ADAPTER_PARITY.md)
 - [x] Wire automatic and explicit re-signing, including create-only signed copies of external banks. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Verify the macOS native external-signing picker workflow on synthetic banks. [macOS evidence](verification/MACOS_EXTERNAL_SIGNING.md)
+- [x] Verify the installed Linux x64 and arm64 synthetic external-signing case through real GTK choosers: independently expected 170-byte output, unchanged sources, retained dirty edit/Undo, settings opt-out and post-close file checks. All eleven CI jobs passed at `e739ed0`; intermittent chooser failures remain open below. [Linux evidence](verification/LINUX_EXTERNAL_SIGNING.md)
+- [ ] Resolve the intermittent GTK source-chooser failure. The mapped-entry diagnostic is implemented; its hosted run `46122678514` remains pending and does not establish a fix. [Diagnostic scope](verification/LINUX_EXTERNAL_SIGNING.md#mapped-entry-diagnostic-follow-up)
 - [x] Match the stored signatures of two owner-supplied banks against independently calculated digests and native/WASM/CLI output. [Private corpus](verification/PRIVATE_SC2_CORPUS.md)
 - [ ] Verify documented SC2-generated digests across a broader corpus and game acceptance of edited copies for REQ-SIG-01, REQ-SIG-02 and REQ-SIG-03.
 - [ ] Add crate-local tests/appropriate verification, run applicable gates, record commands, unresolved issues and atomic Conventional Commit(s).
