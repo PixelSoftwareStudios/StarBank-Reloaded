@@ -183,10 +183,21 @@ const settingsCheckbox =
   'section[aria-label="Settings"] input[type="checkbox"]';
 const autoResignLabel = "Auto re-sign banks on save";
 const dirtyStatus = "Unsaved changes in 1 section";
+const clipboardStatus = "Copied bank XML.";
+const clipboardDialogTitle = "Copy bank XML";
+const preparedXmlField = 'textarea[aria-label="Prepared bank XML"]';
 
 async function verifyEditor(
   command,
-  { first, second, third, exportCopy, saveCopy, closeSender },
+  {
+    first,
+    second,
+    third,
+    assertInputsUnchanged,
+    exportCopy,
+    saveCopy,
+    closeSender,
+  },
 ) {
   const evaluate = (script, ...args) =>
     command("/execute/sync", "POST", { script, args });
@@ -243,6 +254,73 @@ async function verifyEditor(
     (await content(".editor-dirty-status")) === dirtyStatus &&
     (await content(xml))?.includes('int="1234"') &&
     (await queuedName(second)) === secondQueued;
+
+  async function verifyCopy() {
+    const observeCopy = () =>
+      evaluate(
+        `const [success, fieldSelector] = arguments;
+        const status = document.querySelector(".editor-status");
+        const actionText = Array.from(status?.childNodes ?? [])
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent).join("").trim();
+        const dialogs = document.querySelectorAll("dialog[open]");
+        const dialog = dialogs[0];
+        const title = document.getElementById(dialog?.getAttribute("aria-labelledby") ?? "");
+        const field = dialog?.querySelector(fieldSelector);
+        return {
+          copied: actionText === success,
+          dialogCount: dialogs.length,
+          title: title?.textContent.trim() ?? null,
+          instructions: dialog?.querySelector('[role="status"]')?.textContent.trim() ?? null,
+          prepared: field?.getClientRects().length
+            ? { readOnly: field.readOnly, value: field.value }
+            : null,
+        };`,
+        clipboardStatus,
+        preparedXmlField,
+      );
+    const before = await observeCopy();
+    assert.equal(before.copied, false, "Copy success must be fresh.");
+    assert.equal(before.dialogCount, 0, "Copy must start without a modal.");
+    await click('button[aria-label="More save options"]', null);
+    await click('[role="menuitem"]', "Copy bank XML to clipboard");
+    const observed = await waitFor("a native Copy outcome", async () => {
+      const outcome = await observeCopy();
+      return outcome.copied || outcome.dialogCount > 0 ? outcome : null;
+    });
+    if (observed.copied) {
+      assert.equal(
+        observed.dialogCount,
+        0,
+        "Copy reported success and opened a dialog.",
+      );
+    } else {
+      assert.equal(observed.dialogCount, 1);
+      assert.equal(observed.title, clipboardDialogTitle);
+      assert.equal(observed.instructions, "Select and copy the prepared XML.");
+      assert.deepEqual(observed.prepared, {
+        readOnly: true,
+        value: bank("1234").toString("utf8"),
+      });
+      await click("dialog[open] button", "Close");
+      await waitFor("removal of the prepared XML dialog", () =>
+        evaluate(
+          `return !Array.from(document.querySelectorAll("dialog")).some((dialog) =>
+          document.getElementById(dialog.getAttribute("aria-labelledby"))?.textContent.trim() === arguments[0]
+        );`,
+          clipboardDialogTitle,
+        ),
+      );
+    }
+    await waitFor(
+      "the dirty bank and queue after Copy",
+      dirtyBankAndQueueRetained,
+    );
+    await assertInputsUnchanged();
+    console.log(
+      `Linux native Copy: ${observed.copied ? "WebView clipboard API resolved" : "exact prepared XML shown in the read-only fallback"}.`,
+    );
+  }
 
   async function stageGold(value, { hasQueuedOpen = true } = {}) {
     const field = await control(gold, null);
@@ -331,6 +409,7 @@ async function verifyEditor(
   await waitFor("normalized value in the native Raw projection", async () =>
     (await content(xml))?.includes('int="1234"'),
   );
+  await verifyCopy();
   await click('button[aria-label="More save options"]', null);
   await click('[role="menuitem"]', "Export copy…");
   await exportCopy();
@@ -494,6 +573,10 @@ async function run(application, closeSender) {
     const exportDestination = join(scratch, "Copy.sc2bank");
     const saveDestination = join(scratch, "Saved.sc2bank");
     const expectedExport = bank("1234");
+    async function assertInputsUnchanged() {
+      for (const [name, bytes] of inputs)
+        assert.deepEqual(await readFile(join(scratch, name)), bytes);
+    }
     await verifyEditor(
       (path, method, body) =>
         request(driver.origin, session + path, method, body),
@@ -502,6 +585,7 @@ async function run(application, closeSender) {
         second,
         third,
         closeSender,
+        assertInputsUnchanged,
         async exportCopy() {
           await chooseGtkExportDestination(exportDestination);
           await waitFor("the exported bank file", async () => {
@@ -512,14 +596,12 @@ async function run(application, closeSender) {
               throw error;
             }
           });
-          for (const [name, bytes] of inputs)
-            assert.deepEqual(await readFile(join(scratch, name)), bytes);
+          await assertInputsUnchanged();
         },
         saveCopy: () => saveGtkDirtyOpenAs(saveDestination),
       },
     );
-    for (const [name, bytes] of inputs)
-      assert.deepEqual(await readFile(join(scratch, name)), bytes);
+    await assertInputsUnchanged();
     assert.deepEqual(await readFile(exportDestination), expectedExport);
     assert.deepEqual(await readFile(saveDestination), bank("2345"));
   } catch (error) {
@@ -548,7 +630,7 @@ async function run(application, closeSender) {
   }
   if (verificationError) throw verificationError;
   console.log(
-    "Linux native editing, GTK export, navigation Cancel/Discard/Save As, and window close Cancel/Discard passed.",
+    "Linux native editing, Copy XML, GTK export, navigation Cancel/Discard/Save As, and window close Cancel/Discard passed.",
   );
 }
 
