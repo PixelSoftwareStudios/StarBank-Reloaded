@@ -30,7 +30,9 @@ MAX_PID = (1 << 31) - 1
 MAX_UID = (1 << 32) - 2
 MAX_PROC_STATUS_BYTES = 64 * 1024
 MAX_EXE_BYTES = 4_096
-# /proc/<pid>/stat starttime is field 22, with state (field 3) first in the tail.
+# The /proc/<pid>/stat tail starts at state (field 3).
+USER_CPU_INDEX = 14 - 3
+SYSTEM_CPU_INDEX = 15 - 3
 STARTTIME_INDEX = 22 - 3
 MIN_STAT_TAIL_FIELDS = 52 - 2
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -69,6 +71,13 @@ class Counters:
     memory_current_bytes: int
     memory_peak_bytes: int
     populated: bool
+
+
+@dataclass(frozen=True)
+class ProcessStat:
+    starttime_ticks: int
+    user_cpu_ticks: int
+    system_cpu_ticks: int
 
 
 @contextmanager
@@ -215,7 +224,7 @@ def verify_member(process, pid, expected):
         raise ValueError(f"PID {pid} is outside the identified cgroup leaf")
 
 
-def starttime_ticks(process, pid):
+def process_stat(process, pid):
     contents = read_bounded(process, "stat", MAX_CONTROL_BYTES)
     # The parenthesized process name can itself contain spaces and parentheses.
     prefix = f"{pid} (".encode("ascii")
@@ -225,7 +234,13 @@ def starttime_ticks(process, pid):
     fields = contents[tail + 2:].split()
     if len(fields) < MIN_STAT_TAIL_FIELDS or len(fields[0]) != 1:
         raise ValueError(f"Missing stat starttime for PID {pid}")
-    return uint(fields[STARTTIME_INDEX].decode("ascii"), f"PID {pid} starttime")
+    return ProcessStat(
+        starttime_ticks=uint(
+            fields[STARTTIME_INDEX].decode("ascii"), f"PID {pid} starttime"
+        ),
+        user_cpu_ticks=uint(fields[USER_CPU_INDEX].decode("ascii"), f"PID {pid} utime"),
+        system_cpu_ticks=uint(fields[SYSTEM_CPU_INDEX].decode("ascii"), f"PID {pid} stime"),
+    )
 
 
 def effective_uid(process, pid):
@@ -252,6 +267,7 @@ def executable_path(process, pid):
 
 
 def members(root, handle, *, proc_root=PROC_ROOT):
+    """Report each member's first stat read with subsequent identity checks."""
     with open_leaf(root, handle) as leaf:
         pids = member_pids(leaf)
         observed = []
@@ -264,19 +280,27 @@ def members(root, handle, *, proc_root=PROC_ROOT):
                         directory(str(pid), parent=proc)
                     )
                     verify_member(process, pid, expected)
-                    starttime = starttime_ticks(process, pid)
+                    observation = process_stat(process, pid)
                     observed.append({
                         "pid": str(pid),
-                        "starttime_ticks": str(starttime),
+                        "starttime_ticks": str(observation.starttime_ticks),
                         "executable": executable_path(process, pid),
                         "effective_uid": str(effective_uid(process, pid)),
+                        "user_cpu_ticks": str(observation.user_cpu_ticks),
+                        "system_cpu_ticks": str(observation.system_cpu_ticks),
                     })
-                    snapshots.append((pid, process, starttime))
+                    snapshots.append((pid, process, observation))
 
-                for pid, process, starttime in snapshots:
-                    if starttime_ticks(process, pid) != starttime:
+                for pid, process, observation in snapshots:
+                    current = process_stat(process, pid)
+                    if current.starttime_ticks != observation.starttime_ticks:
                         raise ValueError(f"Process identity changed for PID {pid}")
                     verify_member(process, pid, expected)
+                    if (
+                        current.user_cpu_ticks < observation.user_cpu_ticks
+                        or current.system_cpu_ticks < observation.system_cpu_ticks
+                    ):
+                        raise ValueError(f"Process CPU ticks decreased for PID {pid}")
 
         if member_pids(leaf) != pids or populated(leaf) != bool(pids):
             raise ValueError(f"Cgroup membership changed while reading {handle.name}")

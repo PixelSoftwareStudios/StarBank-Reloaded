@@ -90,11 +90,17 @@ class LinuxCgroupTests(unittest.TestCase):
     def snapshot_members(self, handle):
         return cgroup.members(self.root_fd, handle, proc_root=self.proc_root)
 
-    def process_fixture(self, handle, pid, executable=APP_PATH, starttime=87):
+    def process_fixture(
+        self, handle, pid, executable=APP_PATH, starttime=87, *,
+        user_cpu=0, system_cpu=0,
+    ):
         process = self.proc_root / str(pid)
         self.mkdir_process_fixture(process)
         # Include an internal ') ' and a byte outside ASCII in the comm field.
-        before = b" ".join([b"S", *([b"0"] * 18)])
+        fields = [b"S", *([b"0"] * 18)]
+        # The two following fields describe waited-for children, not this process.
+        fields[11:15] = [str(user_cpu).encode(), str(system_cpu).encode(), b"314", b"159"]
+        before = b" ".join(fields)
         tail = b" 0" * 30
         (process / "stat").write_bytes(
             f"{pid} (name".encode("ascii") + b") odd\xff) " + before
@@ -244,8 +250,11 @@ class LinuxCgroupTests(unittest.TestCase):
         handle = self.create()
         first, second, unrelated = 41, 42, 43
         self.set_members([second, first, second])
-        self.process_fixture(handle, first, starttime=(1 << 53) + 1)
-        self.process_fixture(handle, second, WEBKIT_PATH)
+        self.process_fixture(
+            handle, first, starttime=(1 << 53) + 1,
+            user_cpu=(1 << 53) + 3, system_cpu=(1 << 53) + 5,
+        )
+        self.process_fixture(handle, second, WEBKIT_PATH, user_cpu=12, system_cpu=9)
         # Missing metadata for this unrelated PID must have no effect.
         self.mkdir_process_fixture(self.proc_root / str(unrelated))
         self.assertEqual(
@@ -257,12 +266,16 @@ class LinuxCgroupTests(unittest.TestCase):
                         "starttime_ticks": "9007199254740993",
                         "executable": APP_PATH,
                         "effective_uid": "1001",
+                        "user_cpu_ticks": "9007199254740995",
+                        "system_cpu_ticks": "9007199254740997",
                     },
                     {
                         "pid": "42",
                         "starttime_ticks": "87",
                         "executable": WEBKIT_PATH,
                         "effective_uid": "1001",
+                        "user_cpu_ticks": "12",
+                        "system_cpu_ticks": "9",
                     },
                 ],
             },
@@ -359,6 +372,49 @@ class LinuxCgroupTests(unittest.TestCase):
         with patch.object(cgroup.os, "readlink", side_effect=replace_process):
             with self.assertRaisesRegex(ValueError, "Process identity changed"):
                 self.snapshot_members(handle)
+
+    def test_members_rejects_malformed_process_cpu_ticks(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        stat = self.process_fixture(handle, pid, user_cpu=500, system_cpu=250) / "stat"
+        original = stat.read_bytes()
+        for contents, field in (
+            (b"-1 250", "utime"),
+            (b"01 250", "utime"),
+            (b"500 not_ticks", "stime"),
+            (b"500 18446744073709551616", "stime"),
+        ):
+            with self.subTest(contents=contents), self.assertRaisesRegex(ValueError, field):
+                stat.write_bytes(original.replace(b"500 250", contents))
+                self.snapshot_members(handle)
+
+    def test_members_keeps_initial_cpu_ticks_and_rejects_a_decrease(self):
+        handle = self.create()
+        pid = 41
+        self.set_members([pid])
+        stat = self.process_fixture(handle, pid, user_cpu=500, system_cpu=250) / "stat"
+        original = stat.read_bytes()
+        readlink = os.readlink
+
+        def change_ticks(reading):
+            def after_first_stat(name, *, dir_fd):
+                path = readlink(name, dir_fd=dir_fd)
+                stat.write_bytes(original.replace(b"500 250", reading))
+                return path
+            return after_first_stat
+
+        with patch.object(cgroup.os, "readlink", side_effect=change_ticks(b"505 260")):
+            observed = self.snapshot_members(handle)["members"][0]
+        self.assertEqual(observed["user_cpu_ticks"], "500")
+        self.assertEqual(observed["system_cpu_ticks"], "250")
+
+        for reading in (b"499 270", b"505 249"):
+            with self.subTest(reading=reading):
+                stat.write_bytes(original)
+                with patch.object(cgroup.os, "readlink", side_effect=change_ticks(reading)):
+                    with self.assertRaisesRegex(ValueError, "Process CPU ticks decreased"):
+                        self.snapshot_members(handle)
 
     def test_members_rejects_process_migration_or_group_membership_change(self):
         handle = self.create()
