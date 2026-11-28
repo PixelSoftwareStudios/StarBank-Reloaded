@@ -10,7 +10,11 @@ const selectedTab = 'button[role="tab"][aria-selected="true"]';
 const goldField = 'table input[aria-label="Gold value"]';
 const manualRequired =
   "Automatic bank discovery is unavailable. Select a folder.";
+const missingFolder =
+  "Select a StarCraft II folder or a folder containing banks.";
 const readyStatus = "Bank inventory ready.";
+const noCachedMaps = "No cached maps found.";
+const manualRootActions = ["Select Folder…", "Refresh", "Use auto-detect"];
 const openingValue = "001";
 const editedValue = "1,234";
 const dirtyStatus = "Unsaved changes in 1 section";
@@ -94,6 +98,38 @@ function inventoryMatches(listed, collectionName, names, current = null) {
   );
 }
 
+function hasManualRootActions(buttons) {
+  return manualRootActions.every((name) =>
+    buttons.some((button) => button.name === name && !button.disabled),
+  );
+}
+
+function discoveryMatches(state, collectionName, status) {
+  return (
+    state?.root?.title === collectionName &&
+    state.root.text === `Bank folder ${collectionName}` &&
+    state.statuses.length === 1 &&
+    state.statuses[0] === status &&
+    !state.scanning &&
+    state.accountSelectors === 0 &&
+    hasManualRootActions(state.buttons)
+  );
+}
+
+async function unopenedWelcome(content) {
+  return (
+    (await content(".editor-welcome h1")) === "StarBank Reloaded" &&
+    (await content('.editor-welcome p[role="status"]')) === "No bank open." &&
+    (await content(".document-editor")) === null
+  );
+}
+
+async function assertPackagedLocation(command) {
+  const location = new URL(await command("/url"));
+  assert.equal(location.protocol, "tauri:");
+  assert.equal(location.host, "localhost");
+}
+
 export async function verifyManualRootSelection({
   command,
   waitFor,
@@ -159,17 +195,7 @@ export async function verifyManualRootSelection({
     const state = await discovery();
     const listed = await inventory();
     return (
-      state?.root?.title === collectionName &&
-      state.root.text === `Bank folder ${collectionName}` &&
-      state.statuses.length === 1 &&
-      state.statuses[0] === readyStatus &&
-      !state.scanning &&
-      state.accountSelectors === 0 &&
-      ["Select Folder…", "Refresh", "Use auto-detect"].every((name) =>
-        state.buttons.some(
-          (button) => button.name === name && !button.disabled,
-        ),
-      ) &&
+      discoveryMatches(state, collectionName, readyStatus) &&
       inventoryMatches(listed, collectionName, names)
     );
   };
@@ -289,27 +315,17 @@ export async function verifyRestoredManualCollection({
     return (
       inventoryMatches(listed, collectionName, names, current) &&
       listed.statuses.length === 1 &&
-      listed.statuses[0] === "No cached maps found." &&
-      ["Select Folder…", "Refresh", "Use auto-detect"].every((name) =>
-        listed.buttons.some(
-          (button) => button.name === name && !button.disabled,
-        ),
-      )
+      listed.statuses[0] === noCachedMaps &&
+      hasManualRootActions(listed.buttons)
     );
   };
 
   stage("Waiting for the restored collection without a startup bank.");
   await waitFor(
     "the restored three-bank inventory and unopened welcome view",
-    async () =>
-      (await content(".editor-welcome h1")) === "StarBank Reloaded" &&
-      (await content('.editor-welcome p[role="status"]')) === "No bank open." &&
-      (await content(".document-editor")) === null &&
-      (await ready()),
+    async () => (await unopenedWelcome(content)) && (await ready()),
   );
-  const location = new URL(await command("/url"));
-  assert.equal(location.protocol, "tauri:");
-  assert.equal(location.host, "localhost");
+  await assertPackagedLocation(command);
   await assertFilesUnchanged();
 
   stage("Opening the known bank from the restored inventory.");
@@ -348,4 +364,107 @@ export async function verifyRestoredManualCollection({
   );
   await assertFilesUnchanged();
   stage("Restart restored the manual root and opened the known bank cleanly.");
+}
+
+export async function verifyMissingManualCollectionRecovery({
+  command,
+  waitFor,
+  controls,
+  missingCollectionName,
+  collectionName,
+  collectionPath,
+  bankNames,
+  chooseCollection,
+  waitForChooserReleased,
+  assertFilesUnchanged,
+}) {
+  assert.equal(typeof missingCollectionName, "string");
+  assert(missingCollectionName.length > 0);
+  assert.notEqual(missingCollectionName, collectionName);
+  assert.equal(typeof collectionPath, "string");
+  assert(isAbsolute(collectionPath));
+  assert.equal(basename(collectionPath), collectionName);
+  assert(Array.isArray(bankNames) && bankNames.length === 3);
+  assert(
+    bankNames.every((name) => typeof name === "string" && name.length > 0),
+  );
+  assert.equal(new Set(bankNames).size, bankNames.length);
+  const names = [...bankNames].sort();
+  const { click, clickButton, content, evaluate } = controls;
+  const { discovery, inventory } = inventoryReaders(evaluate);
+  const noRebuild = (buttons) =>
+    !buttons.some((button) => button.name === "Rebuild map index");
+  const failedInventory = async () => {
+    const listed = await inventory();
+    return (
+      listed?.roots.length === 1 &&
+      listed.roots[0] === missingCollectionName &&
+      listed.statuses.length === 1 &&
+      listed.statuses[0] === missingFolder &&
+      hasManualRootActions(listed.buttons) &&
+      noRebuild(listed.buttons) &&
+      listed.accountSelectors === 0 &&
+      listed.maps === 0 &&
+      listed.bankLists === 0 &&
+      listed.banks.length === 0 &&
+      listed.queued === 0
+    );
+  };
+  const recoveredInventory = async () => {
+    const listed = await inventory();
+    return (
+      inventoryMatches(listed, collectionName, names) &&
+      listed.statuses.length === 1 &&
+      listed.statuses[0] === noCachedMaps &&
+      hasManualRootActions(listed.buttons)
+    );
+  };
+
+  stage("Waiting for the missing saved folder and unopened welcome view.");
+  await waitFor(
+    "the saved folder failure without a bank or automatic fallback",
+    async () => (await unopenedWelcome(content)) && (await failedInventory()),
+  );
+  await assertPackagedLocation(command);
+  await assertFilesUnchanged();
+
+  await click('button[aria-label="Settings"]', null);
+  await waitFor(
+    "the missing saved folder in Bank discovery settings",
+    async () => {
+      const state = await discovery();
+      return (
+        discoveryMatches(state, missingCollectionName, missingFolder) &&
+        noRebuild(state.buttons) &&
+        (await failedInventory()) &&
+        (await content(".document-editor")) === null
+      );
+    },
+  );
+
+  stage("Selecting the relocated collection through the GTK folder chooser.");
+  await click(settingsButtons, "Select Folder…");
+  await chooseCollection();
+  await waitForChooserReleased();
+  await waitFor(
+    "the ready relocated collection in Settings and the sidebar",
+    async () =>
+      discoveryMatches(await discovery(), collectionName, readyStatus) &&
+      (await recoveredInventory()) &&
+      (await content(".document-editor")) === null,
+  );
+  await assertFilesUnchanged();
+
+  await clickButton("Back to editor");
+  await waitFor(
+    "the unopened welcome view with the three recovered banks",
+    async () =>
+      (await content(settings)) === null &&
+      (await unopenedWelcome(content)) &&
+      (await recoveredInventory()),
+  );
+  await assertFilesUnchanged();
+  stage(
+    "Explicit folder selection recovered the collection without opening a bank.",
+  );
 }

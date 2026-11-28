@@ -8,6 +8,7 @@ import {
   mkdtempDisposable,
   readdir,
   readFile,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -47,6 +48,7 @@ import {
 } from "./linux-gtk-dialog.mjs";
 import {
   verifyManualRootSelection,
+  verifyMissingManualCollectionRecovery,
   verifyRestoredManualCollection,
 } from "./linux-manual-root.mjs";
 import { verifySaveMenu, verifyToolsMenu } from "./linux-menus.mjs";
@@ -1145,13 +1147,20 @@ async function run(
     await writeFile(join(collectionPath, name), bytes, { flag: "wx" });
   const refreshBankPath = join(collectionPath, refreshBankName);
   let refreshBankCreated = false;
-  const assertCollectionUnchanged = async () => {
+  const assertCollectionAt = async (directory) => {
     for (const [name, bytes] of collectionInputs)
-      assert.deepEqual(await readFile(join(collectionPath, name)), bytes);
+      assert.deepEqual(await readFile(join(directory, name)), bytes);
     if (refreshBankCreated)
-      assert.deepEqual(await readFile(refreshBankPath), refreshBankBytes);
-    else await assert.rejects(lstat(refreshBankPath), { code: "ENOENT" });
+      assert.deepEqual(
+        await readFile(join(directory, refreshBankName)),
+        refreshBankBytes,
+      );
+    else
+      await assert.rejects(lstat(join(directory, refreshBankName)), {
+        code: "ENOENT",
+      });
   };
+  const assertCollectionUnchanged = () => assertCollectionAt(collectionPath);
   await withNativeSession(
     application,
     "manual bank collection",
@@ -1211,6 +1220,44 @@ async function run(
       await requestGtkWindowClose(closeSender);
       await waitForWindowGone("StarBank Reloaded");
       await assertCollectionUnchanged();
+    },
+    { configHome },
+  );
+  const recoveredCollectionName = "Recovered collection";
+  const recoveredCollectionPath = join(
+    manualFixture.path,
+    recoveredCollectionName,
+  );
+  await assertCollectionUnchanged();
+  await rename(collectionPath, recoveredCollectionPath);
+  const assertRecoveredCollectionUnchanged = async () => {
+    await assert.rejects(lstat(collectionPath), { code: "ENOENT" });
+    await assertCollectionAt(recoveredCollectionPath);
+  };
+  await assertRecoveredCollectionUnchanged();
+  await withNativeSession(
+    application,
+    "missing manual collection recovery",
+    [],
+    async (command) => {
+      await verifyMissingManualCollectionRecovery({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        missingCollectionName: collectionName,
+        collectionName: recoveredCollectionName,
+        collectionPath: recoveredCollectionPath,
+        bankNames: [...collectionBankNames, refreshBankName],
+        chooseCollection: () =>
+          chooseGtkManualCollectionDirectory(recoveredCollectionPath, (text) =>
+            assertGtkLocation("--gtk-folder-location", text),
+          ),
+        waitForChooserReleased: waitForGtkManualFolderChooserReleased,
+        assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+      });
+      await requestGtkWindowClose(closeSender);
+      await waitForWindowGone("StarBank Reloaded");
+      await assertRecoveredCollectionUnchanged();
     },
     { configHome },
   );
