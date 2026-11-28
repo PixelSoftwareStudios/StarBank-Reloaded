@@ -9,6 +9,8 @@ const run = promisify(execFile);
 const exportTitle = "Export bank copy";
 const saveAsTitle = "Save Bank As";
 const dirtyOpenTitle = "Save changes before opening another bank?";
+const dirtyCloseTitle = "Save changes before closing?";
+const mainWindowTitle = "StarBank Reloaded";
 const dialogTimeout = 10_000;
 const commandTimeout = 3_000;
 const pollInterval = 100;
@@ -71,14 +73,11 @@ export function chooseGtkExportDestination(destination) {
   return chooseGtkDestination(exportTitle, destination);
 }
 
-async function respondToGtkDirtyOpen(...keys) {
-  await focusDialog(dirtyOpenTitle);
-  await xdotool(["key", "--clearmodifiers", ...keys]);
-
+async function waitForWindowGone(title) {
   const deadline = performance.now() + dialogTimeout;
   do {
     try {
-      await xdotool(["search", "--name", titlePattern(dirtyOpenTitle)]);
+      await xdotool(["search", "--name", titlePattern(title)]);
     } catch (error) {
       // xdotool search exits 1 without output when no window matches.
       if (error.code === 1 && !error.stdout && !error.stderr) return;
@@ -86,24 +85,52 @@ async function respondToGtkDirtyOpen(...keys) {
     }
     await delay(pollInterval);
   } while (performance.now() < deadline);
-  throw new Error("The GTK dirty-document Open confirmation did not close.");
+  throw new Error(`The ${title} window did not close.`);
+}
+
+async function respondToGtkPrompt(title, ...keys) {
+  await focusDialog(title);
+  await xdotool(["key", "--clearmodifiers", ...keys]);
+  await waitForWindowGone(title);
 }
 
 /** Cancels the real GTK dirty-document Open confirmation on the caller's Xvfb display. */
 export function cancelGtkDirtyOpen() {
-  return respondToGtkDirtyOpen("Escape");
+  return respondToGtkPrompt(dirtyOpenTitle, "Escape");
 }
 
 /** Discards through the real three-button GTK dirty-document confirmation. */
 export function discardGtkDirtyOpen() {
   // On Noble's GTK 3.24.41 this RFD dialog focuses its first button, Save.
   // Tab moves to Discard in the Save, Discard, Cancel order and Space activates it.
-  return respondToGtkDirtyOpen("Tab", "space");
+  return respondToGtkPrompt(dirtyOpenTitle, "Tab", "space");
 }
 
 /** Selects Save on the GTK dirty-open prompt and supplies the new Save As path. */
 export async function saveGtkDirtyOpenAs(destination) {
   // The exact three-button dialog on Noble's GTK 3.24.41 initially focuses Save.
-  await respondToGtkDirtyOpen("space");
+  await respondToGtkPrompt(dirtyOpenTitle, "space");
   await chooseGtkDestination(saveAsTitle, destination);
+}
+
+/** Sends ICCCM WM_DELETE_WINDOW to this fixture's exact main X11 window. */
+export async function requestGtkWindowClose(sender, expectedWindow) {
+  const window = await focusDialog(mainWindowTitle);
+  if (expectedWindow !== undefined) assert.equal(window, expectedWindow);
+  await run(sender, [window], {
+    encoding: "utf8",
+    killSignal: "SIGKILL",
+    maxBuffer: outputLimit,
+    timeout: commandTimeout,
+  });
+  return window;
+}
+
+export function cancelGtkDirtyClose() {
+  return respondToGtkPrompt(dirtyCloseTitle, "Escape");
+}
+
+export async function discardGtkDirtyClose() {
+  await respondToGtkPrompt(dirtyCloseTitle, "Tab", "space");
+  await waitForWindowGone(mainWindowTitle);
 }

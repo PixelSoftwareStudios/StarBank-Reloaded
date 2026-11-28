@@ -6,9 +6,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import {
+  cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
   chooseGtkExportDestination,
+  discardGtkDirtyClose,
   discardGtkDirtyOpen,
+  requestGtkWindowClose,
   saveGtkDirtyOpenAs,
 } from "./linux-gtk-dialog.mjs";
 
@@ -183,7 +186,7 @@ const dirtyStatus = "Unsaved changes in 1 section";
 
 async function verifyEditor(
   command,
-  { first, second, third, exportCopy, saveCopy },
+  { first, second, third, exportCopy, saveCopy, closeSender },
 ) {
   const evaluate = (script, ...args) =>
     command("/execute/sync", "POST", { script, args });
@@ -241,7 +244,7 @@ async function verifyEditor(
     (await content(xml))?.includes('int="1234"') &&
     (await queuedName(second)) === secondQueued;
 
-  async function stageGold(value) {
+  async function stageGold(value, { hasQueuedOpen = true } = {}) {
     const field = await control(gold, null);
     await command(`/element/${field}/click`, "POST", {});
     await command("/actions", "POST", {
@@ -269,17 +272,19 @@ async function verifyEditor(
       ),
     );
     await command(`/element/${field}/value`, "POST", { text: value });
-    await waitFor("a staged Table edit and disabled queued Open", () =>
+    await waitFor("a staged Table edit with guarded navigation", () =>
       evaluate(
-        `const [queue, gold, value] = arguments;
+        `const [queue, gold, value, hasQueuedOpen] = arguments;
         const open = Array.from(document.querySelectorAll(queue + " button"))
           .find((button) => button.textContent.trim() === "Open");
         const field = document.querySelector(gold);
-        return open?.disabled === true && field?.value === value &&
+        const navigationGuarded = hasQueuedOpen ? open?.disabled === true : open === undefined;
+        return navigationGuarded && field?.value === value &&
           field.hasAttribute("data-table-draft");`,
         queue,
         gold,
         value,
+        hasQueuedOpen,
       ),
     );
   }
@@ -412,6 +417,24 @@ async function verifyEditor(
     .some((button) => ["Undo", "Redo"].includes(button.textContent.trim()));`),
     false,
   );
+  await stageGold("3,456", { hasQueuedOpen: false });
+  await applyGold();
+  await clickTab("Raw View");
+  await waitFor("the third dirty revision before closing", async () =>
+    (await content(xml))?.includes('int="3456"'),
+  );
+  const mainWindow = await requestGtkWindowClose(closeSender);
+  await cancelGtkDirtyClose();
+  await waitFor(
+    "the usable dirty editor after native close Cancel",
+    async () =>
+      (await content(".document-editor h1")) === third &&
+      (await content(".editor-dirty-status")) === dirtyStatus &&
+      (await content(xml))?.includes('int="3456"') &&
+      (await findControl("button", "Undo")),
+  );
+  await requestGtkWindowClose(closeSender, mainWindow);
+  await discardGtkDirtyClose();
 }
 
 function bank(value) {
@@ -420,7 +443,7 @@ function bank(value) {
   );
 }
 
-async function run(application) {
+async function run(application, closeSender) {
   const scratch = await mkdtemp(join(tmpdir(), "starbank-linux-webview-"));
   let driver;
   let session;
@@ -478,6 +501,7 @@ async function run(application) {
         first,
         second,
         third,
+        closeSender,
         async exportCopy() {
           await chooseGtkExportDestination(exportDestination);
           await waitFor("the exported bank file", async () => {
@@ -524,7 +548,7 @@ async function run(application) {
   }
   if (verificationError) throw verificationError;
   console.log(
-    "Linux native open, Table draft guard, Raw adoption, GTK export copy, and dirty Open Cancel, Undo, Redo, Discard, and Save As passed.",
+    "Linux native editing, GTK export, navigation Cancel/Discard/Save As, and window close Cancel/Discard passed.",
   );
 }
 
@@ -536,7 +560,7 @@ assert.equal(
 assert(process.env.DISPLAY, "Start the check with xvfb-run.");
 assert.equal(
   process.argv.length,
-  3,
-  "Pass the packaged starbank-desktop executable path.",
+  4,
+  "Pass the packaged starbank-desktop executable and X11 close sender paths.",
 );
-await run(resolve(process.argv[2]));
+await run(resolve(process.argv[2]), resolve(process.argv[3]));
