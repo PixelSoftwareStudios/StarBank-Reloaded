@@ -3383,6 +3383,7 @@ version = "0.1.0"
 name = "starbank-desktop"
 version = "0.1.0"
 dependencies = [
+ "gtk",
  "libc",
  "rfd",
  "sc2bank",

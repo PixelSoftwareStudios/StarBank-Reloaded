@@ -6,6 +6,7 @@ mod backup_location;
 mod backup_retention;
 mod backup_status;
 mod batch_backup;
+mod clipboard;
 mod close_guard;
 mod commands;
 mod conflict;

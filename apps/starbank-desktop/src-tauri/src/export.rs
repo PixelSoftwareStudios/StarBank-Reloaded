@@ -121,7 +121,7 @@ fn file_name_suggestion(name: &str) -> &str {
 	}
 }
 
-fn needs_confirmation(json: &str) -> Result<bool, CommandError> {
+pub(crate) fn needs_confirmation(json: &str) -> Result<bool, CommandError> {
 	let envelope: Envelope = serde_json::from_str(json).map_err(|_| CommandError::InvalidPacket)?;
 	Ok(!matches!(
 		envelope.result.payload.signature_status,
@@ -141,7 +141,7 @@ async fn confirm_unverified_signature(window: &WebviewWindow) -> bool {
 		== rfd::MessageDialogResult::Ok
 }
 
-fn prepare(app: &AppHandle, control: &str) -> Result<WireReply, CommandError> {
+pub(crate) fn prepare(app: &AppHandle, control: &str) -> Result<WireReply, CommandError> {
 	Ok(app
 		.state::<DesktopEngine>()
 		.engine

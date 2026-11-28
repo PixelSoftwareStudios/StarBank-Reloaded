@@ -6,6 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"complete_window_close",
 			"open_bank",
 			"dispatch_bank",
+			"copy_bank_xml",
 			"export_bank_copy",
 			"can_export_bank",
 			"can_create_bank_copy",

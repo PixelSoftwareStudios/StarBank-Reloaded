@@ -478,7 +478,7 @@ async function verifyEditor(
     );
     await assertInputsUnchanged();
     console.log(
-      `Linux native Copy: ${observed.copied ? "WebView clipboard API resolved" : "exact prepared XML shown in the read-only fallback"}.`,
+      `Linux native Copy: ${observed.copied ? "Copy action confirmed" : "exact prepared XML shown in the read-only fallback"}.`,
     );
   }
 

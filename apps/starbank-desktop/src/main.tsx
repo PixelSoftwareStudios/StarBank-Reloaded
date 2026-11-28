@@ -57,6 +57,7 @@ import {
   canRevealBank,
   compareBankConflict,
   confirmBankNavigation,
+  copyBankXml,
   createBatchBackup,
   decodeBankXml,
   dispatchBank,
@@ -1049,23 +1050,51 @@ function DesktopApp() {
           throw new Error("The bank engine did not prepare XML.");
         }
         const status = reply.result.payload.signature_status;
+        const allowUnverified = status !== "valid" && status !== "unsigned";
         if (
-          status !== "valid" &&
-          status !== "unsigned" &&
+          allowUnverified &&
           !window.confirm(
             "Copy XML with an unverified signature? StarCraft II may refuse it.",
           )
         ) {
           return { ok: true };
         }
-        const xml = decodeBankFileXml(bytes);
-        try {
-          await writeBankClipboard(xml);
-          return { ok: true, message: "Copied bank XML." };
-        } catch {
-          setCopyPreview(xml);
-          return { ok: true };
+        activeDocument(target);
+        const id = requestId();
+        const scope = {
+          document_id: target.id,
+          expected_revision: target.revision,
+        };
+        const control = engineRequest(id, { kind: "prepare" }, scope);
+        const copied = await copyBankXml(
+          JSON.stringify(control),
+          allowUnverified,
+        );
+        if (copied !== null) {
+          const nativeReply = decodeEngineReply(copied, id);
+          const error = engineReplyError(nativeReply, scope);
+          if (error) {
+            if (error instanceof SnapshotRefreshRequired)
+              rememberRefresh(error.target);
+            throw error;
+          }
+          if (
+            nativeReply.result.kind !== "prepared" ||
+            nativeReply.document_id !== target.id ||
+            nativeReply.revision !== target.revision
+          ) {
+            throw new Error("The bank engine did not confirm the copy.");
+          }
+        } else {
+          const xml = decodeBankFileXml(bytes);
+          try {
+            await writeBankClipboard(xml);
+          } catch {
+            setCopyPreview(xml);
+            return { ok: true };
+          }
         }
+        return { ok: true, message: "Copied bank XML." };
       }),
   };
 
@@ -1311,6 +1340,10 @@ function formatNativeMessage(error: unknown): string {
       return "The bank changed on disk.";
     case "conflict_review_changed":
       return "The bank changed during this review. Compare again before reopening.";
+    case "clipboard_unavailable":
+      return "The native clipboard is unavailable.";
+    case "clipboard_consent_required":
+      return "Confirm the unverified signature before copying the bank XML.";
     case "reveal_unavailable":
       return "Open in Folder is unavailable on this platform.";
     case "reveal_invalid_target":

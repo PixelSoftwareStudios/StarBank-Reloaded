@@ -37,6 +37,9 @@ const initialName = "Synthetic.SC2Bank";
 const initialBank = Buffer.from(
   '<Bank version="1"><Section name="Player"><Key name="Gold"><Value int="001"/></Key></Section></Bank>',
 );
+const nativeClipboardXml =
+  '\uFEFF<?xml version="1.0" encoding="UTF-16"?>\r\n<Bank version="1">\r\n<!--A\u00a0B 😀 e\u0301-->\r\n<Section name="Player"><Key name="Gold"><Value int="001"/></Key></Section>\r\n</Bank>\r\n';
+const nativeClipboardBank = Buffer.from(nativeClipboardXml, "utf16le");
 const verifiedBackupId = 1;
 const conflictReviewId = "1";
 const changedDiskBank = Buffer.from(
@@ -178,6 +181,7 @@ function createBridge(
   let saved = false;
   let malformedBackupList = false;
   let supersedeNextEdit = false;
+  let nextNativeClipboardReply;
   let failNextEditProjection = false;
   let failNextOpenProjection = false;
   let restoreNextBackup = false;
@@ -438,6 +442,11 @@ function createBridge(
         );
         return { value: { name: exportedCopyName, control } };
       }
+      case "copy_bank_xml": {
+        const reply = nextNativeClipboardReply;
+        nextNativeClipboardReply = undefined;
+        return reply ? reply(args) : { value: null };
+      }
       case "pick_external_bank_to_resign":
         return {
           value: {
@@ -587,6 +596,10 @@ function createBridge(
       assert.equal(nextWriteRecovery, undefined);
       nextWriteRecovery = { command, receipt };
     },
+    replyToNextNativeCopy(reply) {
+      assert.equal(nextNativeClipboardReply, undefined);
+      nextNativeClipboardReply = reply;
+    },
     wireRequests,
     corruptBackupList() {
       malformedBackupList = true;
@@ -667,6 +680,111 @@ async function editGold(page, value) {
   await goldField(page).fill(value);
   await button(page, "Apply edits").click();
   await button(page, "Undo").click({ trial: true });
+}
+
+async function verifyNativeClipboard(page, engine, bridge) {
+  await page.evaluate(() => {
+    window.fixtureClipboardAllowed = true;
+  });
+  const active = bridge.wireRequests.findLast(
+    ({ command }) => command.kind === "raw_text",
+  );
+  assert(active);
+  const expected = Buffer.from(
+    nativeClipboardXml.replace('int="001"', 'int="002"'),
+    "utf16le",
+  );
+  const cases = [
+    {
+      notice: "Copied bank XML.",
+      respond: (control) => ({ value: control }),
+    },
+    {
+      notice: "The native clipboard is unavailable.",
+      respond: () => ({ error: "clipboard_unavailable" }),
+    },
+    {
+      notice: "Confirm the unverified signature before copying the bank XML.",
+      respond: () => ({ error: "clipboard_consent_required" }),
+    },
+    {
+      notice: "The bank engine did not confirm the copy.",
+      respond: (control) => ({
+        value: JSON.stringify({ ...JSON.parse(control), revision: "999" }),
+      }),
+    },
+    {
+      notice: "The bank engine sent an invalid reply.",
+      respond: (control) => ({
+        value: JSON.stringify({
+          ...JSON.parse(control),
+          request_id: "different-copy-request",
+        }),
+      }),
+    },
+  ];
+  for (const { notice, respond } of cases) {
+    const start = bridge.wireRequests.length;
+    bridge.replyToNextNativeCopy((args) => {
+      assert.deepEqual(Object.keys(args).sort(), [
+        "allowUnverified",
+        "control",
+      ]);
+      assert.equal(args.allowUnverified, false);
+      const request = JSON.parse(args.control);
+      const preview = bridge.wireRequests.at(-1);
+      assert.equal(preview.command.kind, "prepare");
+      assert.notEqual(request.request_id, preview.request_id);
+      assert.deepEqual(request, {
+        schema_version: 1,
+        request_id: request.request_id,
+        document_id: active.document_id,
+        expected_revision: active.expected_revision,
+        command: { kind: "prepare" },
+      });
+      const { control, bytes } = dispatch(engine, args.control);
+      assert.equal(JSON.parse(control).result.kind, "prepared");
+      assert.deepEqual(Buffer.from(bytes), expected);
+      return respond(control);
+    });
+    await button(page, "More save options").click();
+    await page
+      .getByRole("menuitem", {
+        name: "Copy bank XML to clipboard",
+        exact: true,
+      })
+      .click();
+    await page.getByRole("status").filter({ hasText: notice }).waitFor();
+    assert.deepEqual(
+      bridge.wireRequests.slice(start).map(({ command }) => command.kind),
+      ["prepare"],
+    );
+    assert.equal(await page.getByRole("dialog").count(), 0);
+    assert.equal(await goldField(page).inputValue(), "002");
+    assert(await button(page, "Undo").isEnabled());
+    assert.deepEqual(
+      await page.evaluate(() => window.fixtureClipboardWrites),
+      [],
+    );
+  }
+
+  assert.equal(bridge.callsFor("copy_bank_xml").length, cases.length);
+  const snapshot = bridge.dispatchFixture({
+    schema_version: 1,
+    request_id: "native-clipboard-fixture-snapshot",
+    document_id: active.document_id,
+    expected_revision: active.expected_revision,
+    command: { kind: "snapshot" },
+  });
+  assert.equal(snapshot.revision, active.expected_revision);
+  assert.equal(snapshot.result.kind, "snapshot");
+  assert.equal(snapshot.result.payload.dirty, true);
+  for (const command of [
+    "save_active_bank",
+    "save_bank_as",
+    "export_bank_copy",
+  ])
+    assert.deepEqual(bridge.callsFor(command), []);
 }
 
 async function verifyRevert(page) {
@@ -1596,6 +1714,7 @@ async function verifyRenderer(
   openRecovery = false,
   copyCapability,
 ) {
+  const nativeClipboard = openRecovery === "clipboard_native";
   const clipboardMode =
     openRecovery === "clipboard_absent"
       ? "absent"
@@ -1640,10 +1759,16 @@ async function verifyRenderer(
       engine,
       canOverwrite,
       copyCapability,
-      profileImport?.bank ?? (clipboardMode ? clipboardBank : initialBank),
+      profileImport?.bank ??
+        (nativeClipboard
+          ? nativeClipboardBank
+          : clipboardMode
+            ? clipboardBank
+            : initialBank),
       profileImport,
     );
-    if (clipboardMode) await configureDesktopClipboard(page, clipboardMode);
+    if (clipboardMode || nativeClipboard)
+      await configureDesktopClipboard(page, clipboardMode ?? "denied");
     await bindRenderer(page, bridge);
     await page.goto(origin);
     if (profileImport) {
@@ -1656,15 +1781,16 @@ async function verifyRenderer(
       );
       return;
     }
-    if (clipboardMode) {
+    if (clipboardMode || nativeClipboard) {
       await openBank(page);
       await editGold(page, "002");
-      await verifyDesktopClipboard(page, bridge, clipboardMode);
+      if (nativeClipboard) await verifyNativeClipboard(page, engine, bridge);
+      else await verifyDesktopClipboard(page, bridge, clipboardMode);
       assert.deepEqual(bridge.unexpected, []);
       assert.deepEqual(errors, []);
       assert.deepEqual(rejected, []);
       console.log(
-        `Chromium ${browser.version()} desktop renderer copied exact prepared XML with clipboard ${clipboardMode}.`,
+        `Chromium ${browser.version()} desktop renderer passed prepared XML Copy with clipboard ${nativeClipboard ? "native replies" : clipboardMode}.`,
       );
       return;
     }
@@ -1787,6 +1913,7 @@ try {
   await verifyRenderer(browser, false, "legacy_profile");
   await verifyRenderer(browser, false, "clipboard_absent");
   await verifyRenderer(browser, false, "clipboard_denied");
+  await verifyRenderer(browser, false, "clipboard_native");
   for (const capability of [
     { value: true },
     { value: false },

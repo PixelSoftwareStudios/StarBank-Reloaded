@@ -8,6 +8,7 @@
     "allow-complete-window-close",
     "allow-open-bank",
     "allow-dispatch-bank",
+    "allow-copy-bank-xml",
     "allow-export-bank-copy",
     "allow-can-export-bank",
     "allow-can-create-bank-copy",

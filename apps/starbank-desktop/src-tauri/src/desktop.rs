@@ -91,6 +91,7 @@ pub(crate) fn run() -> tauri::Result<()> {
 			close_guard::complete_window_close,
 			crate::commands::open_bank,
 			crate::commands::dispatch_bank,
+			crate::clipboard::copy_bank_xml,
 			crate::export::export_bank_copy,
 			crate::export::can_export_bank,
 			crate::export::can_create_bank_copy,

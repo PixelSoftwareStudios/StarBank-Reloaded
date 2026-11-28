@@ -151,6 +151,16 @@ export function exportBankCopy(
   });
 }
 
+export function copyBankXml(
+  control: string,
+  allowUnverified: boolean,
+): Promise<string | null> {
+  return invokeChecked(v.nullable(v.string()), "copy_bank_xml", {
+    control,
+    allowUnverified,
+  });
+}
+
 export async function dispatchBank(
   control: string,
   bytes?: Uint8Array,

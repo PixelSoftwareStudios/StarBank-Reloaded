@@ -26,6 +26,10 @@ pub(crate) enum CommandError {
 	InvalidPacket,
 	OpenRequiresPicker,
 	Unavailable,
+	#[cfg(target_os = "linux")]
+	ClipboardUnavailable,
+	#[cfg(any(target_os = "linux", test))]
+	ClipboardConsentRequired,
 	WriteRejected(String),
 	ActiveWriteRejected(String),
 	ExternalBankChanged,
