@@ -15,6 +15,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { verifyClipboardXml } from "./linux-clipboard.mjs";
 import {
   cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
@@ -975,6 +976,42 @@ async function run(
   );
   console.log(
     "Linux native auto re-sign preference persisted across restart, and Save As chooser Cancel and verified Save before close passed.",
+  );
+
+  const unicodeBank = "Unicode Clipboard.SC2Bank";
+  const openingXml =
+    '\uFEFF<Bank version="1">\r\n<!-- Clipboard: \u00A0\u{1F600} e\u0301 -->\r\n' +
+    '<Section name="Player"><Key name="Gold"><Value int="001"/></Key></Section>\r\n</Bank>';
+  const preparedXml = openingXml.replace('int="001"', 'int="1234"');
+  await withNativeSession(
+    application,
+    "Unicode clipboard text from UTF-16LE",
+    [[unicodeBank, Buffer.from(openingXml, "utf16le")]],
+    async (command, { assertInputsUnchanged }) => {
+      await verifyClipboardXml({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        name: unicodeBank,
+        expectedXml: preparedXml,
+        assertInputsUnchanged,
+        async assertClipboard(expectedXml) {
+          const { stdout } = await execFileAsync(clipboardReader, [], {
+            encoding: "buffer",
+            killSignal: "SIGKILL",
+            maxBuffer: clipboardReadLimit,
+            timeout: commandTimeout,
+          });
+          assert.deepEqual(stdout, Buffer.from(expectedXml, "utf8"));
+        },
+      });
+      await requestGtkWindowClose(closeSender);
+      await discardGtkDirtyClose();
+      await assertInputsUnchanged();
+    },
+  );
+  console.log(
+    "Linux native Copy: exact BOM, CRLF and Unicode X11 text from edited UTF-16LE passed.",
   );
 }
 
