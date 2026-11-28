@@ -1,0 +1,5415 @@
+{
+  "schema_version": 2,
+  "started_at": "2026-11-28T05:11:06.069Z",
+  "build_scope": "Installed unsigned Linux debug Debian package on a hosted Xvfb runner",
+  "accounting_scope": "Fresh cgroup v2 leaf containing the app and its descendants, including the final work of the admission launcher. Shared services outside the leaf are excluded. Memory counters are cgroup-charged bytes and kernel peak watermarks.",
+  "timing_scope": "Fresh app and WebView processes launch with unflushed system caches. Startup includes automation from WebDriver session POST through observed UI readiness. Quiet CPU windows span first and last cgroup sample-command midpoints, with no WebDriver calls after readiness until both windows finish. The early window can include work deferred from startup.",
+  "attribution_scope": "Process CPU deltas use Linux clock ticks for matching PID, start time, executable and effective UID at each window's endpoints. Membership commands bracket the group samples and have a separate midpoint span. Processes missing at either endpoint or present only between endpoints can contribute to group totals without appearing in process deltas.",
+  "settle_ms": 1000,
+  "late_settle_ms": 15000,
+  "samples_per_window": 7,
+  "sample_interval_ms": 500,
+  "trials": [
+    {
+      "scenario": "empty",
+      "iteration": 1,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "cbaf1ad83e58242b6b12b3cf11466ec8",
+        "device": "31",
+        "inode": "7252"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 703.927194,
+        "session_post_to_enabled_action_ms": 1043.557586
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1001.842187,
+        "request_finished_ms_after_readiness": 1056.6156669999998,
+        "members": [
+          {
+            "pid": "14252",
+            "starttime_ticks": "27691",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "14277",
+            "starttime_ticks": "27703",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14306",
+            "starttime_ticks": "27710",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "97",
+            "system_cpu_ticks": "18"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.922623000000385,
+          "request_duration_ms": 47.84264200000007,
+          "cpu_usage_usec": 1481430,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.7673075000002,
+          "request_duration_ms": 48.3852109999998,
+          "cpu_usage_usec": 1481762,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1121.7180955000003,
+          "request_duration_ms": 48.20358699999997,
+          "cpu_usage_usec": 1481879,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1670.4890000000005,
+          "request_duration_ms": 47.879007999999885,
+          "cpu_usage_usec": 1481986,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2219.149128,
+          "request_duration_ms": 47.87827599999946,
+          "cpu_usage_usec": 1482137,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2767.7512509999997,
+          "request_duration_ms": 47.78017799999998,
+          "cpu_usage_usec": 1482218,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3316.6883264999997,
+          "request_duration_ms": 48.701176999999916,
+          "cpu_usage_usec": 1483254,
+          "memory_current_bytes": 220958720,
+          "memory_peak_bytes": 221982720,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1056.6266039999998,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4397.676396,
+        "request_finished_ms_after_readiness": 4451.691512,
+        "members": [
+          {
+            "pid": "14252",
+            "starttime_ticks": "27691",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "14277",
+            "starttime_ticks": "27703",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14306",
+            "starttime_ticks": "27710",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "97",
+            "system_cpu_ticks": "18"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3292.7657034999993,
+        "cpu_usage_delta_usec": 1824,
+        "cpu_percent_of_one_core": 0.055394162969482,
+        "final_memory_peak_bytes": 221982720
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3395.455027,
+        "matched": [
+          {
+            "pid": "14252",
+            "starttime_ticks": "27691",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14277",
+            "starttime_ticks": "27703",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14306",
+            "starttime_ticks": "27710",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15000.883761999998,
+          "request_finished_ms_after_readiness": 15056.340995999999,
+          "members": [
+            {
+              "pid": "14252",
+              "starttime_ticks": "27691",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "14277",
+              "starttime_ticks": "27703",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14306",
+              "starttime_ticks": "27710",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "98",
+              "system_cpu_ticks": "18"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.3214724999998,
+            "request_duration_ms": 48.639798999996856,
+            "cpu_usage_usec": 1496479,
+            "memory_current_bytes": 217378816,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.4619000000021,
+            "request_duration_ms": 48.34817999999723,
+            "cpu_usage_usec": 1497085,
+            "memory_current_bytes": 217112576,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1122.2187835000004,
+            "request_duration_ms": 47.83209100000022,
+            "cpu_usage_usec": 1497145,
+            "memory_current_bytes": 217112576,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.8471175000013,
+            "request_duration_ms": 48.05288500000097,
+            "cpu_usage_usec": 1497282,
+            "memory_current_bytes": 217112576,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2219.934126,
+            "request_duration_ms": 48.7925000000032,
+            "cpu_usage_usec": 1498741,
+            "memory_current_bytes": 216760320,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2768.218020499997,
+            "request_duration_ms": 48.4035729999996,
+            "cpu_usage_usec": 1498814,
+            "memory_current_bytes": 216760320,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3317.2544025000025,
+            "request_duration_ms": 48.3334070000019,
+            "cpu_usage_usec": 1498880,
+            "memory_current_bytes": 216760320,
+            "memory_peak_bytes": 221982720,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15056.351872,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18397.787289,
+          "request_finished_ms_after_readiness": 18452.893262999998,
+          "members": [
+            {
+              "pid": "14252",
+              "starttime_ticks": "27691",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "14277",
+              "starttime_ticks": "27703",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14306",
+              "starttime_ticks": "27710",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "98",
+              "system_cpu_ticks": "18"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3292.9329300000027,
+          "cpu_usage_delta_usec": 2401,
+          "cpu_percent_of_one_core": 0.07291372314710333,
+          "final_memory_peak_bytes": 221982720
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3396.7278970000007,
+          "matched": [
+            {
+              "pid": "14252",
+              "starttime_ticks": "27691",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14277",
+              "starttime_ticks": "27703",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14306",
+              "starttime_ticks": "27710",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "small",
+      "iteration": 1,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "4cfb7d25de77ef020e7cbd509b2a7995",
+        "device": "31",
+        "inode": "7314"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 191.99217399999907,
+        "session_post_to_enabled_action_ms": 1173.8464099999983,
+        "open_click_to_visible_table_ms": 126.24367499999789,
+        "session_post_to_visible_table_ms": 1300.094861999998
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.6665090000024,
+        "request_finished_ms_after_readiness": 1055.095182000001,
+        "members": [
+          {
+            "pid": "14400",
+            "starttime_ticks": "29695",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "14",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "14409",
+            "starttime_ticks": "29700",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "1",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "14440",
+            "starttime_ticks": "29712",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "150",
+            "system_cpu_ticks": "20"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.678326999997807,
+          "request_duration_ms": 47.35395000000062,
+          "cpu_usage_usec": 2030455,
+          "memory_current_bytes": 250257408,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.0664910000014,
+          "request_duration_ms": 48.05580800000098,
+          "cpu_usage_usec": 2030609,
+          "memory_current_bytes": 250257408,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1124.191020000002,
+          "request_duration_ms": 54.851198000000295,
+          "cpu_usage_usec": 2162179,
+          "memory_current_bytes": 250707968,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1677.8060174999991,
+          "request_duration_ms": 53.55962300000101,
+          "cpu_usage_usec": 2523683,
+          "memory_current_bytes": 250679296,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2232.397550999998,
+          "request_duration_ms": 55.139328000001115,
+          "cpu_usage_usec": 2887280,
+          "memory_current_bytes": 250662912,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2787.398148,
+          "request_duration_ms": 53.02679999999964,
+          "cpu_usage_usec": 3247596,
+          "memory_current_bytes": 248860672,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3341.3507470000004,
+          "request_duration_ms": 53.16562999999951,
+          "cpu_usage_usec": 3600500,
+          "memory_current_bytes": 248815616,
+          "memory_peak_bytes": 255315968,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.0998790000012,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4423.044157,
+        "request_finished_ms_after_readiness": 4485.312425,
+        "members": [
+          {
+            "pid": "14400",
+            "starttime_ticks": "29695",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "19",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "14409",
+            "starttime_ticks": "29700",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "1",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "14440",
+            "starttime_ticks": "29712",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "284",
+            "system_cpu_ticks": "39"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3317.6724200000026,
+        "cpu_usage_delta_usec": 1570045,
+        "cpu_percent_of_one_core": 47.32368966071698,
+        "final_memory_peak_bytes": 255315968
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3426.2974454999985,
+        "matched": [
+          {
+            "pid": "14400",
+            "starttime_ticks": "29695",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 70,
+            "cpu_percent_of_one_core": 2.043021690715615
+          },
+          {
+            "pid": "14409",
+            "starttime_ticks": "29700",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14440",
+            "starttime_ticks": "29712",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 134,
+            "system_cpu_delta_ticks": 19,
+            "cpu_delta_ms": 1530,
+            "cpu_percent_of_one_core": 44.65461695421273
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15005.183387000001,
+          "request_finished_ms_after_readiness": 15059.506456,
+          "members": [
+            {
+              "pid": "14400",
+              "starttime_ticks": "29695",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "20",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "14409",
+              "starttime_ticks": "29700",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "1",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "14440",
+              "starttime_ticks": "29712",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "313",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.895943999996234,
+            "request_duration_ms": 47.789765999994415,
+            "cpu_usage_usec": 3966636,
+            "memory_current_bytes": 246026240,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.8993410000039,
+            "request_duration_ms": 48.944964000002074,
+            "cpu_usage_usec": 3966799,
+            "memory_current_bytes": 245792768,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1122.5710289999988,
+            "request_duration_ms": 49.06293200000073,
+            "cpu_usage_usec": 3966882,
+            "memory_current_bytes": 245792768,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1671.5617344999991,
+            "request_duration_ms": 47.61685099999886,
+            "cpu_usage_usec": 3966950,
+            "memory_current_bytes": 245792768,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2220.7582254999943,
+            "request_duration_ms": 49.46028099999967,
+            "cpu_usage_usec": 3967471,
+            "memory_current_bytes": 245706752,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2770.1215774999946,
+            "request_duration_ms": 48.015512999998464,
+            "cpu_usage_usec": 3967542,
+            "memory_current_bytes": 245649408,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3319.3993189999965,
+            "request_duration_ms": 49.13827800000581,
+            "cpu_usage_usec": 3967600,
+            "memory_current_bytes": 245649408,
+            "memory_peak_bytes": 255315968,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15059.51538,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18403.494023000003,
+          "request_finished_ms_after_readiness": 18458.314983,
+          "members": [
+            {
+              "pid": "14400",
+              "starttime_ticks": "29695",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "20",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "14409",
+              "starttime_ticks": "29700",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "1",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "14440",
+              "starttime_ticks": "29712",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "313",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3295.5033750000002,
+          "cpu_usage_delta_usec": 964,
+          "cpu_percent_of_one_core": 0.029251980359449637,
+          "final_memory_peak_bytes": 255315968
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3398.5595815000015,
+          "matched": [
+            {
+              "pid": "14400",
+              "starttime_ticks": "29695",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14409",
+              "starttime_ticks": "29700",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14440",
+              "starttime_ticks": "29712",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "large",
+      "iteration": 1,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "f966a4096991e65b15315efa060e18e8",
+        "device": "31",
+        "inode": "7591"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 192.66447000000335,
+        "session_post_to_enabled_action_ms": 1143.0692560000025,
+        "open_click_to_visible_table_ms": 500.82420499999716,
+        "session_post_to_visible_table_ms": 1643.8992900000012
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1001.775741999998,
+        "request_finished_ms_after_readiness": 1057.8393920000017,
+        "members": [
+          {
+            "pid": "14566",
+            "starttime_ticks": "31725",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "46",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "14575",
+            "starttime_ticks": "31731",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14606",
+            "starttime_ticks": "31743",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "157",
+            "system_cpu_ticks": "22"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.773442999998224,
+          "request_duration_ms": 47.54436200000055,
+          "cpu_usage_usec": 2463988,
+          "memory_current_bytes": 284344320,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 573.7564720000009,
+          "request_duration_ms": 51.08155000000261,
+          "cpu_usage_usec": 2474024,
+          "memory_current_bytes": 284606464,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1127.2719615000024,
+          "request_duration_ms": 54.649796999998216,
+          "cpu_usage_usec": 2629613,
+          "memory_current_bytes": 273764352,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1680.8813934999998,
+          "request_duration_ms": 51.15745500000048,
+          "cpu_usage_usec": 2950006,
+          "memory_current_bytes": 273756160,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2234.2956685000026,
+          "request_duration_ms": 53.91245899999922,
+          "cpu_usage_usec": 3271821,
+          "memory_current_bytes": 271654912,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2788.6453005000003,
+          "request_duration_ms": 54.152224999998,
+          "cpu_usage_usec": 3604550,
+          "memory_current_bytes": 271171584,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3342.4456810000047,
+          "request_duration_ms": 54.08529399999679,
+          "cpu_usage_usec": 3932242,
+          "memory_current_bytes": 271147008,
+          "memory_peak_bytes": 298008576,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1057.855316000001,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4427.365987999998,
+        "request_finished_ms_after_readiness": 4486.191666999999,
+        "members": [
+          {
+            "pid": "14566",
+            "starttime_ticks": "31725",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "50",
+            "system_cpu_ticks": "11"
+          },
+          {
+            "pid": "14575",
+            "starttime_ticks": "31731",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14606",
+            "starttime_ticks": "31743",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "282",
+            "system_cpu_ticks": "39"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3318.6722380000065,
+        "cpu_usage_delta_usec": 1468254,
+        "cpu_percent_of_one_core": 44.242211785422995,
+        "final_memory_peak_bytes": 298008576
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3426.9712604999986,
+        "matched": [
+          {
+            "pid": "14566",
+            "starttime_ticks": "31725",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 4,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 60,
+            "cpu_percent_of_one_core": 1.7508171338222995
+          },
+          {
+            "pid": "14575",
+            "starttime_ticks": "31731",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14606",
+            "starttime_ticks": "31743",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 125,
+            "system_cpu_delta_ticks": 17,
+            "cpu_delta_ms": 1420,
+            "cpu_percent_of_one_core": 41.436005500461086
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15000.516357,
+          "request_finished_ms_after_readiness": 15055.435300999998,
+          "members": [
+            {
+              "pid": "14566",
+              "starttime_ticks": "31725",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "51",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "14575",
+              "starttime_ticks": "31731",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14606",
+              "starttime_ticks": "31743",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "305",
+              "system_cpu_ticks": "42"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.27101450000191,
+            "request_duration_ms": 48.54036500000075,
+            "cpu_usage_usec": 4228936,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.528481500005,
+            "request_duration_ms": 48.681126999996195,
+            "cpu_usage_usec": 4229065,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1122.4305319999985,
+            "request_duration_ms": 47.602749999998196,
+            "cpu_usage_usec": 4229129,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.9283759999962,
+            "request_duration_ms": 48.11548400000174,
+            "cpu_usage_usec": 4229195,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2220.0991385000016,
+            "request_duration_ms": 48.86940100000356,
+            "cpu_usage_usec": 4229259,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2769.097096999998,
+            "request_duration_ms": 47.83602200000314,
+            "cpu_usage_usec": 4229331,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3317.735380500002,
+            "request_duration_ms": 48.1437769999975,
+            "cpu_usage_usec": 4229403,
+            "memory_current_bytes": 263589888,
+            "memory_peak_bytes": 298008576,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15055.440448000001,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18397.252864000002,
+          "request_finished_ms_after_readiness": 18451.559008000004,
+          "members": [
+            {
+              "pid": "14566",
+              "starttime_ticks": "31725",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "51",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "14575",
+              "starttime_ticks": "31731",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14606",
+              "starttime_ticks": "31743",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "305",
+              "system_cpu_ticks": "42"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3293.464366,
+          "cpu_usage_delta_usec": 467,
+          "cpu_percent_of_one_core": 0.014179597776161273,
+          "final_memory_peak_bytes": 298008576
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3396.4301070000038,
+          "matched": [
+            {
+              "pid": "14566",
+              "starttime_ticks": "31725",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14575",
+              "starttime_ticks": "31731",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14606",
+              "starttime_ticks": "31743",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "empty",
+      "iteration": 2,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "8a14b44118683f338b5eb095cc8d3508",
+        "device": "31",
+        "inode": "7653"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 188.4218500000061,
+        "session_post_to_enabled_action_ms": 1003.3556790000002
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.6203170000008,
+        "request_finished_ms_after_readiness": 1055.2646760000061,
+        "members": [
+          {
+            "pid": "14712",
+            "starttime_ticks": "33787",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "14721",
+            "starttime_ticks": "33792",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14753",
+            "starttime_ticks": "33804",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "101",
+            "system_cpu_ticks": "16"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.716261000001396,
+          "request_duration_ms": 47.43174200000067,
+          "cpu_usage_usec": 1478279,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 571.987912500008,
+          "request_duration_ms": 47.78167899999971,
+          "cpu_usage_usec": 1478713,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1120.343685000007,
+          "request_duration_ms": 47.58251800000289,
+          "cpu_usage_usec": 1478830,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1668.025990000002,
+          "request_duration_ms": 48.23301999999967,
+          "cpu_usage_usec": 1478899,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2215.6467634999935,
+          "request_duration_ms": 47.503879000010784,
+          "cpu_usage_usec": 1479096,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2763.3861355000045,
+          "request_duration_ms": 48.114501000003656,
+          "cpu_usage_usec": 1479179,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3310.848309000001,
+          "request_duration_ms": 47.99359800000093,
+          "cpu_usage_usec": 1480238,
+          "memory_current_bytes": 219590656,
+          "memory_peak_bytes": 221036544,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.2684420000005,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4390.1188480000055,
+        "request_finished_ms_after_readiness": 4444.481711000008,
+        "members": [
+          {
+            "pid": "14712",
+            "starttime_ticks": "33787",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "14721",
+            "starttime_ticks": "33792",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "14753",
+            "starttime_ticks": "33804",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "101",
+            "system_cpu_ticks": "16"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3287.1320479999995,
+        "cpu_usage_delta_usec": 1959,
+        "cpu_percent_of_one_core": 0.059596023871079984,
+        "final_memory_peak_bytes": 221036544
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3389.357783000003,
+        "matched": [
+          {
+            "pid": "14712",
+            "starttime_ticks": "33787",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14721",
+            "starttime_ticks": "33792",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14753",
+            "starttime_ticks": "33804",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15004.655659000004,
+          "request_finished_ms_after_readiness": 15059.633277000008,
+          "members": [
+            {
+              "pid": "14712",
+              "starttime_ticks": "33787",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "14721",
+              "starttime_ticks": "33792",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14753",
+              "starttime_ticks": "33804",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "101",
+              "system_cpu_ticks": "17"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.002548500007833,
+            "request_duration_ms": 48.004195000001346,
+            "cpu_usage_usec": 1494287,
+            "memory_current_bytes": 215527424,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.568589500006,
+            "request_duration_ms": 49.80431300000055,
+            "cpu_usage_usec": 1494781,
+            "memory_current_bytes": 215527424,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1123.2542460000113,
+            "request_duration_ms": 48.27778799999214,
+            "cpu_usage_usec": 1494849,
+            "memory_current_bytes": 215527424,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1672.1609915000008,
+            "request_duration_ms": 47.92166100000031,
+            "cpu_usage_usec": 1494912,
+            "memory_current_bytes": 215527424,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2220.6849099999963,
+            "request_duration_ms": 47.83926600000996,
+            "cpu_usage_usec": 1495512,
+            "memory_current_bytes": 215441408,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2769.3636815000064,
+            "request_duration_ms": 48.072122999990825,
+            "cpu_usage_usec": 1495600,
+            "memory_current_bytes": 215441408,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3317.893809500005,
+            "request_duration_ms": 47.69015700000455,
+            "cpu_usage_usec": 1495665,
+            "memory_current_bytes": 215441408,
+            "memory_peak_bytes": 221036544,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15059.637332999999,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18401.381148000008,
+          "request_finished_ms_after_readiness": 18456.1858,
+          "members": [
+            {
+              "pid": "14712",
+              "starttime_ticks": "33787",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "14721",
+              "starttime_ticks": "33792",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "14753",
+              "starttime_ticks": "33804",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "101",
+              "system_cpu_ticks": "17"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3293.891260999997,
+          "cpu_usage_delta_usec": 1378,
+          "cpu_percent_of_one_core": 0.04183501794110991,
+          "final_memory_peak_bytes": 221036544
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3396.6390059999976,
+          "matched": [
+            {
+              "pid": "14712",
+              "starttime_ticks": "33787",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14721",
+              "starttime_ticks": "33792",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14753",
+              "starttime_ticks": "33804",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "small",
+      "iteration": 2,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "fd844fd7714d648f98800a821b63beec",
+        "device": "31",
+        "inode": "7715"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 186.5034030000097,
+        "session_post_to_enabled_action_ms": 1126.990531000003,
+        "open_click_to_visible_table_ms": 167.23394499999995,
+        "session_post_to_visible_table_ms": 1294.2306450000033
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.6335240000044,
+        "request_finished_ms_after_readiness": 1055.9287550000008,
+        "members": [
+          {
+            "pid": "14851",
+            "starttime_ticks": "35784",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "14",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "14860",
+            "starttime_ticks": "35790",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "14891",
+            "starttime_ticks": "35801",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "153",
+            "system_cpu_ticks": "19"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 24.6474739999976,
+          "request_duration_ms": 49.293806000001496,
+          "cpu_usage_usec": 2060832,
+          "memory_current_bytes": 250257408,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 573.919307499993,
+          "request_duration_ms": 47.9399829999893,
+          "cpu_usage_usec": 2060983,
+          "memory_current_bytes": 250257408,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1125.8074769999948,
+          "request_duration_ms": 54.59308200000669,
+          "cpu_usage_usec": 2215529,
+          "memory_current_bytes": 250499072,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1681.0407290000003,
+          "request_duration_ms": 56.493759999997565,
+          "cpu_usage_usec": 2588340,
+          "memory_current_bytes": 250445824,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2236.4004264999967,
+          "request_duration_ms": 53.14312500000233,
+          "cpu_usage_usec": 2946122,
+          "memory_current_bytes": 250445824,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2792.1593619999912,
+          "request_duration_ms": 56.654152000002796,
+          "cpu_usage_usec": 3300361,
+          "memory_current_bytes": 248627200,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3347.749833499998,
+          "request_duration_ms": 54.20472700000391,
+          "cpu_usage_usec": 3662398,
+          "memory_current_bytes": 248610816,
+          "memory_peak_bytes": 256221184,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.9338530000095,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4430.793189999997,
+        "request_finished_ms_after_readiness": 4491.181266,
+        "members": [
+          {
+            "pid": "14851",
+            "starttime_ticks": "35784",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "19",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "14860",
+            "starttime_ticks": "35790",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "14891",
+            "starttime_ticks": "35801",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "290",
+            "system_cpu_ticks": "39"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3323.1023595000006,
+        "cpu_usage_delta_usec": 1601566,
+        "cpu_percent_of_one_core": 48.19490424125769,
+        "final_memory_peak_bytes": 256221184
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3432.7060884999955,
+        "matched": [
+          {
+            "pid": "14851",
+            "starttime_ticks": "35784",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 3,
+            "cpu_delta_ms": 80,
+            "cpu_percent_of_one_core": 2.3305228568216263
+          },
+          {
+            "pid": "14860",
+            "starttime_ticks": "35790",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "14891",
+            "starttime_ticks": "35801",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 137,
+            "system_cpu_delta_ticks": 20,
+            "cpu_delta_ms": 1570,
+            "cpu_percent_of_one_core": 45.73651106512442
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15000.941265000001,
+          "request_finished_ms_after_readiness": 15055.939815000005,
+          "members": [
+            {
+              "pid": "14851",
+              "starttime_ticks": "35784",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "20",
+              "system_cpu_ticks": "9"
+            },
+            {
+              "pid": "14860",
+              "starttime_ticks": "35790",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "14891",
+              "starttime_ticks": "35801",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "316",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.12551749999693,
+            "request_duration_ms": 48.249932999999146,
+            "cpu_usage_usec": 4007193,
+            "memory_current_bytes": 246345728,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.831674999994,
+            "request_duration_ms": 47.85939200001303,
+            "cpu_usage_usec": 4007352,
+            "memory_current_bytes": 246345728,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1121.5997605000011,
+            "request_duration_ms": 48.37318700000469,
+            "cpu_usage_usec": 4007422,
+            "memory_current_bytes": 246345728,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.3793635000038,
+            "request_duration_ms": 47.779790999993565,
+            "cpu_usage_usec": 4007491,
+            "memory_current_bytes": 246345728,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2219.4441714999994,
+            "request_duration_ms": 49.0443510000041,
+            "cpu_usage_usec": 4008221,
+            "memory_current_bytes": 245444608,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2768.691249999989,
+            "request_duration_ms": 48.20768800000951,
+            "cpu_usage_usec": 4008301,
+            "memory_current_bytes": 245444608,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3317.7882674999855,
+            "request_duration_ms": 48.69008700000995,
+            "cpu_usage_usec": 4008378,
+            "memory_current_bytes": 245444608,
+            "memory_peak_bytes": 256221184,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15055.94287900001,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18398.081177,
+          "request_finished_ms_after_readiness": 18454.681884999998,
+          "members": [
+            {
+              "pid": "14851",
+              "starttime_ticks": "35784",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "20",
+              "system_cpu_ticks": "9"
+            },
+            {
+              "pid": "14860",
+              "starttime_ticks": "35790",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "14891",
+              "starttime_ticks": "35801",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "316",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3293.6627499999886,
+          "cpu_usage_delta_usec": 1185,
+          "cpu_percent_of_one_core": 0.03597818264787444,
+          "final_memory_peak_bytes": 256221184
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3397.940990999996,
+          "matched": [
+            {
+              "pid": "14851",
+              "starttime_ticks": "35784",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14860",
+              "starttime_ticks": "35790",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "14891",
+              "starttime_ticks": "35801",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "large",
+      "iteration": 2,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "c57d6b7ebdb653edabafa9e06abdfa6e",
+        "device": "31",
+        "inode": "7777"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 186.4150110000046,
+        "session_post_to_enabled_action_ms": 1125.536002000008,
+        "open_click_to_visible_table_ms": 484.7271410000103,
+        "session_post_to_visible_table_ms": 1610.269032000011
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.6176689999993,
+        "request_finished_ms_after_readiness": 1056.325525999986,
+        "members": [
+          {
+            "pid": "14992",
+            "starttime_ticks": "37822",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "44",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "15001",
+            "starttime_ticks": "37828",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15032",
+            "starttime_ticks": "37838",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "156",
+            "system_cpu_ticks": "22"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 24.325778500002343,
+          "request_duration_ms": 48.65027500000724,
+          "cpu_usage_usec": 2458915,
+          "memory_current_bytes": 282488832,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 573.7803574999853,
+          "request_duration_ms": 48.97378300000855,
+          "cpu_usage_usec": 2469189,
+          "memory_current_bytes": 282750976,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1125.7723124999902,
+          "request_duration_ms": 54.652908999996725,
+          "cpu_usage_usec": 2625722,
+          "memory_current_bytes": 272138240,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1681.1467180000036,
+          "request_duration_ms": 55.715228000000934,
+          "cpu_usage_usec": 2982820,
+          "memory_current_bytes": 272125952,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2235.992968499995,
+          "request_duration_ms": 54.51955299999099,
+          "cpu_usage_usec": 3322874,
+          "memory_current_bytes": 269111296,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2793.0849034999846,
+          "request_duration_ms": 57.53592499998922,
+          "cpu_usage_usec": 3679877,
+          "memory_current_bytes": 268591104,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3348.1902405,
+          "request_duration_ms": 53.48969900001248,
+          "cpu_usage_usec": 4026626,
+          "memory_current_bytes": 268591104,
+          "memory_peak_bytes": 295649280,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1056.3293709999998,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4431.270479999992,
+        "request_finished_ms_after_readiness": 4494.024339999989,
+        "members": [
+          {
+            "pid": "14992",
+            "starttime_ticks": "37822",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "51",
+            "system_cpu_ticks": "11"
+          },
+          {
+            "pid": "15001",
+            "starttime_ticks": "37828",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15032",
+            "starttime_ticks": "37838",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "292",
+            "system_cpu_ticks": "39"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3323.8644619999977,
+        "cpu_usage_delta_usec": 1567711,
+        "cpu_percent_of_one_core": 47.1653106774605,
+        "final_memory_peak_bytes": 295649280
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3434.175812499998,
+        "matched": [
+          {
+            "pid": "14992",
+            "starttime_ticks": "37822",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 7,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 90,
+            "cpu_percent_of_one_core": 2.6207161459937645
+          },
+          {
+            "pid": "15001",
+            "starttime_ticks": "37828",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15032",
+            "starttime_ticks": "37838",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 136,
+            "system_cpu_delta_ticks": 17,
+            "cpu_delta_ms": 1530,
+            "cpu_percent_of_one_core": 44.552174481894
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15004.225632999995,
+          "request_finished_ms_after_readiness": 15059.833547999995,
+          "members": [
+            {
+              "pid": "14992",
+              "starttime_ticks": "37822",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "52",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "15001",
+              "starttime_ticks": "37828",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15032",
+              "starttime_ticks": "37838",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "317",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.214189500009525,
+            "request_duration_ms": 48.42721700000402,
+            "cpu_usage_usec": 4360015,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.4722430000111,
+            "request_duration_ms": 48.80916399999114,
+            "cpu_usage_usec": 4360093,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1122.5350270000054,
+            "request_duration_ms": 48.07162999999127,
+            "cpu_usage_usec": 4360219,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.1797379999916,
+            "request_duration_ms": 47.84563999999955,
+            "cpu_usage_usec": 4360282,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2219.856362000006,
+            "request_duration_ms": 50.16608200001065,
+            "cpu_usage_usec": 4360359,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2769.4970319999993,
+            "request_duration_ms": 47.62681000000157,
+            "cpu_usage_usec": 4360423,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3318.019852000012,
+            "request_duration_ms": 48.00770000000193,
+            "cpu_usage_usec": 4360493,
+            "memory_current_bytes": 260714496,
+            "memory_peak_bytes": 295649280,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15059.837072999988,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18401.865181999994,
+          "request_finished_ms_after_readiness": 18455.70390899999,
+          "members": [
+            {
+              "pid": "14992",
+              "starttime_ticks": "37822",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "52",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "15001",
+              "starttime_ticks": "37828",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15032",
+              "starttime_ticks": "37838",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "317",
+              "system_cpu_ticks": "41"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3293.8056625000027,
+          "cpu_usage_delta_usec": 478,
+          "cpu_percent_of_one_core": 0.014512088719806178,
+          "final_memory_peak_bytes": 295649280
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3396.7549549999967,
+          "matched": [
+            {
+              "pid": "14992",
+              "starttime_ticks": "37822",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15001",
+              "starttime_ticks": "37828",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15032",
+              "starttime_ticks": "37838",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "empty",
+      "iteration": 3,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "401d029366417fc64e5033b90bbf0394",
+        "device": "31",
+        "inode": "7839"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 183.10580099999788,
+        "session_post_to_enabled_action_ms": 1029.3744489999954
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1002.0017510000034,
+        "request_finished_ms_after_readiness": 1056.1793990000006,
+        "members": [
+          {
+            "pid": "15131",
+            "starttime_ticks": "39880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "15140",
+            "starttime_ticks": "39886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15171",
+            "starttime_ticks": "39897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "98",
+            "system_cpu_ticks": "18"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.87028149999969,
+          "request_duration_ms": 47.739821000010124,
+          "cpu_usage_usec": 1474541,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.5584390000004,
+          "request_duration_ms": 48.34309999999823,
+          "cpu_usage_usec": 1474922,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1121.197947499997,
+          "request_duration_ms": 47.638036999996984,
+          "cpu_usage_usec": 1475037,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1669.5774539999984,
+          "request_duration_ms": 47.80807400000049,
+          "cpu_usage_usec": 1475170,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2218.0418639999843,
+          "request_duration_ms": 47.65901799999119,
+          "cpu_usage_usec": 1475342,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2764.8426364999905,
+          "request_duration_ms": 47.46420499999658,
+          "cpu_usage_usec": 1475433,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3313.2508914999926,
+          "request_duration_ms": 48.59173700000974,
+          "cpu_usage_usec": 1476499,
+          "memory_current_bytes": 218271744,
+          "memory_peak_bytes": 219987968,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1056.184407000008,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4393.736594999995,
+        "request_finished_ms_after_readiness": 4447.399307,
+        "members": [
+          {
+            "pid": "15131",
+            "starttime_ticks": "39880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "15140",
+            "starttime_ticks": "39886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15171",
+            "starttime_ticks": "39897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "98",
+            "system_cpu_ticks": "18"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3289.380609999993,
+        "cpu_usage_delta_usec": 1958,
+        "cpu_percent_of_one_core": 0.059524884230408484,
+        "final_memory_peak_bytes": 219987968
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3391.4773759999953,
+        "matched": [
+          {
+            "pid": "15131",
+            "starttime_ticks": "39880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15140",
+            "starttime_ticks": "39886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15171",
+            "starttime_ticks": "39897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15007.414557000011,
+          "request_finished_ms_after_readiness": 15061.634005,
+          "members": [
+            {
+              "pid": "15131",
+              "starttime_ticks": "39880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "6"
+            },
+            {
+              "pid": "15140",
+              "starttime_ticks": "39886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15171",
+              "starttime_ticks": "39897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "99",
+              "system_cpu_ticks": "18"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.83997850000742,
+            "request_duration_ms": 47.679074999992736,
+            "cpu_usage_usec": 1490009,
+            "memory_current_bytes": 215113728,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.2306375000044,
+            "request_duration_ms": 47.763953000016045,
+            "cpu_usage_usec": 1490286,
+            "memory_current_bytes": 215113728,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1120.8878499999992,
+            "request_duration_ms": 48.041841999976896,
+            "cpu_usage_usec": 1490358,
+            "memory_current_bytes": 215113728,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1669.5973764999944,
+            "request_duration_ms": 48.081443000002764,
+            "cpu_usage_usec": 1490470,
+            "memory_current_bytes": 215113728,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2218.318859000021,
+            "request_duration_ms": 49.889351999998325,
+            "cpu_usage_usec": 1491058,
+            "memory_current_bytes": 215040000,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2767.685071499989,
+            "request_duration_ms": 47.606575000012526,
+            "cpu_usage_usec": 1491130,
+            "memory_current_bytes": 215040000,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3315.979967499996,
+            "request_duration_ms": 47.707196999981534,
+            "cpu_usage_usec": 1491201,
+            "memory_current_bytes": 215040000,
+            "memory_peak_bytes": 219987968,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15061.637189000001,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18401.476013000007,
+          "request_finished_ms_after_readiness": 18455.05301100001,
+          "members": [
+            {
+              "pid": "15131",
+              "starttime_ticks": "39880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "6"
+            },
+            {
+              "pid": "15140",
+              "starttime_ticks": "39886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15171",
+              "starttime_ticks": "39897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "99",
+              "system_cpu_ticks": "18"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3292.1399889999884,
+          "cpu_usage_delta_usec": 1192,
+          "cpu_percent_of_one_core": 0.03620745180893959,
+          "final_memory_peak_bytes": 219987968
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3393.7402310000034,
+          "matched": [
+            {
+              "pid": "15131",
+              "starttime_ticks": "39880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15140",
+              "starttime_ticks": "39886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15171",
+              "starttime_ticks": "39897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "small",
+      "iteration": 3,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "401fd46a55aa35bd97c67e192a574252",
+        "device": "31",
+        "inode": "7901"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 190.06740900001023,
+        "session_post_to_enabled_action_ms": 1132.9124140000204,
+        "open_click_to_visible_table_ms": 169.4428300000145,
+        "session_post_to_visible_table_ms": 1302.3617240000167
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.5047949999862,
+        "request_finished_ms_after_readiness": 1054.8377580000088,
+        "members": [
+          {
+            "pid": "15266",
+            "starttime_ticks": "41880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "8"
+          },
+          {
+            "pid": "15275",
+            "starttime_ticks": "41886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "1",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "15306",
+            "starttime_ticks": "41897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "152",
+            "system_cpu_ticks": "22"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.713221499987412,
+          "request_duration_ms": 47.42552099999739,
+          "cpu_usage_usec": 2085422,
+          "memory_current_bytes": 248819712,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.0720659999934,
+          "request_duration_ms": 47.749872000014875,
+          "cpu_usage_usec": 2085564,
+          "memory_current_bytes": 248819712,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1122.801581000007,
+          "request_duration_ms": 52.47053999998025,
+          "cpu_usage_usec": 2245399,
+          "memory_current_bytes": 249319424,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1676.1241004999902,
+          "request_duration_ms": 54.79803499998525,
+          "cpu_usage_usec": 2588489,
+          "memory_current_bytes": 249778176,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2231.1204384999874,
+          "request_duration_ms": 53.808981000009226,
+          "cpu_usage_usec": 2930766,
+          "memory_current_bytes": 249769984,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2785.694151999982,
+          "request_duration_ms": 55.63717199998791,
+          "cpu_usage_usec": 3280638,
+          "memory_current_bytes": 247951360,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3340.174325,
+          "request_duration_ms": 52.54477199999383,
+          "cpu_usage_usec": 3632575,
+          "memory_current_bytes": 247922688,
+          "memory_peak_bytes": 256159744,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1054.8425350000034,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4421.294323999988,
+        "request_finished_ms_after_readiness": 4481.308554999996,
+        "members": [
+          {
+            "pid": "15266",
+            "starttime_ticks": "41880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "18",
+            "system_cpu_ticks": "10"
+          },
+          {
+            "pid": "15275",
+            "starttime_ticks": "41886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "1",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "15306",
+            "starttime_ticks": "41897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "282",
+            "system_cpu_ticks": "42"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3316.4611035000125,
+        "cpu_usage_delta_usec": 1547153,
+        "cpu_percent_of_one_core": 46.650720503467355,
+        "final_memory_peak_bytes": 256159744
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3423.6301629999944,
+        "matched": [
+          {
+            "pid": "15266",
+            "starttime_ticks": "41880",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 70,
+            "cpu_percent_of_one_core": 2.044613368479664
+          },
+          {
+            "pid": "15275",
+            "starttime_ticks": "41886",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15306",
+            "starttime_ticks": "41897",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 130,
+            "system_cpu_delta_ticks": 20,
+            "cpu_delta_ms": 1500,
+            "cpu_percent_of_one_core": 43.813143610278516
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15003.451220999996,
+          "request_finished_ms_after_readiness": 15059.153502000001,
+          "members": [
+            {
+              "pid": "15266",
+              "starttime_ticks": "41880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "19",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "15275",
+              "starttime_ticks": "41886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "1",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "15306",
+              "starttime_ticks": "41897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "307",
+              "system_cpu_ticks": "46"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.593350000010105,
+            "request_duration_ms": 49.18577800001367,
+            "cpu_usage_usec": 3957343,
+            "memory_current_bytes": 240263168,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 574.824744499987,
+            "request_duration_ms": 49.99887100001797,
+            "cpu_usage_usec": 3957539,
+            "memory_current_bytes": 240263168,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1124.5862020000059,
+            "request_duration_ms": 48.24454399998649,
+            "cpu_usage_usec": 3957617,
+            "memory_current_bytes": 240263168,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1673.7637234999856,
+            "request_duration_ms": 48.82554300001357,
+            "cpu_usage_usec": 3957688,
+            "memory_current_bytes": 240263168,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2223.3579749999917,
+            "request_duration_ms": 49.05293599999277,
+            "cpu_usage_usec": 3958343,
+            "memory_current_bytes": 240177152,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2772.853682999994,
+            "request_duration_ms": 48.62839399999939,
+            "cpu_usage_usec": 3958424,
+            "memory_current_bytes": 240177152,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3322.1065285000077,
+            "request_duration_ms": 48.57410300002084,
+            "cpu_usage_usec": 3958504,
+            "memory_current_bytes": 240177152,
+            "memory_peak_bytes": 256159744,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15059.156977000006,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18405.556475999998,
+          "request_finished_ms_after_readiness": 18460.873029999988,
+          "members": [
+            {
+              "pid": "15266",
+              "starttime_ticks": "41880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "19",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "15275",
+              "starttime_ticks": "41886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "1",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "15306",
+              "starttime_ticks": "41897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "307",
+              "system_cpu_ticks": "46"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3297.5131784999976,
+          "cpu_usage_delta_usec": 1161,
+          "cpu_percent_of_one_core": 0.03520835057066023,
+          "final_memory_peak_bytes": 256159744
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3401.9123914999946,
+          "matched": [
+            {
+              "pid": "15266",
+              "starttime_ticks": "41880",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15275",
+              "starttime_ticks": "41886",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15306",
+              "starttime_ticks": "41897",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "large",
+      "iteration": 3,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "2cba773e919751c4944fc6fabe0ac621",
+        "device": "31",
+        "inode": "8025"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 173.84628999998677,
+        "session_post_to_enabled_action_ms": 1097.3947789999947,
+        "open_click_to_visible_table_ms": 517.6661629999871,
+        "session_post_to_visible_table_ms": 1615.0670009999885
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.7417350000178,
+        "request_finished_ms_after_readiness": 1055.0556149999902,
+        "members": [
+          {
+            "pid": "15425",
+            "starttime_ticks": "43909",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "48",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "15434",
+            "starttime_ticks": "43915",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15465",
+            "starttime_ticks": "43925",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "162",
+            "system_cpu_ticks": "25"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.97377400001278,
+          "request_duration_ms": 47.94686600001296,
+          "cpu_usage_usec": 2546943,
+          "memory_current_bytes": 286093312,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.6221620000142,
+          "request_duration_ms": 48.04471400001785,
+          "cpu_usage_usec": 2556207,
+          "memory_current_bytes": 286093312,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1124.7735195000132,
+          "request_duration_ms": 55.01914500002749,
+          "cpu_usage_usec": 2715648,
+          "memory_current_bytes": 275378176,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1678.5749484999978,
+          "request_duration_ms": 53.30399499999476,
+          "cpu_usage_usec": 3047792,
+          "memory_current_bytes": 275365888,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2231.6126189999923,
+          "request_duration_ms": 53.385367999988375,
+          "cpu_usage_usec": 3375587,
+          "memory_current_bytes": 272969728,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2786.0954135000065,
+          "request_duration_ms": 55.13628099998459,
+          "cpu_usage_usec": 3706096,
+          "memory_current_bytes": 272728064,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3339.8882925000216,
+          "request_duration_ms": 51.52999899999122,
+          "cpu_usage_usec": 4030280,
+          "memory_current_bytes": 272723968,
+          "memory_peak_bytes": 298790912,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.0592499999912,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4420.717911000014,
+        "request_finished_ms_after_readiness": 4483.05958500001,
+        "members": [
+          {
+            "pid": "15425",
+            "starttime_ticks": "43909",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "53",
+            "system_cpu_ticks": "12"
+          },
+          {
+            "pid": "15434",
+            "starttime_ticks": "43915",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15465",
+            "starttime_ticks": "43925",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "290",
+            "system_cpu_ticks": "41"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3315.914518500009,
+        "cpu_usage_delta_usec": 1483337,
+        "cpu_percent_of_one_core": 44.733873316824955,
+        "final_memory_peak_bytes": 298790912
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3423.990073000008,
+        "matched": [
+          {
+            "pid": "15425",
+            "starttime_ticks": "43909",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 3,
+            "cpu_delta_ms": 80,
+            "cpu_percent_of_one_core": 2.3364553720772374
+          },
+          {
+            "pid": "15434",
+            "starttime_ticks": "43915",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15465",
+            "starttime_ticks": "43925",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 128,
+            "system_cpu_delta_ticks": 16,
+            "cpu_delta_ms": 1440,
+            "cpu_percent_of_one_core": 42.05619669739027
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15000.448326000012,
+          "request_finished_ms_after_readiness": 15055.880238999991,
+          "members": [
+            {
+              "pid": "15425",
+              "starttime_ticks": "43909",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "54",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "15434",
+              "starttime_ticks": "43915",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15465",
+              "starttime_ticks": "43925",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "313",
+              "system_cpu_ticks": "43"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.38862899999367,
+            "request_duration_ms": 48.776436000014655,
+            "cpu_usage_usec": 4333946,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.7411539999885,
+            "request_duration_ms": 48.48299200000474,
+            "cpu_usage_usec": 4334085,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1122.8635714999982,
+            "request_duration_ms": 48.46370299998671,
+            "cpu_usage_usec": 4334150,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1672.0715429999982,
+            "request_duration_ms": 48.629063999978825,
+            "cpu_usage_usec": 4334217,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2221.376546000014,
+            "request_duration_ms": 48.72350599998026,
+            "cpu_usage_usec": 4334284,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2770.4473754999926,
+            "request_duration_ms": 48.14651500000036,
+            "cpu_usage_usec": 4334355,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3319.044970499992,
+            "request_duration_ms": 47.767663000005996,
+            "cpu_usage_usec": 4334426,
+            "memory_current_bytes": 265142272,
+            "memory_peak_bytes": 298790912,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15055.883864000003,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18398.816882999992,
+          "request_finished_ms_after_readiness": 18452.256297999993,
+          "members": [
+            {
+              "pid": "15425",
+              "starttime_ticks": "43909",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "54",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "15434",
+              "starttime_ticks": "43915",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15465",
+              "starttime_ticks": "43925",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "313",
+              "system_cpu_ticks": "44"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3294.6563414999982,
+          "cpu_usage_delta_usec": 480,
+          "cpu_percent_of_one_core": 0.014569046062675676,
+          "final_memory_peak_bytes": 298790912
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3397.372307999991,
+          "matched": [
+            {
+              "pid": "15425",
+              "starttime_ticks": "43909",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15434",
+              "starttime_ticks": "43915",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15465",
+              "starttime_ticks": "43925",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 1,
+              "cpu_delta_ms": 10,
+              "cpu_percent_of_one_core": 0.294345131867132
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "empty",
+      "iteration": 4,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "c2f0ced670a73cd777f0136ba97d7aa9",
+        "device": "31",
+        "inode": "8087"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 173.0637160000042,
+        "session_post_to_enabled_action_ms": 1007.0500720000127
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.738709999976,
+        "request_finished_ms_after_readiness": 1055.2586089999822,
+        "members": [
+          {
+            "pid": "15565",
+            "starttime_ticks": "45967",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "15574",
+            "starttime_ticks": "45973",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15605",
+            "starttime_ticks": "45983",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "97",
+            "system_cpu_ticks": "17"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.69362400000682,
+          "request_duration_ms": 47.386286000022665,
+          "cpu_usage_usec": 1460647,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 571.9347090000228,
+          "request_duration_ms": 47.73324000000139,
+          "cpu_usage_usec": 1460995,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1119.9449604999973,
+          "request_duration_ms": 47.7506670000148,
+          "cpu_usage_usec": 1461112,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1668.3135480000055,
+          "request_duration_ms": 47.67131599999266,
+          "cpu_usage_usec": 1461168,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2216.8880405000236,
+          "request_duration_ms": 47.77477300001192,
+          "cpu_usage_usec": 1461389,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2762.908171999996,
+          "request_duration_ms": 47.64993400001549,
+          "cpu_usage_usec": 1461470,
+          "memory_current_bytes": 220053504,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3311.006201500015,
+          "request_duration_ms": 47.888162999995984,
+          "cpu_usage_usec": 1462580,
+          "memory_current_bytes": 220315648,
+          "memory_peak_bytes": 220581888,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.2646979999845,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4390.220508999977,
+        "request_finished_ms_after_readiness": 4444.160611999978,
+        "members": [
+          {
+            "pid": "15565",
+            "starttime_ticks": "45967",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "6"
+          },
+          {
+            "pid": "15574",
+            "starttime_ticks": "45973",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15605",
+            "starttime_ticks": "45983",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "97",
+            "system_cpu_ticks": "17"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3287.312577500008,
+        "cpu_usage_delta_usec": 1933,
+        "cpu_percent_of_one_core": 0.05880183141787025,
+        "final_memory_peak_bytes": 220581888
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3389.1919009999983,
+        "matched": [
+          {
+            "pid": "15565",
+            "starttime_ticks": "45967",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15574",
+            "starttime_ticks": "45973",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15605",
+            "starttime_ticks": "45983",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15004.188089000003,
+          "request_finished_ms_after_readiness": 15058.535058999987,
+          "members": [
+            {
+              "pid": "15565",
+              "starttime_ticks": "45967",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "15574",
+              "starttime_ticks": "45973",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15605",
+              "starttime_ticks": "45983",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "98",
+              "system_cpu_ticks": "17"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.697617500001797,
+            "request_duration_ms": 47.39437300001737,
+            "cpu_usage_usec": 1476640,
+            "memory_current_bytes": 215977984,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.007809999981,
+            "request_duration_ms": 47.94486399999005,
+            "cpu_usage_usec": 1476811,
+            "memory_current_bytes": 215977984,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1120.4993874999927,
+            "request_duration_ms": 47.78563500000746,
+            "cpu_usage_usec": 1476967,
+            "memory_current_bytes": 215977984,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1669.149825999979,
+            "request_duration_ms": 48.232359999994515,
+            "cpu_usage_usec": 1477095,
+            "memory_current_bytes": 215977984,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2217.8297374999966,
+            "request_duration_ms": 47.876201000006404,
+            "cpu_usage_usec": 1477897,
+            "memory_current_bytes": 215601152,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2766.233509499987,
+            "request_duration_ms": 47.655386999977054,
+            "cpu_usage_usec": 1478294,
+            "memory_current_bytes": 215461888,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3314.5873060000013,
+            "request_duration_ms": 47.81344599998556,
+            "cpu_usage_usec": 1478371,
+            "memory_current_bytes": 215461888,
+            "memory_peak_bytes": 220581888,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15058.538834999985,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18397.037912,
+          "request_finished_ms_after_readiness": 18451.046583999996,
+          "members": [
+            {
+              "pid": "15565",
+              "starttime_ticks": "45967",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "15574",
+              "starttime_ticks": "45973",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15605",
+              "starttime_ticks": "45983",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "98",
+              "system_cpu_ticks": "17"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3290.8896884999995,
+          "cpu_usage_delta_usec": 1731,
+          "cpu_percent_of_one_core": 0.05259975762934176,
+          "final_memory_peak_bytes": 220581888
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3392.680674000003,
+          "matched": [
+            {
+              "pid": "15565",
+              "starttime_ticks": "45967",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15574",
+              "starttime_ticks": "45973",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15605",
+              "starttime_ticks": "45983",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "small",
+      "iteration": 4,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "f2f1d196176cd6eb18e7909878835a31",
+        "device": "31",
+        "inode": "8149"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 179.1536039999919,
+        "session_post_to_enabled_action_ms": 1137.446563000005,
+        "open_click_to_visible_table_ms": 166.79973999998765,
+        "session_post_to_visible_table_ms": 1304.253263999999
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.7954690000042,
+        "request_finished_ms_after_readiness": 1055.6345460000157,
+        "members": [
+          {
+            "pid": "15698",
+            "starttime_ticks": "47964",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "14",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "15707",
+            "starttime_ticks": "47970",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15739",
+            "starttime_ticks": "47980",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "151",
+            "system_cpu_ticks": "22"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.861134499980835,
+          "request_duration_ms": 47.721426999982214,
+          "cpu_usage_usec": 2057380,
+          "memory_current_bytes": 249896960,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.2894389999856,
+          "request_duration_ms": 47.84947000001557,
+          "cpu_usage_usec": 2057445,
+          "memory_current_bytes": 249896960,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1123.0803284999856,
+          "request_duration_ms": 52.483834999991814,
+          "cpu_usage_usec": 2217884,
+          "memory_current_bytes": 249888768,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1675.756372999982,
+          "request_duration_ms": 53.49697400000878,
+          "cpu_usage_usec": 2564512,
+          "memory_current_bytes": 249757696,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2228.9002760000003,
+          "request_duration_ms": 51.99377999998978,
+          "cpu_usage_usec": 2910819,
+          "memory_current_bytes": 249749504,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2782.944690000004,
+          "request_duration_ms": 54.33440800002427,
+          "cpu_usage_usec": 3259789,
+          "memory_current_bytes": 249405440,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3337.2745334999927,
+          "request_duration_ms": 53.83122900000308,
+          "cpu_usage_usec": 3616699,
+          "memory_current_bytes": 249610240,
+          "memory_peak_bytes": 256868352,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.6408260000171,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4419.837123000005,
+        "request_finished_ms_after_readiness": 4480.620595999993,
+        "members": [
+          {
+            "pid": "15698",
+            "starttime_ticks": "47964",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "18",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "15707",
+            "starttime_ticks": "47970",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "15739",
+            "starttime_ticks": "47980",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "284",
+            "system_cpu_ticks": "41"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3313.413399000012,
+        "cpu_usage_delta_usec": 1559319,
+        "cpu_percent_of_one_core": 47.06080444023684,
+        "final_memory_peak_bytes": 256868352
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3422.013851999989,
+        "matched": [
+          {
+            "pid": "15698",
+            "starttime_ticks": "47964",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 4,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 60,
+            "cpu_percent_of_one_core": 1.7533535103878413
+          },
+          {
+            "pid": "15707",
+            "starttime_ticks": "47970",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15739",
+            "starttime_ticks": "47980",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 133,
+            "system_cpu_delta_ticks": 19,
+            "cpu_delta_ms": 1520,
+            "cpu_percent_of_one_core": 44.418288929825316
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15003.791683000018,
+          "request_finished_ms_after_readiness": 15058.824019000022,
+          "members": [
+            {
+              "pid": "15698",
+              "starttime_ticks": "47964",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "19",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "15707",
+              "starttime_ticks": "47970",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15739",
+              "starttime_ticks": "47980",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "309",
+              "system_cpu_ticks": "43"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.85601050002151,
+            "request_duration_ms": 47.71107900000061,
+            "cpu_usage_usec": 3946174,
+            "memory_current_bytes": 242520064,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.4406299999973,
+            "request_duration_ms": 48.183914000022924,
+            "cpu_usage_usec": 3946340,
+            "memory_current_bytes": 242520064,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1121.502372499992,
+            "request_duration_ms": 48.68557100000908,
+            "cpu_usage_usec": 3946431,
+            "memory_current_bytes": 242520064,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.0359670000325,
+            "request_duration_ms": 47.614933999982895,
+            "cpu_usage_usec": 3946506,
+            "memory_current_bytes": 242520064,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2218.47557900002,
+            "request_duration_ms": 48.01135200000135,
+            "cpu_usage_usec": 3947101,
+            "memory_current_bytes": 242167808,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2767.1090080000286,
+            "request_duration_ms": 47.984201999992365,
+            "cpu_usage_usec": 3947168,
+            "memory_current_bytes": 242167808,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3316.065996499994,
+            "request_duration_ms": 48.65254100001766,
+            "cpu_usage_usec": 3947234,
+            "memory_current_bytes": 242167808,
+            "memory_peak_bytes": 256868352,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15058.832320999994,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18399.23556500001,
+          "request_finished_ms_after_readiness": 18454.346259000013,
+          "members": [
+            {
+              "pid": "15698",
+              "starttime_ticks": "47964",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "19",
+              "system_cpu_ticks": "10"
+            },
+            {
+              "pid": "15707",
+              "starttime_ticks": "47970",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "15739",
+              "starttime_ticks": "47980",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "309",
+              "system_cpu_ticks": "43"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3292.2099859999726,
+          "cpu_usage_delta_usec": 1060,
+          "cpu_percent_of_one_core": 0.03219721720387276,
+          "final_memory_peak_bytes": 256868352
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3395.4830609999917,
+          "matched": [
+            {
+              "pid": "15698",
+              "starttime_ticks": "47964",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15707",
+              "starttime_ticks": "47970",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15739",
+              "starttime_ticks": "47980",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "large",
+      "iteration": 4,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "d4139ddb39d88280598a589be2328c38",
+        "device": "31",
+        "inode": "8211"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 187.01629800000228,
+        "session_post_to_enabled_action_ms": 1155.6356800000067,
+        "open_click_to_visible_table_ms": 445.81468400001177,
+        "session_post_to_visible_table_ms": 1601.4579650000087
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1001.212761999981,
+        "request_finished_ms_after_readiness": 1057.0200599999807,
+        "members": [
+          {
+            "pid": "15838",
+            "starttime_ticks": "49991",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "45",
+            "system_cpu_ticks": "8"
+          },
+          {
+            "pid": "15847",
+            "starttime_ticks": "49997",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "15878",
+            "starttime_ticks": "50007",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "158",
+            "system_cpu_ticks": "23"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 24.631961000006413,
+          "request_duration_ms": 49.263200000015786,
+          "cpu_usage_usec": 2476579,
+          "memory_current_bytes": 286146560,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 574.0321154999838,
+          "request_duration_ms": 48.25665900000604,
+          "cpu_usage_usec": 2487503,
+          "memory_current_bytes": 286400512,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1125.365454999992,
+          "request_duration_ms": 53.63208800001303,
+          "cpu_usage_usec": 2617714,
+          "memory_current_bytes": 274747392,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1679.5022419999877,
+          "request_duration_ms": 55.305896000005305,
+          "cpu_usage_usec": 2968946,
+          "memory_current_bytes": 274735104,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2236.0580039999913,
+          "request_duration_ms": 57.0991240000003,
+          "cpu_usage_usec": 3299227,
+          "memory_current_bytes": 272605184,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2791.9566524999973,
+          "request_duration_ms": 54.09578900001361,
+          "cpu_usage_usec": 3639328,
+          "memory_current_bytes": 272105472,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3345.1050075000094,
+          "request_duration_ms": 52.95989299999201,
+          "cpu_usage_usec": 3975777,
+          "memory_current_bytes": 272101376,
+          "memory_peak_bytes": 298737664,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1057.0235249999969,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4428.614217999973,
+        "request_finished_ms_after_readiness": 4489.670042999991,
+        "members": [
+          {
+            "pid": "15838",
+            "starttime_ticks": "49991",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "50",
+            "system_cpu_ticks": "10"
+          },
+          {
+            "pid": "15847",
+            "starttime_ticks": "49997",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "15878",
+            "starttime_ticks": "50007",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "285",
+            "system_cpu_ticks": "42"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3320.473046500003,
+        "cpu_usage_delta_usec": 1499198,
+        "cpu_percent_of_one_core": 45.15013309866356,
+        "final_memory_peak_bytes": 298737664
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3430.0257195000013,
+        "matched": [
+          {
+            "pid": "15838",
+            "starttime_ticks": "49991",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 70,
+            "cpu_percent_of_one_core": 2.0408010237953547
+          },
+          {
+            "pid": "15847",
+            "starttime_ticks": "49997",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15878",
+            "starttime_ticks": "50007",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 127,
+            "system_cpu_delta_ticks": 19,
+            "cpu_delta_ms": 1460,
+            "cpu_percent_of_one_core": 42.56527849630311
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15011.443224999995,
+          "request_finished_ms_after_readiness": 15065.715637999994,
+          "members": [
+            {
+              "pid": "15838",
+              "starttime_ticks": "49991",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "51",
+              "system_cpu_ticks": "11"
+            },
+            {
+              "pid": "15847",
+              "starttime_ticks": "49997",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "15878",
+              "starttime_ticks": "50007",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "310",
+              "system_cpu_ticks": "44"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.260465500003193,
+            "request_duration_ms": 48.51986900001066,
+            "cpu_usage_usec": 4303206,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.0016159999941,
+            "request_duration_ms": 47.80350600002566,
+            "cpu_usage_usec": 4303271,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1121.3466604999849,
+            "request_duration_ms": 47.68692099998589,
+            "cpu_usage_usec": 4303382,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1669.7004899999883,
+            "request_duration_ms": 47.759439999994356,
+            "cpu_usage_usec": 4303447,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2218.30143349999,
+            "request_duration_ms": 48.1608750000014,
+            "cpu_usage_usec": 4303525,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2767.386264999979,
+            "request_duration_ms": 48.76080999997794,
+            "cpu_usage_usec": 4303606,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3316.7676590000046,
+            "request_duration_ms": 48.75117600001977,
+            "cpu_usage_usec": 4303683,
+            "memory_current_bytes": 264601600,
+            "memory_peak_bytes": 298737664,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15065.718962999992,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18406.867218,
+          "request_finished_ms_after_readiness": 18460.789345999976,
+          "members": [
+            {
+              "pid": "15838",
+              "starttime_ticks": "49991",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "51",
+              "system_cpu_ticks": "11"
+            },
+            {
+              "pid": "15847",
+              "starttime_ticks": "49997",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "15878",
+              "starttime_ticks": "50007",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "310",
+              "system_cpu_ticks": "44"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3292.5071935000014,
+          "cpu_usage_delta_usec": 477,
+          "cpu_percent_of_one_core": 0.014487439873834851,
+          "final_memory_peak_bytes": 298737664
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3395.248850499993,
+          "matched": [
+            {
+              "pid": "15838",
+              "starttime_ticks": "49991",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15847",
+              "starttime_ticks": "49997",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15878",
+              "starttime_ticks": "50007",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "empty",
+      "iteration": 5,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "4fd951588f1b951efab0aaf885d27a8c",
+        "device": "31",
+        "inode": "8273"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 196.56865600001765,
+        "session_post_to_enabled_action_ms": 1031.4470730000176
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.5914679999987,
+        "request_finished_ms_after_readiness": 1055.258633999998,
+        "members": [
+          {
+            "pid": "15981",
+            "starttime_ticks": "52049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "15990",
+            "starttime_ticks": "52055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "16021",
+            "starttime_ticks": "52067",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "96",
+            "system_cpu_ticks": "16"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.59346750000259,
+          "request_duration_ms": 47.186155000003055,
+          "cpu_usage_usec": 1457138,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 571.5925470000075,
+          "request_duration_ms": 47.53179600002477,
+          "cpu_usage_usec": 1457467,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1119.9424865000183,
+          "request_duration_ms": 47.81728699998348,
+          "cpu_usage_usec": 1457593,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1668.920486500021,
+          "request_duration_ms": 48.87220900002285,
+          "cpu_usage_usec": 1457714,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2217.956418499991,
+          "request_duration_ms": 47.780128999991575,
+          "cpu_usage_usec": 1457873,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2765.955788000021,
+          "request_duration_ms": 47.7661880000087,
+          "cpu_usage_usec": 1457952,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3314.3740824999986,
+          "request_duration_ms": 48.38751100000809,
+          "cpu_usage_usec": 1459008,
+          "memory_current_bytes": 219770880,
+          "memory_peak_bytes": 220696576,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.2636119999806,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4393.836216999975,
+        "request_finished_ms_after_readiness": 4447.995345000003,
+        "members": [
+          {
+            "pid": "15981",
+            "starttime_ticks": "52049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "13",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "15990",
+            "starttime_ticks": "52055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "16021",
+            "starttime_ticks": "52067",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "96",
+            "system_cpu_ticks": "16"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3290.780614999996,
+        "cpu_usage_delta_usec": 1870,
+        "cpu_percent_of_one_core": 0.05682542286399126,
+        "final_memory_peak_bytes": 220696576
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3392.9907299999904,
+        "matched": [
+          {
+            "pid": "15981",
+            "starttime_ticks": "52049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "15990",
+            "starttime_ticks": "52055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "16021",
+            "starttime_ticks": "52067",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15010.417784999998,
+          "request_finished_ms_after_readiness": 15064.998475999979,
+          "members": [
+            {
+              "pid": "15981",
+              "starttime_ticks": "52049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "15990",
+              "starttime_ticks": "52055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "16021",
+              "starttime_ticks": "52067",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "97",
+              "system_cpu_ticks": "16"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.55673799998476,
+            "request_duration_ms": 47.11277400000836,
+            "cpu_usage_usec": 1472746,
+            "memory_current_bytes": 215875584,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 571.1012664999871,
+            "request_duration_ms": 47.615403000003425,
+            "cpu_usage_usec": 1472907,
+            "memory_current_bytes": 215875584,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1119.2703579999798,
+            "request_duration_ms": 47.5124379999761,
+            "cpu_usage_usec": 1472975,
+            "memory_current_bytes": 215875584,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1667.773589999997,
+            "request_duration_ms": 48.168628000013996,
+            "cpu_usage_usec": 1473092,
+            "memory_current_bytes": 215875584,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2216.5459575000277,
+            "request_duration_ms": 48.11376499995822,
+            "cpu_usage_usec": 1473688,
+            "memory_current_bytes": 215789568,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2764.057627000002,
+            "request_duration_ms": 47.618347999989055,
+            "cpu_usage_usec": 1473759,
+            "memory_current_bytes": 215789568,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3312.340420499997,
+            "request_duration_ms": 47.69988099997863,
+            "cpu_usage_usec": 1473825,
+            "memory_current_bytes": 215789568,
+            "memory_peak_bytes": 220696576,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15065.002020999993,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18401.197339000006,
+          "request_finished_ms_after_readiness": 18455.55879899999,
+          "members": [
+            {
+              "pid": "15981",
+              "starttime_ticks": "52049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "13",
+              "system_cpu_ticks": "7"
+            },
+            {
+              "pid": "15990",
+              "starttime_ticks": "52055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "16021",
+              "starttime_ticks": "52067",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "97",
+              "system_cpu_ticks": "16"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3288.783682500012,
+          "cpu_usage_delta_usec": 1079,
+          "cpu_percent_of_one_core": 0.032808481924228715,
+          "final_memory_peak_bytes": 220696576
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3390.66993850001,
+          "matched": [
+            {
+              "pid": "15981",
+              "starttime_ticks": "52049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "15990",
+              "starttime_ticks": "52055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "16021",
+              "starttime_ticks": "52067",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "small",
+      "iteration": 5,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "89a50e8de1251f75c9174e78f4c21534",
+        "device": "31",
+        "inode": "8335"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 186.59253099997295,
+        "session_post_to_enabled_action_ms": 1127.1424889999907,
+        "open_click_to_visible_table_ms": 169.8218619999825,
+        "session_post_to_visible_table_ms": 1296.9675059999572
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.5752199999988,
+        "request_finished_ms_after_readiness": 1055.1233130000182,
+        "members": [
+          {
+            "pid": "16114",
+            "starttime_ticks": "54049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "14",
+            "system_cpu_ticks": "7"
+          },
+          {
+            "pid": "16123",
+            "starttime_ticks": "54055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "16154",
+            "starttime_ticks": "54066",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "156",
+            "system_cpu_ticks": "18"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 24.077345499943476,
+          "request_duration_ms": 48.1536709999782,
+          "cpu_usage_usec": 2078862,
+          "memory_current_bytes": 251146240,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 572.6224634999526,
+          "request_duration_ms": 47.65412699995795,
+          "cpu_usage_usec": 2079007,
+          "memory_current_bytes": 251146240,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1124.0195909999893,
+          "request_duration_ms": 54.64802399999462,
+          "cpu_usage_usec": 2236599,
+          "memory_current_bytes": 251330560,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1677.7936769999797,
+          "request_duration_ms": 53.5107480000006,
+          "cpu_usage_usec": 2580634,
+          "memory_current_bytes": 251293696,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2232.032701999997,
+          "request_duration_ms": 53.702422000002116,
+          "cpu_usage_usec": 2917171,
+          "memory_current_bytes": 251289600,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2785.2688779999735,
+          "request_duration_ms": 53.160117999999784,
+          "cpu_usage_usec": 3267727,
+          "memory_current_bytes": 249462784,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3338.403980000003,
+          "request_duration_ms": 52.59820000000764,
+          "cpu_usage_usec": 3609076,
+          "memory_current_bytes": 249454592,
+          "memory_peak_bytes": 256659456,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.1280310000293,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4419.836769999994,
+        "request_finished_ms_after_readiness": 4482.336827000021,
+        "members": [
+          {
+            "pid": "16114",
+            "starttime_ticks": "54049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "17",
+            "system_cpu_ticks": "10"
+          },
+          {
+            "pid": "16123",
+            "starttime_ticks": "54055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "16154",
+            "starttime_ticks": "54066",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "289",
+            "system_cpu_ticks": "35"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3314.3266345000593,
+        "cpu_usage_delta_usec": 1530214,
+        "cpu_percent_of_one_core": 46.16967996067235,
+        "final_memory_peak_bytes": 256659456
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3423.237531999999,
+        "matched": [
+          {
+            "pid": "16114",
+            "starttime_ticks": "54049",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 3,
+            "system_cpu_delta_ticks": 3,
+            "cpu_delta_ms": 60,
+            "cpu_percent_of_one_core": 1.7527267517701433
+          },
+          {
+            "pid": "16123",
+            "starttime_ticks": "54055",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 0,
+            "cpu_delta_ms": 0,
+            "cpu_percent_of_one_core": 0
+          },
+          {
+            "pid": "16154",
+            "starttime_ticks": "54066",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 133,
+            "system_cpu_delta_ticks": 17,
+            "cpu_delta_ms": 1500,
+            "cpu_percent_of_one_core": 43.81816879425357
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15002.842872000008,
+          "request_finished_ms_after_readiness": 15057.24529500003,
+          "members": [
+            {
+              "pid": "16114",
+              "starttime_ticks": "54049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "18",
+              "system_cpu_ticks": "11"
+            },
+            {
+              "pid": "16123",
+              "starttime_ticks": "54055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "16154",
+              "starttime_ticks": "54066",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "315",
+              "system_cpu_ticks": "37"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 23.68452549999347,
+            "request_duration_ms": 47.368170999980066,
+            "cpu_usage_usec": 3941128,
+            "memory_current_bytes": 242044928,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 572.3559475000366,
+            "request_duration_ms": 48.69554899999639,
+            "cpu_usage_usec": 3941198,
+            "memory_current_bytes": 242044928,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1121.537502500054,
+            "request_duration_ms": 48.40544299996691,
+            "cpu_usage_usec": 3941265,
+            "memory_current_bytes": 242044928,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1670.4102980000316,
+            "request_duration_ms": 48.08786400000099,
+            "cpu_usage_usec": 3941343,
+            "memory_current_bytes": 242044928,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2219.476849000028,
+            "request_duration_ms": 48.57420600001933,
+            "cpu_usage_usec": 3941897,
+            "memory_current_bytes": 241958912,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2768.152262000018,
+            "request_duration_ms": 47.513720000046305,
+            "cpu_usage_usec": 3941962,
+            "memory_current_bytes": 241958912,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3317.8001234999974,
+            "request_duration_ms": 50.45721099997172,
+            "cpu_usage_usec": 3942029,
+            "memory_current_bytes": 241958912,
+            "memory_peak_bytes": 256659456,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15057.249481000006,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18400.284189000027,
+          "request_finished_ms_after_readiness": 18454.781660000037,
+          "members": [
+            {
+              "pid": "16114",
+              "starttime_ticks": "54049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "18",
+              "system_cpu_ticks": "11"
+            },
+            {
+              "pid": "16123",
+              "starttime_ticks": "54055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "1"
+            },
+            {
+              "pid": "16154",
+              "starttime_ticks": "54066",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "315",
+              "system_cpu_ticks": "37"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3294.115598000004,
+          "cpu_usage_delta_usec": 901,
+          "cpu_percent_of_one_core": 0.027351802728083827,
+          "final_memory_peak_bytes": 256659456
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3397.488841000013,
+          "matched": [
+            {
+              "pid": "16114",
+              "starttime_ticks": "54049",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "16123",
+              "starttime_ticks": "54055",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "16154",
+              "starttime_ticks": "54066",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    },
+    {
+      "scenario": "large",
+      "iteration": 5,
+      "status": "passed",
+      "failures": [],
+      "empty_before_session_delete": true,
+      "leaf": {
+        "token": "192ff1937b75b53f15bd620cc1eeed2f",
+        "device": "31",
+        "inode": "8397"
+      },
+      "baseline": {
+        "cpu_usage_usec": 0,
+        "memory_current_bytes": 0,
+        "memory_peak_bytes": 0,
+        "populated": false
+      },
+      "timing": {
+        "session_post_to_created_ms": 179.58992999995826,
+        "session_post_to_enabled_action_ms": 1119.9924619999947,
+        "open_click_to_visible_table_ms": 497.1273360000341,
+        "session_post_to_visible_table_ms": 1617.1225519999862
+      },
+      "webdriver_browser": {
+        "name": "wry",
+        "version": "0.57.2"
+      },
+      "members_at_start": {
+        "request_started_ms_after_readiness": 1000.6142639999744,
+        "request_finished_ms_after_readiness": 1055.3512730000075,
+        "members": [
+          {
+            "pid": "16254",
+            "starttime_ticks": "56076",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "46",
+            "system_cpu_ticks": "9"
+          },
+          {
+            "pid": "16263",
+            "starttime_ticks": "56081",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "1"
+          },
+          {
+            "pid": "16294",
+            "starttime_ticks": "56092",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "158",
+            "system_cpu_ticks": "23"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "request_midpoint_ms": 23.63375699997414,
+          "request_duration_ms": 47.2667519999668,
+          "cpu_usage_usec": 2493896,
+          "memory_current_bytes": 285507584,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 571.2577429999947,
+          "request_duration_ms": 47.56006599997636,
+          "cpu_usage_usec": 2504552,
+          "memory_current_bytes": 285769728,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1122.1585069999564,
+          "request_duration_ms": 53.3943459999864,
+          "cpu_usage_usec": 2666373,
+          "memory_current_bytes": 275419136,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 1675.867279500002,
+          "request_duration_ms": 52.8095869999961,
+          "cpu_usage_usec": 2992734,
+          "memory_current_bytes": 275402752,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2227.811944999965,
+          "request_duration_ms": 51.96340999996755,
+          "cpu_usage_usec": 3310083,
+          "memory_current_bytes": 274120704,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 2781.0206444999785,
+          "request_duration_ms": 53.834284999989904,
+          "cpu_usage_usec": 3647098,
+          "memory_current_bytes": 273899520,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        },
+        {
+          "request_midpoint_ms": 3336.58823449997,
+          "request_duration_ms": 53.53397099999711,
+          "cpu_usage_usec": 3983438,
+          "memory_current_bytes": 273879040,
+          "memory_peak_bytes": 298418176,
+          "populated": true
+        }
+      ],
+      "samples_started_ms_after_readiness": 1055.3548280000105,
+      "members_at_end": {
+        "request_started_ms_after_readiness": 4418.716507999983,
+        "request_finished_ms_after_readiness": 4478.345146999985,
+        "members": [
+          {
+            "pid": "16254",
+            "starttime_ticks": "56076",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "51",
+            "system_cpu_ticks": "11"
+          },
+          {
+            "pid": "16263",
+            "starttime_ticks": "56081",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "2",
+            "system_cpu_ticks": "2"
+          },
+          {
+            "pid": "16294",
+            "starttime_ticks": "56092",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_ticks": "286",
+            "system_cpu_ticks": "41"
+          }
+        ]
+      },
+      "idle": {
+        "sample_midpoint_span_ms": 3312.954477499996,
+        "cpu_usage_delta_usec": 1489542,
+        "cpu_percent_of_one_core": 44.96113695845378,
+        "final_memory_peak_bytes": 298418176
+      },
+      "attribution": {
+        "status": "matched_endpoints",
+        "membership_midpoint_span_ms": 3420.5480589999934,
+        "matched": [
+          {
+            "pid": "16254",
+            "starttime_ticks": "56076",
+            "executable": "/usr/bin/starbank-desktop",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 5,
+            "system_cpu_delta_ticks": 2,
+            "cpu_delta_ms": 70,
+            "cpu_percent_of_one_core": 2.0464556788149526
+          },
+          {
+            "pid": "16263",
+            "starttime_ticks": "56081",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 0,
+            "system_cpu_delta_ticks": 1,
+            "cpu_delta_ms": 10,
+            "cpu_percent_of_one_core": 0.2923508112592789
+          },
+          {
+            "pid": "16294",
+            "starttime_ticks": "56092",
+            "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+            "effective_uid": "1001",
+            "user_cpu_delta_ticks": 128,
+            "system_cpu_delta_ticks": 18,
+            "cpu_delta_ms": 1460,
+            "cpu_percent_of_one_core": 42.68321844385473
+          }
+        ],
+        "start_only": [],
+        "end_only": []
+      },
+      "late": {
+        "members_at_start": {
+          "request_started_ms_after_readiness": 15011.735869999975,
+          "request_finished_ms_after_readiness": 15067.002434999973,
+          "members": [
+            {
+              "pid": "16254",
+              "starttime_ticks": "56076",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "52",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "16263",
+              "starttime_ticks": "56081",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "16294",
+              "starttime_ticks": "56092",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "309",
+              "system_cpu_ticks": "43"
+            }
+          ]
+        },
+        "samples": [
+          {
+            "request_midpoint_ms": 24.273365500033833,
+            "request_duration_ms": 48.54582900000969,
+            "cpu_usage_usec": 4292999,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 573.7587204999872,
+            "request_duration_ms": 49.18134899996221,
+            "cpu_usage_usec": 4293123,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1123.5201520000119,
+            "request_duration_ms": 49.06088800000725,
+            "cpu_usage_usec": 4293191,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 1673.7640624999767,
+            "request_duration_ms": 50.12347099999897,
+            "cpu_usage_usec": 4293258,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2224.007886999985,
+            "request_duration_ms": 49.14396400004625,
+            "cpu_usage_usec": 4293336,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 2773.5397179999854,
+            "request_duration_ms": 48.65573400002904,
+            "cpu_usage_usec": 4293391,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          },
+          {
+            "request_midpoint_ms": 3322.8500589999603,
+            "request_duration_ms": 48.6824220000417,
+            "cpu_usage_usec": 4293458,
+            "memory_current_bytes": 266092544,
+            "memory_peak_bytes": 298418176,
+            "populated": true
+          }
+        ],
+        "samples_started_ms_after_readiness": 15067.005359000002,
+        "members_at_end": {
+          "request_started_ms_after_readiness": 18414.202657999995,
+          "request_finished_ms_after_readiness": 18469.298236000002,
+          "members": [
+            {
+              "pid": "16254",
+              "starttime_ticks": "56076",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "52",
+              "system_cpu_ticks": "12"
+            },
+            {
+              "pid": "16263",
+              "starttime_ticks": "56081",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "2",
+              "system_cpu_ticks": "2"
+            },
+            {
+              "pid": "16294",
+              "starttime_ticks": "56092",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_ticks": "309",
+              "system_cpu_ticks": "43"
+            }
+          ]
+        },
+        "idle": {
+          "sample_midpoint_span_ms": 3298.5766934999265,
+          "cpu_usage_delta_usec": 459,
+          "cpu_percent_of_one_core": 0.013915092558086983,
+          "final_memory_peak_bytes": 298418176
+        },
+        "attribution": {
+          "status": "matched_endpoints",
+          "membership_midpoint_span_ms": 3402.3812945000245,
+          "matched": [
+            {
+              "pid": "16254",
+              "starttime_ticks": "56076",
+              "executable": "/usr/bin/starbank-desktop",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "16263",
+              "starttime_ticks": "56081",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            },
+            {
+              "pid": "16294",
+              "starttime_ticks": "56092",
+              "executable": "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess",
+              "effective_uid": "1001",
+              "user_cpu_delta_ticks": 0,
+              "system_cpu_delta_ticks": 0,
+              "cpu_delta_ms": 0,
+              "cpu_percent_of_one_core": 0
+            }
+          ],
+          "start_only": [],
+          "end_only": []
+        }
+      },
+      "source_bytes_unchanged": true,
+      "leaf_removed": true
+    }
+  ],
+  "environment": {
+    "revision": "6c68a337d3ccf9e4aec4d7d88c5aee009238ad16",
+    "run_id": "46110611436",
+    "run_attempt": "1",
+    "kernel": "7.0.0-1020-azure",
+    "architecture": "x64",
+    "node": "v24.22.3",
+    "process_clock_ticks_per_second": 100,
+    "available_cpu_count": 4,
+    "physical_memory_bytes": 16760320000,
+    "executable_bytes": 239015408,
+    "executable_sha256": "db53b220fcb6e23dcfeb947920099bf37b1c98a616d728110844dff95bd50cda",
+    "launcher_sha256": "80b9acadb3811a28cdb4b6fe6bce5f4b9c36cf8fc5cd0f092718ee288f8a8459",
+    "cgroup_helper_sha256": "f042f415539b61120b6337232f5124193a8f54b5a3fcb221c34e89f5d5745e1c",
+    "installed_packages": [
+      ["libwebkit2gtk-4.1-0", "2.52.6-0ubuntu0.24.04.2", "amd64"],
+      ["starbank-reloaded", "0.1.0", "amd64"],
+      ["webkit2gtk-driver", "2.52.6-0ubuntu0.24.04.2", "amd64"]
+    ]
+  },
+  "fixtures": [
+    {
+      "scenario": "empty",
+      "values": 0,
+      "file_bytes": 0,
+      "sha256": null
+    },
+    {
+      "scenario": "small",
+      "values": 32,
+      "file_bytes": 1557,
+      "sha256": "c23dd696f7f18452d5e3402d5b6cdac811ade000e5d8c670247f10452d00fad4"
+    },
+    {
+      "scenario": "large",
+      "values": 10000,
+      "file_bytes": 488953,
+      "sha256": "897d985ef2d9c9bc79b122ad9ca5d8fee956e4f2c6cbccaa7fa9956c05041f91"
+    }
+  ],
+  "finished_at": "2026-11-28T05:16:10.701Z"
+}
