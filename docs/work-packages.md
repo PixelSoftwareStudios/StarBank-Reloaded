@@ -129,6 +129,7 @@ Depends on: 05,06,07,10,11.
 - [x] Implement controlled Table and CodeMirror Raw views, same-value bulk editing, draft safeguards and callback-driven file actions.
 - [x] Bind live Table, Raw, and Simple View and qualify the supported local save, backup and restore flows with synthetic banks. [Implementation evidence](verification/IMPLEMENTATION.md)
 - [x] Preserve numeric pointer selections when entering exact values and provide bounded, advisory Raw syntax hints. Verify both in all three headless browser engines. [Editor evidence](verification/IMPLEMENTATION.md#req-ui-06-editor-input-follow-ups)
+- [x] Verify installed Linux Raw keyboard editing, native rejection, repair, Apply and Undo while preserving queued files and source bytes. [Raw evidence](verification/IMPLEMENTATION.md#installed-linux-raw-editing)
 - [x] Verify installed Linux unapplied-draft close protection, cancelled/verified Save As on close and independent exact X11 clipboard readback under Xvfb. [Native evidence](verification/IMPLEMENTATION.md#native-unsaved-dialog-response-compatibility)
 - [ ] Complete the installed native platform and assistive technology matrix. Keep writes scoped to qualified storage.
 - [ ] Complete installed native and assistive-technology acceptance for REQ-UI-05, REQ-UI-06, REQ-UI-07 and REQ-UI-08.
