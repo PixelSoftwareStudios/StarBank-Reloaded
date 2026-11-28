@@ -10,6 +10,7 @@ const exportTitle = "Export bank copy";
 const saveAsTitle = "Save Bank As";
 const dirtyOpenTitle = "Save changes before opening another bank?";
 const dirtyCloseTitle = "Save changes before closing?";
+const draftCloseTitle = "Discard changes and close?";
 const mainWindowTitle = "StarBank Reloaded";
 const dialogTimeout = 10_000;
 const commandTimeout = 3_000;
@@ -132,5 +133,26 @@ export function cancelGtkDirtyClose() {
 
 export async function discardGtkDirtyClose() {
   await respondToGtkPrompt(dirtyCloseTitle, "Tab", "space");
+  await waitForWindowGone(mainWindowTitle);
+}
+
+export function cancelGtkDraftClose() {
+  return respondToGtkPrompt(draftCloseTitle, "Escape");
+}
+
+export async function discardGtkDraftClose() {
+  // GTK 3.24.41's stock OK/Cancel dialog uses _OK in the fixture's C.UTF-8 locale.
+  await respondToGtkPrompt(draftCloseTitle, "alt+o");
+  await waitForWindowGone(mainWindowTitle);
+}
+
+export async function cancelGtkSaveAsOnClose() {
+  await respondToGtkPrompt(dirtyCloseTitle, "space");
+  await respondToGtkPrompt(saveAsTitle, "Escape");
+}
+
+export async function saveGtkDirtyCloseAs(destination) {
+  await respondToGtkPrompt(dirtyCloseTitle, "space");
+  await chooseGtkDestination(saveAsTitle, destination);
   await waitForWindowGone(mainWindowTitle);
 }

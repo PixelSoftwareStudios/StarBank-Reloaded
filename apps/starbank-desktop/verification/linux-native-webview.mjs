@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,10 +15,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   cancelGtkDirtyClose,
   cancelGtkDirtyOpen,
+  cancelGtkDraftClose,
+  cancelGtkSaveAsOnClose,
   chooseGtkExportDestination,
   discardGtkDirtyClose,
   discardGtkDirtyOpen,
+  discardGtkDraftClose,
   requestGtkWindowClose,
+  saveGtkDirtyCloseAs,
   saveGtkDirtyOpenAs,
 } from "./linux-gtk-dialog.mjs";
 
@@ -187,18 +198,7 @@ const clipboardStatus = "Copied bank XML.";
 const clipboardDialogTitle = "Copy bank XML";
 const preparedXmlField = 'textarea[aria-label="Prepared bank XML"]';
 
-async function verifyEditor(
-  command,
-  {
-    first,
-    second,
-    third,
-    assertInputsUnchanged,
-    exportCopy,
-    saveCopy,
-    closeSender,
-  },
-) {
+function editorControls(command) {
   const evaluate = (script, ...args) =>
     command("/execute/sync", "POST", { script, args });
   const content = (selector) =>
@@ -248,6 +248,146 @@ async function verifyEditor(
   const clickButton = (name) => click("button", name);
   const clickTab = (name) => click('button[role="tab"]', name);
   const queuedName = (name) => content(`${queue} p[title="${name}"]`);
+  async function stageGold(value, { hasQueuedOpen = true } = {}) {
+    const field = await control(gold, null);
+    await command(`/element/${field}/click`, "POST", {});
+    await command("/actions", "POST", {
+      actions: [
+        {
+          type: "key",
+          id: "table-keyboard",
+          actions: [
+            { type: "keyDown", value: controlKey },
+            { type: "keyDown", value: "a" },
+            { type: "keyUp", value: "a" },
+            { type: "keyUp", value: controlKey },
+            { type: "keyDown", value: backspaceKey },
+            { type: "keyUp", value: backspaceKey },
+          ],
+        },
+      ],
+    });
+    await waitFor("the focused Table draft to be cleared", () =>
+      evaluate(
+        `const field = document.querySelector(arguments[0]);
+        return document.activeElement === field && field?.value === "" &&
+          field.hasAttribute("data-table-draft");`,
+        gold,
+      ),
+    );
+    await command(`/element/${field}/value`, "POST", { text: value });
+    await waitFor("a staged Table edit with guarded navigation", () =>
+      evaluate(
+        `const [queue, gold, value, hasQueuedOpen] = arguments;
+        const open = Array.from(document.querySelectorAll(queue + " button"))
+          .find((button) => button.textContent.trim() === "Open");
+        const field = document.querySelector(gold);
+        const navigationGuarded = hasQueuedOpen ? open?.disabled === true : open === undefined;
+        return navigationGuarded && field?.value === value &&
+          field.hasAttribute("data-table-draft");`,
+        queue,
+        gold,
+        value,
+        hasQueuedOpen,
+      ),
+    );
+  }
+
+  async function applyGold() {
+    await clickButton("Apply edits");
+    await waitFor(
+      "the accepted, dirty edit",
+      async () =>
+        (await content(".editor-draft-actions")) === null &&
+        (await content(".editor-dirty-status")) === dirtyStatus,
+    );
+  }
+
+  async function openInitialBank(name, value, additionalRequests = 0) {
+    await waitFor(
+      "the packaged welcome screen",
+      async () => (await content(".editor-welcome h1")) === "StarBank Reloaded",
+    );
+    const location = new URL(await command("/url"));
+    assert.equal(location.protocol, "tauri:");
+    assert.equal(location.host, "localhost");
+    const label = additionalRequests
+      ? `${name} (${additionalRequests} more)`
+      : name;
+    await waitFor(
+      "the initial queued bank",
+      async () => (await queuedName(name)) === label,
+    );
+    await click(`${queue} button`, "Open");
+    await waitFor(
+      "the initial native Table projection",
+      async () =>
+        (await content(".document-editor h1")) === name &&
+        (await tableValue()) === value,
+    );
+  }
+
+  async function disableAutoResign() {
+    await click('button[aria-label="Settings"]', null);
+    await waitFor(
+      "the enabled auto re-sign setting with its default value",
+      () => findControl(settingsCheckbox, autoResignLabel, true),
+    );
+    await click(settingsCheckbox, autoResignLabel);
+    await waitFor("the confirmed unchecked auto re-sign setting", () =>
+      findControl(settingsCheckbox, autoResignLabel, false),
+    );
+    await clickButton("Back to editor");
+  }
+
+  const hasHistory = () =>
+    evaluate(`return Array.from(document.querySelectorAll(".document-editor button"))
+      .some((button) => ["Undo", "Redo"].includes(button.textContent.trim()));`);
+
+  return {
+    evaluate,
+    content,
+    tableValue,
+    findControl,
+    click,
+    clickButton,
+    clickTab,
+    queuedName,
+    stageGold,
+    applyGold,
+    openInitialBank,
+    disableAutoResign,
+    hasHistory,
+  };
+}
+
+async function verifyEditor(
+  command,
+  {
+    first,
+    second,
+    third,
+    assertInputsUnchanged,
+    exportCopy,
+    saveCopy,
+    closeSender,
+  },
+) {
+  const {
+    evaluate,
+    content,
+    tableValue,
+    findControl,
+    click,
+    clickButton,
+    clickTab,
+    queuedName,
+    stageGold,
+    applyGold,
+    openInitialBank,
+    disableAutoResign,
+    hasHistory,
+  } = editorControls(command);
   const secondQueued = `${second} (1 more)`;
   const dirtyBankAndQueueRetained = async () =>
     (await content(".document-editor h1")) === first &&
@@ -322,79 +462,7 @@ async function verifyEditor(
     );
   }
 
-  async function stageGold(value, { hasQueuedOpen = true } = {}) {
-    const field = await control(gold, null);
-    await command(`/element/${field}/click`, "POST", {});
-    await command("/actions", "POST", {
-      actions: [
-        {
-          type: "key",
-          id: "table-keyboard",
-          actions: [
-            { type: "keyDown", value: controlKey },
-            { type: "keyDown", value: "a" },
-            { type: "keyUp", value: "a" },
-            { type: "keyUp", value: controlKey },
-            { type: "keyDown", value: backspaceKey },
-            { type: "keyUp", value: backspaceKey },
-          ],
-        },
-      ],
-    });
-    await waitFor("the focused Table draft to be cleared", () =>
-      evaluate(
-        `const field = document.querySelector(arguments[0]);
-        return document.activeElement === field && field?.value === "" &&
-          field.hasAttribute("data-table-draft");`,
-        gold,
-      ),
-    );
-    await command(`/element/${field}/value`, "POST", { text: value });
-    await waitFor("a staged Table edit with guarded navigation", () =>
-      evaluate(
-        `const [queue, gold, value, hasQueuedOpen] = arguments;
-        const open = Array.from(document.querySelectorAll(queue + " button"))
-          .find((button) => button.textContent.trim() === "Open");
-        const field = document.querySelector(gold);
-        const navigationGuarded = hasQueuedOpen ? open?.disabled === true : open === undefined;
-        return navigationGuarded && field?.value === value &&
-          field.hasAttribute("data-table-draft");`,
-        queue,
-        gold,
-        value,
-        hasQueuedOpen,
-      ),
-    );
-  }
-
-  async function applyGold() {
-    await clickButton("Apply edits");
-    await waitFor(
-      "the accepted, dirty edit",
-      async () =>
-        (await content(".editor-draft-actions")) === null &&
-        (await content(".editor-dirty-status")) === dirtyStatus,
-    );
-  }
-
-  await waitFor(
-    "the packaged welcome screen",
-    async () => (await content(".editor-welcome h1")) === "StarBank Reloaded",
-  );
-  const location = new URL(await command("/url"));
-  assert.equal(location.protocol, "tauri:");
-  assert.equal(location.host, "localhost");
-  await waitFor(
-    "three pending open requests",
-    async () => (await queuedName(first)) === `${first} (2 more)`,
-  );
-  await click(`${queue} button`, "Open");
-  await waitFor(
-    "the first native Table projection",
-    async () =>
-      (await content(".document-editor h1")) === first &&
-      (await tableValue()) === "001",
-  );
+  await openInitialBank(first, "001", 2);
   await waitFor(
     "the second queued bank before editing",
     async () =>
@@ -454,15 +522,7 @@ async function verifyEditor(
       (await queuedName(third)) === third,
   );
 
-  await click('button[aria-label="Settings"]', null);
-  await waitFor("the enabled auto re-sign setting with its default value", () =>
-    findControl(settingsCheckbox, autoResignLabel, true),
-  );
-  await click(settingsCheckbox, autoResignLabel);
-  await waitFor("the confirmed unchecked auto re-sign setting", () =>
-    findControl(settingsCheckbox, autoResignLabel, false),
-  );
-  await clickButton("Back to editor");
+  await disableAutoResign();
   await waitFor(
     "the second Table projection after Settings",
     async () =>
@@ -491,11 +551,7 @@ async function verifyEditor(
       (await content(".editor-dirty-status")) === null &&
       (await content(queue)) === null,
   );
-  assert.equal(
-    await evaluate(`return Array.from(document.querySelectorAll(".document-editor button"))
-    .some((button) => ["Undo", "Redo"].includes(button.textContent.trim()));`),
-    false,
-  );
+  assert.equal(await hasHistory(), false);
   await stageGold("3,456", { hasQueuedOpen: false });
   await applyGold();
   await clickTab("Raw View");
@@ -516,32 +572,139 @@ async function verifyEditor(
   await discardGtkDirtyClose();
 }
 
+async function verifyDraftClose(
+  command,
+  { name, closeSender, scratch, assertInputsUnchanged },
+) {
+  const {
+    clickButton,
+    content,
+    findControl,
+    hasHistory,
+    openInitialBank,
+    stageGold,
+    tableValue,
+  } = editorControls(command);
+  const cleanOpening = async () =>
+    (await content(".document-editor h1")) === name &&
+    (await content(".editor-dirty-status")) === null &&
+    !(await hasHistory());
+  const retainedDraft = async (value) =>
+    (await cleanOpening()) &&
+    (await tableValue()) === value &&
+    (await content(".editor-draft-actions [role=status]")) ===
+      "Unapplied Table View changes" &&
+    (await findControl("button", "Apply edits"));
+
+  await openInitialBank(name, "009");
+  assert(await cleanOpening());
+  await stageGold("4,567", { hasQueuedOpen: false });
+  await waitFor("the valid unapplied Table draft", () =>
+    retainedDraft("4,567"),
+  );
+  const mainWindow = await requestGtkWindowClose(closeSender);
+  await cancelGtkDraftClose();
+  await waitFor("the same usable Table draft after close Cancel", () =>
+    retainedDraft("4,567"),
+  );
+  await assertInputsUnchanged();
+
+  await clickButton("Discard draft");
+  await waitFor(
+    "the unchanged canonical Table value after dropping the draft",
+    async () =>
+      (await cleanOpening()) &&
+      (await tableValue()) === "009" &&
+      (await content(".editor-draft-actions")) === null,
+  );
+  await stageGold("5,678", { hasQueuedOpen: false });
+  await waitFor("the second valid unapplied Table draft", () =>
+    retainedDraft("5,678"),
+  );
+  await requestGtkWindowClose(closeSender, mainWindow);
+  await discardGtkDraftClose();
+  assert.deepEqual(
+    (await readdir(scratch)).filter((entry) => /\.sc2bank$/i.test(entry)),
+    [name],
+  );
+}
+
+async function verifySaveAsOnClose(
+  command,
+  { name, closeSender, scratch, assertInputsUnchanged },
+) {
+  const {
+    applyGold,
+    clickTab,
+    content,
+    disableAutoResign,
+    findControl,
+    openInitialBank,
+    stageGold,
+    tableValue,
+  } = editorControls(command);
+  const destination = join(scratch, "Close Saved.sc2bank");
+  const retainedDirtyBank = async () =>
+    (await content(".document-editor h1")) === name &&
+    (await content(".editor-dirty-status")) === dirtyStatus &&
+    (await content(xml))?.includes('int="6789"') &&
+    (await findControl("button", "Undo"));
+
+  await openInitialBank(name, "010");
+  await disableAutoResign();
+  await waitFor(
+    "the opening Table value after Settings",
+    async () =>
+      (await content(".document-editor h1")) === name &&
+      (await tableValue()) === "010",
+  );
+  await stageGold("6,789", { hasQueuedOpen: false });
+  await applyGold();
+  await clickTab("Raw View");
+  await waitFor(
+    "the dirty Raw projection before close Save As",
+    retainedDirtyBank,
+  );
+  const mainWindow = await requestGtkWindowClose(closeSender);
+  await cancelGtkSaveAsOnClose();
+  await waitFor(
+    "the same usable dirty bank after Save As chooser Cancel",
+    retainedDirtyBank,
+  );
+  await assertInputsUnchanged();
+  await assert.rejects(readFile(destination), { code: "ENOENT" });
+
+  await requestGtkWindowClose(closeSender, mainWindow);
+  await saveGtkDirtyCloseAs(destination);
+  assert.deepEqual(await readFile(destination), bank("6789"));
+}
+
 function bank(value) {
   return Buffer.from(
     `<Bank version="1"><Section name="Player"><Key name="Gold"><Value int="${value}"/></Key></Section></Bank>`,
   );
 }
 
-async function run(application, closeSender) {
+async function withNativeSession(application, scenario, inputs, verify) {
   const scratch = await mkdtemp(join(tmpdir(), "starbank-linux-webview-"));
   let driver;
   let session;
   let verificationError;
+  async function assertInputsUnchanged() {
+    for (const [name, bytes] of inputs)
+      assert.deepEqual(await readFile(join(scratch, name)), bytes);
+  }
   try {
-    const environment = { ...process.env, GTK_USE_PORTAL: "0" };
+    const environment = {
+      ...process.env,
+      GTK_USE_PORTAL: "0",
+      LC_ALL: "C.UTF-8",
+    };
     for (const directory of ["CONFIG", "CACHE", "DATA"]) {
       const path = join(scratch, directory.toLowerCase());
       await mkdir(path);
       environment[`XDG_${directory}_HOME`] = path;
     }
-    const first = "First.SC2Bank";
-    const second = "Second.SC2Bank";
-    const third = "Third.SC2Bank";
-    const inputs = [
-      [first, bank("001")],
-      [second, bank("007")],
-      [third, bank("008")],
-    ];
     for (const [name, bytes] of inputs)
       await writeFile(join(scratch, name), bytes);
     driver = await startDriver(environment);
@@ -568,42 +731,14 @@ async function run(application, closeSender) {
     );
     session = `/session/${encodeURIComponent(sessionId)}`;
     console.log(
-      `Linux native WebView: ${capabilities.browserName} ${capabilities.browserVersion}`,
+      `Linux native WebView (${scenario}): ${capabilities.browserName} ${capabilities.browserVersion}`,
     );
-    const exportDestination = join(scratch, "Copy.sc2bank");
-    const saveDestination = join(scratch, "Saved.sc2bank");
-    const expectedExport = bank("1234");
-    async function assertInputsUnchanged() {
-      for (const [name, bytes] of inputs)
-        assert.deepEqual(await readFile(join(scratch, name)), bytes);
-    }
-    await verifyEditor(
+    await verify(
       (path, method, body) =>
         request(driver.origin, session + path, method, body),
-      {
-        first,
-        second,
-        third,
-        closeSender,
-        assertInputsUnchanged,
-        async exportCopy() {
-          await chooseGtkExportDestination(exportDestination);
-          await waitFor("the exported bank file", async () => {
-            try {
-              return (await readFile(exportDestination)).equals(expectedExport);
-            } catch (error) {
-              if (error.code === "ENOENT") return false;
-              throw error;
-            }
-          });
-          await assertInputsUnchanged();
-        },
-        saveCopy: () => saveGtkDirtyOpenAs(saveDestination),
-      },
+      { scratch, assertInputsUnchanged },
     );
     await assertInputsUnchanged();
-    assert.deepEqual(await readFile(exportDestination), expectedExport);
-    assert.deepEqual(await readFile(saveDestination), bank("2345"));
   } catch (error) {
     verificationError = error;
     if (driver && session) await reportFailureState(driver.origin, session);
@@ -626,11 +761,86 @@ async function run(application, closeSender) {
     const errors = verificationError
       ? [verificationError, ...cleanupErrors]
       : cleanupErrors;
-    throw new AggregateError(errors, "Linux native WebView cleanup failed.");
+    throw new AggregateError(
+      errors,
+      `Linux native WebView cleanup failed for ${scenario}.`,
+    );
   }
-  if (verificationError) throw verificationError;
+  if (verificationError) {
+    throw new Error(
+      `Linux native WebView verification failed for ${scenario}.`,
+      { cause: verificationError },
+    );
+  }
+}
+
+async function run(application, closeSender) {
+  const first = "First.SC2Bank";
+  const second = "Second.SC2Bank";
+  const third = "Third.SC2Bank";
+  const inputs = [
+    [first, bank("001")],
+    [second, bank("007")],
+    [third, bank("008")],
+  ];
+  await withNativeSession(
+    application,
+    "editing and navigation",
+    inputs,
+    async (command, { scratch, assertInputsUnchanged }) => {
+      const exportDestination = join(scratch, "Copy.sc2bank");
+      const saveDestination = join(scratch, "Saved.sc2bank");
+      const expectedExport = bank("1234");
+      await verifyEditor(command, {
+        first,
+        second,
+        third,
+        closeSender,
+        assertInputsUnchanged,
+        async exportCopy() {
+          await chooseGtkExportDestination(exportDestination);
+          await waitFor("the exported bank file", async () => {
+            try {
+              return (await readFile(exportDestination)).equals(expectedExport);
+            } catch (error) {
+              if (error.code === "ENOENT") return false;
+              throw error;
+            }
+          });
+          await assertInputsUnchanged();
+        },
+        saveCopy: () => saveGtkDirtyOpenAs(saveDestination),
+      });
+      assert.deepEqual(await readFile(exportDestination), expectedExport);
+      assert.deepEqual(await readFile(saveDestination), bank("2345"));
+    },
+  );
   console.log(
     "Linux native editing, Copy XML, GTK export, navigation Cancel/Discard/Save As, and window close Cancel/Discard passed.",
+  );
+
+  const draft = "Draft Close.SC2Bank";
+  await withNativeSession(
+    application,
+    "unapplied draft close",
+    [[draft, bank("009")]],
+    (command, context) =>
+      verifyDraftClose(command, { ...context, name: draft, closeSender }),
+  );
+  console.log(
+    "Linux native unapplied Table draft close Cancel and Discard passed.",
+  );
+
+  const save = "Save Close.SC2Bank";
+  await withNativeSession(
+    application,
+    "Save As on close",
+    [[save, bank("010")]],
+    (command, context) =>
+      verifySaveAsOnClose(command, { ...context, name: save, closeSender }),
+  );
+  console.log(
+    "Linux native Save As chooser Cancel and verified Save before close passed.",
   );
 }
 
