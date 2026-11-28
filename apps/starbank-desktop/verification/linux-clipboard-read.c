@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 // Only run on the fixture-owned Xvfb display after its synthetic Copy action.
@@ -23,6 +24,8 @@ enum {
 
 static const char CLIPBOARD_SELECTION[] = "CLIPBOARD";
 static const char UTF8_TARGET[] = "UTF8_STRING";
+static const char PLAIN_UTF8_TARGET[] = "text/plain;charset=utf-8";
+static const char PLAIN_UTF8_OPTION[] = "--plain-utf8";
 static const char RESULT_PROPERTY[] = "_STARBANK_CLIPBOARD_READ";
 static unsigned char x11_error_code;
 
@@ -73,7 +76,7 @@ static const char *wait_for_selection(
 				notification->target != target || notification->time != CurrentTime)
 				return "The clipboard selection reply did not match the request.";
 			if (notification->property == None)
-				return "The clipboard owner refused UTF8_STRING.";
+				return "The clipboard owner refused the requested text target.";
 			if (notification->property != property)
 				return "The clipboard owner returned an unexpected property.";
 			return NULL;
@@ -89,9 +92,12 @@ static const char *wait_for_selection(
 
 int main(int argc, char **argv)
 {
-	(void)argv;
-	if (argc != 1) {
-		fputs("The clipboard fixture reader accepts no arguments.\n", stderr);
+	const char *target_name = UTF8_TARGET;
+	if (argc == 2 && strcmp(argv[1], PLAIN_UTF8_OPTION) == 0) {
+		target_name = PLAIN_UTF8_TARGET;
+	} else if (argc != 1) {
+		fprintf(stderr, "The clipboard fixture reader accepts only the optional %s flag.\n",
+			PLAIN_UTF8_OPTION);
 		return EXIT_FAILURE;
 	}
 	const char *display_name = getenv("DISPLAY");
@@ -107,7 +113,7 @@ int main(int argc, char **argv)
 	XSetErrorHandler(record_x11_error);
 
 	const Atom selection = XInternAtom(display, CLIPBOARD_SELECTION, True);
-	const Atom target = XInternAtom(display, UTF8_TARGET, True);
+	const Atom target = XInternAtom(display, target_name, True);
 	const Atom property = XInternAtom(display, RESULT_PROPERTY, False);
 	const Window owner = selection == None ? None : XGetSelectionOwner(display, selection);
 	Window requestor = None;
@@ -115,7 +121,7 @@ int main(int argc, char **argv)
 	unsigned long length = 0;
 	const char *failure = NULL;
 	if (selection == None || target == None || property == None || owner == None) {
-		failure = "The fixture clipboard has no UTF8_STRING owner.";
+		failure = "The fixture clipboard owner or requested text target is unavailable.";
 		goto cleanup;
 	}
 
@@ -136,7 +142,7 @@ int main(int argc, char **argv)
 		&actual_type, &format, &length, &remaining, &bytes);
 	if (status != Success || actual_type != target || format != TEXT_FORMAT ||
 		length > MAX_CLIPBOARD_BYTES || remaining != 0 || (length > 0 && !bytes)) {
-		failure = "The clipboard reply is not bounded, complete UTF8_STRING text.";
+		failure = "The clipboard reply did not contain complete, bounded text for the requested target.";
 		goto cleanup;
 	}
 	if (XGetSelectionOwner(display, selection) != owner) {
@@ -158,6 +164,6 @@ cleanup:
 	if (bytes)
 		XFree(bytes);
 	if (failure)
-		fprintf(stderr, "%s\n", failure);
+		fprintf(stderr, "%s (%s)\n", failure, target_name);
 	return failure ? EXIT_FAILURE : EXIT_SUCCESS;
 }

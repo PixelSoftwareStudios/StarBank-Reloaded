@@ -1002,13 +1002,23 @@ async function run(
         expectedXml: preparedXml,
         assertInputsUnchanged,
         async assertClipboard(expectedXml) {
-          const { stdout } = await execFileAsync(clipboardReader, [], {
-            encoding: "buffer",
-            killSignal: "SIGKILL",
-            maxBuffer: clipboardReadLimit,
-            timeout: commandTimeout,
-          });
-          assert.deepEqual(stdout, Buffer.from(expectedXml, "utf8"));
+          const expected = Buffer.from(expectedXml, "utf8");
+          const targets = [
+            { name: "UTF8_STRING", args: [] },
+            { name: "text/plain;charset=utf-8", args: ["--plain-utf8"] },
+          ];
+          for (const { name, args } of targets) {
+            const { stdout } = await execFileAsync(clipboardReader, args, {
+              encoding: "buffer",
+              killSignal: "SIGKILL",
+              maxBuffer: clipboardReadLimit,
+              timeout: commandTimeout,
+            });
+            assert.deepEqual(stdout, expected, `Clipboard target ${name}`);
+            console.log(
+              `Linux native Copy: exact ${name} Unicode text verified.`,
+            );
+          }
         },
       });
       await requestGtkWindowClose(closeSender);
