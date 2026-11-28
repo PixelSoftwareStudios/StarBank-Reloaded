@@ -43,8 +43,12 @@ import {
   waitForGtkManualFolderChooserReleased,
   waitForGtkSaveAsChooserReleased,
   waitForGtkSignedCopyChooserReleased,
+  waitForWindowGone,
 } from "./linux-gtk-dialog.mjs";
-import { verifyManualRootSelection } from "./linux-manual-root.mjs";
+import {
+  verifyManualRootSelection,
+  verifyRestoredManualCollection,
+} from "./linux-manual-root.mjs";
 import { verifySaveMenu, verifyToolsMenu } from "./linux-menus.mjs";
 import { verifyRawEditing } from "./linux-raw-editor.mjs";
 
@@ -1129,26 +1133,33 @@ async function run(
     ["Notes.txt", Buffer.from("Synthetic collection notes.\n", "utf8")],
   ];
   const refreshBankBytes = bank("004");
+  await using manualFixture = await mkdtempDisposable(
+    join(tmpdir(), "starbank-linux-collection-"),
+  );
+  const collectionPath = join(manualFixture.path, collectionName);
+  const configHome = join(manualFixture.path, "config");
+  await mkdir(join(collectionPath, "Nested"), { recursive: true });
+  // Distinct child names prevent GTK inline completion into a sole child.
+  await mkdir(join(collectionPath, "Empty sibling"));
+  for (const [name, bytes] of collectionInputs)
+    await writeFile(join(collectionPath, name), bytes, { flag: "wx" });
+  const refreshBankPath = join(collectionPath, refreshBankName);
+  let refreshBankCreated = false;
+  const assertCollectionUnchanged = async () => {
+    for (const [name, bytes] of collectionInputs)
+      assert.deepEqual(await readFile(join(collectionPath, name)), bytes);
+    if (refreshBankCreated)
+      assert.deepEqual(await readFile(refreshBankPath), refreshBankBytes);
+    else await assert.rejects(lstat(refreshBankPath), { code: "ENOENT" });
+  };
   await withNativeSession(
     application,
     "manual bank collection",
     [[currentBank, bank("001")]],
-    async (command, { scratch, assertInputsUnchanged }) => {
-      const collectionPath = join(scratch, collectionName);
-      await mkdir(join(collectionPath, "Nested"), { recursive: true });
-      // Distinct child names keep GTK from completing the directory into its sole child.
-      await mkdir(join(collectionPath, "Empty sibling"));
-      for (const [name, bytes] of collectionInputs)
-        await writeFile(join(collectionPath, name), bytes, { flag: "wx" });
-      const refreshBankPath = join(collectionPath, refreshBankName);
-      let refreshBankCreated = false;
+    async (command, { assertInputsUnchanged }) => {
       const assertFilesUnchanged = async () => {
         await assertInputsUnchanged();
-        for (const [name, bytes] of collectionInputs)
-          assert.deepEqual(await readFile(join(collectionPath, name)), bytes);
-        if (refreshBankCreated)
-          assert.deepEqual(await readFile(refreshBankPath), refreshBankBytes);
-        else await assert.rejects(lstat(refreshBankPath), { code: "ENOENT" });
+        await assertCollectionUnchanged();
       };
       await verifyManualRootSelection({
         command,
@@ -1179,6 +1190,29 @@ async function run(
       await discardGtkDirtyClose();
       await assertFilesUnchanged();
     },
+    { configHome },
+  );
+  await withNativeSession(
+    application,
+    "restored manual collection",
+    [],
+    async (command) => {
+      await verifyRestoredManualCollection({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        collectionName,
+        collectionPath,
+        bankNames: [...collectionBankNames, refreshBankName],
+        openBankName: collectionBankNames[0],
+        openingValue: "002",
+        assertFilesUnchanged: assertCollectionUnchanged,
+      });
+      await requestGtkWindowClose(closeSender);
+      await waitForWindowGone("StarBank Reloaded");
+      await assertCollectionUnchanged();
+    },
+    { configHome },
   );
 }
 

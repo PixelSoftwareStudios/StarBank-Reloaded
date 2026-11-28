@@ -7,6 +7,7 @@ const sidebar = "aside.map-pane";
 const queue = 'aside[aria-label="File open requests"] p[title]';
 const heading = ".document-editor h1";
 const selectedTab = 'button[role="tab"][aria-selected="true"]';
+const goldField = 'table input[aria-label="Gold value"]';
 const manualRequired =
   "Automatic bank discovery is unavailable. Select a folder.";
 const readyStatus = "Bank inventory ready.";
@@ -16,6 +17,81 @@ const dirtyStatus = "Unsaved changes in 1 section";
 
 function stage(message) {
   console.log(`Linux native manual root: ${message}`);
+}
+
+function inventoryReaders(evaluate) {
+  const discovery = () =>
+    evaluate(
+      `const panels = document.querySelectorAll(arguments[0]);
+      if (panels.length !== 1) return null;
+      const groups = Array.from(panels[0].querySelectorAll("fieldset"))
+        .filter((group) => group.querySelector(":scope > legend")?.textContent.trim() === "Bank discovery");
+      if (groups.length !== 1) return null;
+      const group = groups[0];
+      const roots = group.querySelectorAll("p[title]");
+      if (roots.length > 1) return null;
+      return {
+        root: roots.length === 1 ? {
+          title: roots[0].getAttribute("title"), text: roots[0].textContent.trim(),
+        } : null,
+        statuses: Array.from(group.querySelectorAll('[role="status"]'), (item) => item.textContent.trim()),
+        buttons: Array.from(group.querySelectorAll("button"), (button) => ({
+          name: button.textContent.trim(), disabled: button.matches(":disabled"),
+        })),
+        accountSelectors: group.querySelectorAll("select").length,
+        scanning: group.querySelector('progress[aria-label="Bank discovery progress"]') !== null,
+      };`,
+      settings,
+    );
+  const inventory = () =>
+    evaluate(
+      `const panes = document.querySelectorAll(arguments[0]);
+      if (panes.length !== 1) return null;
+      const pane = panes[0];
+      return {
+        roots: Array.from(pane.querySelectorAll("header p[title]"), (item) => item.getAttribute("title")),
+        buttons: Array.from(pane.querySelectorAll("header button"), (button) => ({
+          name: button.textContent.trim(), disabled: button.matches(":disabled"),
+        })),
+        statuses: Array.from(pane.querySelectorAll('[role="status"]'), (item) => item.textContent.trim()),
+        maps: pane.querySelectorAll('ul[aria-label="Maps"]').length,
+        bankLists: pane.querySelectorAll('ul[aria-label="Bank files"]').length,
+        banks: Array.from(pane.querySelectorAll('ul[aria-label="Bank files"] li > button'), (button) => ({
+          name: button.firstElementChild?.tagName === "SPAN" ? button.firstElementChild.textContent.trim() : null,
+          unmatched: Array.from(button.children).filter((child) => child.textContent.trim() === "Unmatched map").length,
+          scopes: Array.from(button.querySelectorAll("span[title]"), (item) => item.getAttribute("title")),
+          current: button.getAttribute("aria-current"), disabled: button.matches(":disabled"),
+        })),
+        accountSelectors: pane.querySelectorAll("select").length,
+        queued: document.querySelectorAll(arguments[1]).length,
+      };`,
+      sidebar,
+      queue,
+    );
+  return { discovery, inventory };
+}
+
+function inventoryMatches(listed, collectionName, names, current = null) {
+  return (
+    listed?.roots.length === 1 &&
+    listed.roots[0] === collectionName &&
+    listed.maps === 0 &&
+    listed.bankLists === 1 &&
+    listed.accountSelectors === 0 &&
+    listed.queued === 0 &&
+    listed.banks.length === names.length &&
+    listed.banks
+      .map((bank) => bank.name)
+      .sort()
+      .every((name, index) => name === names[index]) &&
+    listed.banks.every(
+      (bank) =>
+        bank.unmatched === 1 &&
+        bank.scopes.length === 0 &&
+        bank.current === (bank.name === current ? "true" : null) &&
+        !bank.disabled,
+    )
+  );
 }
 
 export async function verifyManualRootSelection({
@@ -78,51 +154,7 @@ export async function verifyManualRootSelection({
     (await noQueuedBank()) &&
     (await findControl(".document-editor button", "Undo"));
 
-  const discovery = () =>
-    evaluate(
-      `const panels = document.querySelectorAll(arguments[0]);
-      if (panels.length !== 1) return null;
-      const groups = Array.from(panels[0].querySelectorAll("fieldset"))
-        .filter((group) => group.querySelector(":scope > legend")?.textContent.trim() === "Bank discovery");
-      if (groups.length !== 1) return null;
-      const group = groups[0];
-      const roots = group.querySelectorAll("p[title]");
-      if (roots.length > 1) return null;
-      return {
-        root: roots.length === 1 ? {
-          title: roots[0].getAttribute("title"), text: roots[0].textContent.trim(),
-        } : null,
-        statuses: Array.from(group.querySelectorAll('[role="status"]'), (item) => item.textContent.trim()),
-        buttons: Array.from(group.querySelectorAll("button"), (button) => ({
-          name: button.textContent.trim(), disabled: button.matches(":disabled"),
-        })),
-        accountSelectors: group.querySelectorAll("select").length,
-        scanning: group.querySelector('progress[aria-label="Bank discovery progress"]') !== null,
-      };`,
-      settings,
-    );
-  const inventory = () =>
-    evaluate(
-      `const panes = document.querySelectorAll(arguments[0]);
-      if (panes.length !== 1) return null;
-      const pane = panes[0];
-      return {
-        roots: Array.from(pane.querySelectorAll("header p[title]"), (item) => item.getAttribute("title")),
-        statuses: Array.from(pane.querySelectorAll('[role="status"]'), (item) => item.textContent.trim()),
-        maps: pane.querySelectorAll('ul[aria-label="Maps"]').length,
-        bankLists: pane.querySelectorAll('ul[aria-label="Bank files"]').length,
-        banks: Array.from(pane.querySelectorAll('ul[aria-label="Bank files"] li > button'), (button) => ({
-          name: button.firstElementChild?.tagName === "SPAN" ? button.firstElementChild.textContent.trim() : null,
-          unmatched: Array.from(button.children).filter((child) => child.textContent.trim() === "Unmatched map").length,
-          scopes: Array.from(button.querySelectorAll("span[title]"), (item) => item.getAttribute("title")),
-          current: button.getAttribute("aria-current"), disabled: button.matches(":disabled"),
-        })),
-        accountSelectors: pane.querySelectorAll("select").length,
-        queued: document.querySelectorAll(arguments[1]).length,
-      };`,
-      sidebar,
-      queue,
-    );
+  const { discovery, inventory } = inventoryReaders(evaluate);
   const ready = async (names = expectedNames) => {
     const state = await discovery();
     const listed = await inventory();
@@ -138,24 +170,7 @@ export async function verifyManualRootSelection({
           (button) => button.name === name && !button.disabled,
         ),
       ) &&
-      listed?.roots.length === 1 &&
-      listed.roots[0] === collectionName &&
-      listed.maps === 0 &&
-      listed.bankLists === 1 &&
-      listed.accountSelectors === 0 &&
-      listed.queued === 0 &&
-      listed.banks.length === names.length &&
-      listed.banks
-        .map((bank) => bank.name)
-        .sort()
-        .every((name, index) => name === names[index]) &&
-      listed.banks.every(
-        (bank) =>
-          bank.unmatched === 1 &&
-          bank.scopes.length === 0 &&
-          bank.current === null &&
-          !bank.disabled,
-      )
+      inventoryMatches(listed, collectionName, names)
     );
   };
   const returnToRetainedEditor = async (label) => {
@@ -238,4 +253,99 @@ export async function verifyManualRootSelection({
     "the original editable dirty bank and Undo after Refresh",
   );
   stage("Native folder Cancel, manual collection import and Refresh passed.");
+}
+
+export async function verifyRestoredManualCollection({
+  command,
+  waitFor,
+  controls,
+  collectionName,
+  collectionPath,
+  bankNames,
+  openBankName,
+  openingValue,
+  assertFilesUnchanged,
+}) {
+  assert.equal(typeof collectionName, "string");
+  assert(collectionName.length > 0);
+  assert.equal(typeof collectionPath, "string");
+  assert(isAbsolute(collectionPath));
+  assert.equal(basename(collectionPath), collectionName);
+  assert(Array.isArray(bankNames) && bankNames.length === 3);
+  assert(
+    bankNames.every((name) => typeof name === "string" && name.length > 0),
+  );
+  assert.equal(new Set(bankNames).size, bankNames.length);
+  assert(bankNames.includes(openBankName));
+  assert.equal(typeof openingValue, "string");
+  assert(openingValue.length > 0);
+  const names = [...bankNames].sort();
+  const { content, findControl, hasHistory, tableValue } = controls;
+  const evaluate = (script, ...args) =>
+    command("/execute/sync", "POST", { script, args });
+  const { inventory } = inventoryReaders(evaluate);
+  const ready = async (current = null) => {
+    const listed = await inventory();
+    return (
+      inventoryMatches(listed, collectionName, names, current) &&
+      listed.statuses.length === 1 &&
+      listed.statuses[0] === "No cached maps found." &&
+      ["Select Folder…", "Refresh", "Use auto-detect"].every((name) =>
+        listed.buttons.some(
+          (button) => button.name === name && !button.disabled,
+        ),
+      )
+    );
+  };
+
+  stage("Waiting for the restored collection without a startup bank.");
+  await waitFor(
+    "the restored three-bank inventory and unopened welcome view",
+    async () =>
+      (await content(".editor-welcome h1")) === "StarBank Reloaded" &&
+      (await content('.editor-welcome p[role="status"]')) === "No bank open." &&
+      (await content(".document-editor")) === null &&
+      (await ready()),
+  );
+  const location = new URL(await command("/url"));
+  assert.equal(location.protocol, "tauri:");
+  assert.equal(location.host, "localhost");
+  await assertFilesUnchanged();
+
+  stage("Opening the known bank from the restored inventory.");
+  const row = await evaluate(
+    `const rows = Array.from(document.querySelectorAll(arguments[0]))
+      .filter((button) => button.firstElementChild?.tagName === "SPAN" &&
+        button.firstElementChild.textContent.trim() === arguments[1]);
+    if (rows.length !== 1 || rows[0].getClientRects().length === 0 ||
+      rows[0].matches(":disabled") || rows[0].getAttribute("aria-disabled") === "true") return null;
+    return rows[0];`,
+    `${sidebar} ul[aria-label="Bank files"] li > button`,
+    openBankName,
+  );
+  const elementKey = "element-6066-11e4-a52e-4f735466cecf";
+  assert.equal(
+    typeof row?.[elementKey],
+    "string",
+    "Missing unique restored bank row.",
+  );
+  await command(`/element/${row[elementKey]}/click`, "POST", {});
+  await waitFor(
+    "the clean editable bank opened from the restored collection",
+    async () =>
+      (await content(heading)) === openBankName &&
+      (await content(selectedTab)) === "Table View" &&
+      (await tableValue()) === openingValue &&
+      (await findControl(goldField, null)) &&
+      (await evaluate(
+        "return document.querySelector(arguments[0])?.readOnly === false;",
+        goldField,
+      )) &&
+      (await content(".editor-dirty-status")) === null &&
+      (await content(".editor-draft-actions")) === null &&
+      !(await hasHistory()) &&
+      (await ready(openBankName)),
+  );
+  await assertFilesUnchanged();
+  stage("Restart restored the manual root and opened the known bank cleanly.");
 }
