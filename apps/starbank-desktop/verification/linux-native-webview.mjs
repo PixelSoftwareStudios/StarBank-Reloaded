@@ -55,6 +55,7 @@ import {
 } from "./linux-manual-root.mjs";
 import { verifySaveMenu, verifyToolsMenu } from "./linux-menus.mjs";
 import { verifyRawEditing } from "./linux-raw-editor.mjs";
+import { verifySidebarLayout } from "./linux-sidebar-layout.mjs";
 
 const loopback = "127.0.0.1";
 const commandTimeout = 5_000;
@@ -1305,6 +1306,38 @@ async function run(
         waitFor,
         controls: editorControls(command),
         selectAppearance: false,
+        assertUnchanged: assertRecoveredCollectionUnchanged,
+      });
+      await verifyAutomaticInventoryMode({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        assertFilesUnchanged: assertRecoveredCollectionUnchanged,
+        selectAutomatic: false,
+      });
+      await verifySidebarLayout({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        resize: true,
+        assertUnchanged: assertRecoveredCollectionUnchanged,
+      });
+      await requestGtkWindowClose(closeSender);
+      await waitForWindowGone("StarBank Reloaded");
+      await assertRecoveredCollectionUnchanged();
+    },
+    { configHome },
+  );
+  await withNativeSession(
+    application,
+    "sidebar layout after restart",
+    [],
+    async (command) => {
+      await verifySidebarLayout({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        resize: false,
         assertUnchanged: assertRecoveredCollectionUnchanged,
       });
       await verifyAutomaticInventoryMode({
