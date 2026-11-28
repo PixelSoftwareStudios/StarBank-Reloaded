@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 const settings = 'section[aria-label="Settings"]';
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 const system = ["system", "System"];
+const light = ["light", "Light"];
 const dark = ["dark", "Dark"];
+const colorSchemes = { system: "light dark", light: "light", dark: "dark" };
 const compact = ["compact", "Compact"];
 const comfortable = ["comfortable", "Comfortable"];
 
@@ -31,6 +33,8 @@ export async function verifyAppearancePreferences({
       return {
         theme: html.dataset.starbankTheme,
         colorScheme: getComputedStyle(html).colorScheme,
+        background: getComputedStyle(shells[0]).backgroundColor,
+        prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
         density: shells[0].dataset.density,
         labelPadding: Number.parseFloat(getComputedStyle(label).paddingBlockStart),
       };`);
@@ -73,7 +77,7 @@ export async function verifyAppearancePreferences({
   async function applied(theme, density) {
     const appearance = await readApplied();
     return appearance?.theme === theme[0] &&
-      (theme[0] !== dark[0] || appearance.colorScheme === dark[0]) &&
+      appearance.colorScheme === colorSchemes[theme[0]] &&
       appearance.density === density[0] &&
       Number.isFinite(appearance.labelPadding)
       ? appearance
@@ -84,6 +88,14 @@ export async function verifyAppearancePreferences({
     if (JSON.stringify(selected) !== JSON.stringify([theme, density]))
       return null;
     return applied(theme, density);
+  }
+  async function selectTheme(choice) {
+    stage(`Selecting ${choice[1]} on the real Theme control.`);
+    await clickChoice("Theme", choice);
+    return waitFor(
+      `the confirmed ${choice[1]} theme and applied color scheme`,
+      () => confirmedSettings(choice, compact),
+    );
   }
   async function welcomeWithAppearance(theme, density) {
     if (
@@ -111,11 +123,26 @@ export async function verifyAppearancePreferences({
     confirmedSettings(initialTheme, initialDensity),
   );
   if (selectAppearance) {
-    stage("Selecting Dark on the real Theme control.");
-    await clickChoice("Theme", dark);
-    await waitFor("the confirmed Dark theme and applied color scheme", () =>
-      confirmedSettings(dark, compact),
+    const lightAppearance = await selectTheme(light);
+    const systemAppearance = await selectTheme(system);
+    const darkAppearance = await selectTheme(dark);
+    assert.notEqual(
+      lightAppearance.background,
+      darkAppearance.background,
+      "Explicit Light and Dark must use different shell backgrounds.",
     );
+    const preferredAppearance = systemAppearance.prefersDark
+      ? darkAppearance
+      : lightAppearance;
+    assert.equal(
+      systemAppearance.background,
+      preferredAppearance.background,
+      "The System shell background must match WebKit's preferred scheme.",
+    );
+    stage(
+      `System matched the ${preferredAppearance.theme} preference reported by WebKit.`,
+    );
+
     stage("Selecting Comfortable on the real Density control.");
     await clickChoice("Density", comfortable);
     const updated = await waitFor("the confirmed Comfortable density", () =>
