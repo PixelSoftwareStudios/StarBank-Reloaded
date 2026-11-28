@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import init, { WasmBankEngine } from "../src/generated/starbank_wasm.js";
 import { verifyBatchBackupReview } from "./batch-backup-review.mjs";
+import {
+  clipboardBank,
+  configureDesktopClipboard,
+  verifyDesktopClipboard,
+} from "./desktop-clipboard.mjs";
 import { verifyEmptyEngineCloseProbe } from "./native-close-probe.mjs";
 import { verifySidebarResize } from "./sidebar-resize.mjs";
 import { verifyNativeStructureDraftClose } from "./structure-draft-close.mjs";
@@ -153,7 +158,12 @@ function dispatchFrame(engine, packet, beforeDispatch, afterDispatch) {
   return Array.from(output);
 }
 
-function createBridge(engine, canOverwrite, copyCapability) {
+function createBridge(
+  engine,
+  canOverwrite,
+  copyCapability,
+  sourceBank = initialBank,
+) {
   const calls = [];
   const unexpected = [];
   let navigation;
@@ -387,7 +397,7 @@ function createBridge(engine, canOverwrite, copyCapability) {
         openCount += 1;
         openName =
           openCount === 1 ? initialName : `Replacement-${openCount}.SC2Bank`;
-        return acceptBankOpen(request, initialBank);
+        return acceptBankOpen(request, sourceBank);
       }
       case "active_backup_status":
         return {
@@ -1552,6 +1562,12 @@ async function verifyRenderer(
   openRecovery = false,
   copyCapability,
 ) {
+  const clipboardMode =
+    openRecovery === "clipboard_absent"
+      ? "absent"
+      : openRecovery === "clipboard_denied"
+        ? "denied"
+        : undefined;
   const context = await browser.newContext({
     offline: true,
     serviceWorkers: "block",
@@ -1582,9 +1598,27 @@ async function verifyRenderer(
     page.setDefaultTimeout(10_000);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const bridge = createBridge(engine, canOverwrite, copyCapability);
+    const bridge = createBridge(
+      engine,
+      canOverwrite,
+      copyCapability,
+      clipboardMode ? clipboardBank : initialBank,
+    );
+    if (clipboardMode) await configureDesktopClipboard(page, clipboardMode);
     await bindRenderer(page, bridge);
     await page.goto(origin);
+    if (clipboardMode) {
+      await openBank(page);
+      await editGold(page, "002");
+      await verifyDesktopClipboard(page, bridge, clipboardMode);
+      assert.deepEqual(bridge.unexpected, []);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(rejected, []);
+      console.log(
+        `Chromium ${browser.version()} desktop renderer copied exact prepared XML with clipboard ${clipboardMode}.`,
+      );
+      return;
+    }
     if (copyCapability !== undefined) {
       await verifyCreateOnlyRenderer(
         page,
@@ -1701,6 +1735,8 @@ try {
   await verifyRenderer(browser, true, "close_probe");
   await verifyRenderer(browser, true, "structure_close");
   await verifyRenderer(browser, false, "sidebar_resize");
+  await verifyRenderer(browser, false, "clipboard_absent");
+  await verifyRenderer(browser, false, "clipboard_denied");
   for (const capability of [
     { value: true },
     { value: false },

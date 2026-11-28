@@ -12,6 +12,7 @@ import type {
 } from "starbank-ui";
 import { AppShell } from "starbank-ui";
 import { decodeBankFileXml } from "starbank-ui/bank-encoding";
+import { writeBankClipboard } from "starbank-ui/browser";
 import type {
   EngineCommand,
   EngineDiff,
@@ -39,6 +40,7 @@ import {
 } from "./backup-preferences";
 import { BackupRetentionReview } from "./backup-retention";
 import { useActiveBackupStatus } from "./backup-status";
+import { BankClipboardDialog } from "./bank-clipboard-dialog";
 import { BankConflictDialog, type BankConflictPrompt } from "./bank-conflict";
 import { BatchBackupTools } from "./batch-backup-ui";
 import { resignExternalBank } from "./external-sign";
@@ -141,6 +143,7 @@ function DesktopApp() {
   const [backupPrompt, setBackupPrompt] = useState<BackupPrompt>();
   const [conflictPrompt, setConflictPrompt] = useState<BankConflictPrompt>();
   const [signingPrompt, setSigningPrompt] = useState<ManualSigningPrompt>();
+  const [copyPreview, setCopyPreview] = useState<string>();
   const inProgress = useRef(false);
   const nextRequest = useRef(0);
   const preferences = useDesktopSettings();
@@ -1016,35 +1019,37 @@ function DesktopApp() {
             return { ok: true, message: `Exported ${exported.name}.` };
           })
       : undefined,
-    onCopy: navigator.clipboard
-      ? (target) =>
-          action(async () => {
-            activeDocument(target);
-            const { reply, bytes } = await dispatch(target, {
-              kind: "prepare",
-            });
-            if (
-              reply.result.kind !== "prepared" ||
-              reply.document_id !== target.id ||
-              reply.revision !== target.revision ||
-              bytes === undefined
-            ) {
-              throw new Error("The bank engine did not prepare XML.");
-            }
-            const status = reply.result.payload.signature_status;
-            if (
-              status !== "valid" &&
-              status !== "unsigned" &&
-              !window.confirm(
-                "Copy XML with an unverified signature? StarCraft II may refuse it.",
-              )
-            ) {
-              return { ok: true };
-            }
-            await navigator.clipboard.writeText(decodeBankFileXml(bytes));
-            return { ok: true, message: "Copied bank XML." };
-          })
-      : undefined,
+    onCopy: (target) =>
+      action(async () => {
+        activeDocument(target);
+        const { reply, bytes } = await dispatch(target, { kind: "prepare" });
+        if (
+          reply.result.kind !== "prepared" ||
+          reply.document_id !== target.id ||
+          reply.revision !== target.revision ||
+          bytes === undefined
+        ) {
+          throw new Error("The bank engine did not prepare XML.");
+        }
+        const status = reply.result.payload.signature_status;
+        if (
+          status !== "valid" &&
+          status !== "unsigned" &&
+          !window.confirm(
+            "Copy XML with an unverified signature? StarCraft II may refuse it.",
+          )
+        ) {
+          return { ok: true };
+        }
+        const xml = decodeBankFileXml(bytes);
+        try {
+          await writeBankClipboard(xml);
+          return { ok: true, message: "Copied bank XML." };
+        } catch {
+          setCopyPreview(xml);
+          return { ok: true };
+        }
+      }),
   };
 
   function updateBackupSettings(
@@ -1207,6 +1212,12 @@ function DesktopApp() {
         }
       />
       {signingPrompt ? <ManualSigningSheet {...signingPrompt} /> : null}
+      {copyPreview !== undefined && (
+        <BankClipboardDialog
+          xml={copyPreview}
+          close={() => setCopyPreview(undefined)}
+        />
+      )}
       {conflictPrompt ? <BankConflictDialog {...conflictPrompt} /> : null}
       {backupPrompt ? (
         <BackupPicker {...backupPrompt} messageFor={messageFor} />
