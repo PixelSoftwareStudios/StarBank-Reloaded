@@ -315,6 +315,15 @@ jobs:
         run: >-
           python3 apps/starbank-desktop/verification/verify_package.py
           target/debug/bundle "${{ runner.os }}" "${{ runner.arch }}"
+      - name: Resolve Debian runtime dependencies in minimal Ubuntu
+        if: runner.os == 'Linux'
+        timeout-minutes: 8
+        run: |
+          deb_version=$(node -p 'require("./apps/starbank-desktop/src-tauri/tauri.conf.json").version')
+          deb_arch=$(dpkg --print-architecture)
+          bash apps/starbank-desktop/verification/linux-minimal-dependencies.sh \
+            "target/debug/bundle/deb/starbank-reloaded_${deb_version}_${deb_arch}.deb" \
+            "$deb_version" "$deb_arch"
       - name: Test GTK allocation ownership without a display
         if: runner.os == 'Linux'
         timeout-minutes: 5
