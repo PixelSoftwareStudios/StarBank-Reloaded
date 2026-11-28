@@ -24,10 +24,12 @@ import {
   cancelGtkDirtyOpen,
   cancelGtkDraftClose,
   cancelGtkExportCopy,
+  cancelGtkManualFolderSelection,
   cancelGtkSaveAsOnClose,
   cancelGtkSaveAsOnOpen,
   chooseGtkExportDestination,
   chooseGtkExternalSigningSource,
+  chooseGtkManualCollectionDirectory,
   chooseGtkSignedCopyDestination,
   discardGtkDirtyClose,
   discardGtkDirtyOpen,
@@ -38,9 +40,11 @@ import {
   saveGtkDirtyOpenAs,
   waitForGtkExportChooserReleased,
   waitForGtkExternalSourceChooserReleased,
+  waitForGtkManualFolderChooserReleased,
   waitForGtkSaveAsChooserReleased,
   waitForGtkSignedCopyChooserReleased,
 } from "./linux-gtk-dialog.mjs";
+import { verifyManualRootSelection } from "./linux-manual-root.mjs";
 import { verifySaveMenu, verifyToolsMenu } from "./linux-menus.mjs";
 import { verifyRawEditing } from "./linux-raw-editor.mjs";
 
@@ -897,6 +901,15 @@ async function run(
   clipboardReader,
   accessibilityProbe,
 ) {
+  async function assertGtkLocation(option, text) {
+    const { stdout } = await execFileAsync(accessibilityProbe, [option, text], {
+      encoding: "utf8",
+      killSignal: "SIGKILL",
+      maxBuffer: accessibilityOutputLimit,
+      timeout: commandTimeout,
+    });
+    console.log(stdout.trim());
+  }
   await using sharedConfig = await mkdtempDisposable(
     join(tmpdir(), "starbank-linux-preferences-"),
   );
@@ -1084,17 +1097,7 @@ async function run(
         foreignName,
         chooseSource: () =>
           chooseGtkExternalSigningSource(foreignPath, async (text) => {
-            const { stdout } = await execFileAsync(
-              accessibilityProbe,
-              ["--gtk-open-location", text],
-              {
-                encoding: "utf8",
-                killSignal: "SIGKILL",
-                maxBuffer: accessibilityOutputLimit,
-                timeout: commandTimeout,
-              },
-            );
-            console.log(stdout.trim());
+            await assertGtkLocation("--gtk-open-location", text);
             console.log(
               "Linux native external source: focused Location text verified through AT-SPI.",
             );
@@ -1111,6 +1114,68 @@ async function run(
       await discardGtkDirtyClose();
       await assertFilesUnchanged();
       await assertSignedOutput();
+    },
+  );
+  const collectionName = "Imported collection";
+  const collectionBankNames = [
+    "CollectionOne.SC2Bank",
+    "CollectionTwo.sC2bAnK",
+  ];
+  const refreshBankName = "After refresh.SC2Bank";
+  const collectionInputs = [
+    [collectionBankNames[0], bank("002")],
+    [join("Nested", collectionBankNames[1]), bank("003")],
+    ["Ignored.sc2bank.bak", bank("999")],
+    ["Notes.txt", Buffer.from("Synthetic collection notes.\n", "utf8")],
+  ];
+  const refreshBankBytes = bank("004");
+  await withNativeSession(
+    application,
+    "manual bank collection",
+    [[currentBank, bank("001")]],
+    async (command, { scratch, assertInputsUnchanged }) => {
+      const collectionPath = join(scratch, collectionName);
+      await mkdir(join(collectionPath, "Nested"), { recursive: true });
+      for (const [name, bytes] of collectionInputs)
+        await writeFile(join(collectionPath, name), bytes, { flag: "wx" });
+      const refreshBankPath = join(collectionPath, refreshBankName);
+      let refreshBankCreated = false;
+      const assertFilesUnchanged = async () => {
+        await assertInputsUnchanged();
+        for (const [name, bytes] of collectionInputs)
+          assert.deepEqual(await readFile(join(collectionPath, name)), bytes);
+        if (refreshBankCreated)
+          assert.deepEqual(await readFile(refreshBankPath), refreshBankBytes);
+        else await assert.rejects(lstat(refreshBankPath), { code: "ENOENT" });
+      };
+      await verifyManualRootSelection({
+        command,
+        waitFor,
+        controls: editorControls(command),
+        currentName: currentBank,
+        collectionName,
+        collectionPath,
+        bankNames: collectionBankNames,
+        refreshBankName,
+        addRefreshBank: async () => {
+          await writeFile(refreshBankPath, refreshBankBytes, { flag: "wx" });
+          refreshBankCreated = true;
+        },
+        cancelChooser: cancelGtkManualFolderSelection,
+        chooseCollection: () =>
+          chooseGtkManualCollectionDirectory(collectionPath, (text) =>
+            assertGtkLocation("--gtk-folder-location", text),
+          ),
+        waitForChooserReleased: waitForGtkManualFolderChooserReleased,
+        assertFilesUnchanged,
+      });
+      assert(
+        refreshBankCreated,
+        "The fixture must exercise an actual refresh.",
+      );
+      await requestGtkWindowClose(closeSender);
+      await discardGtkDirtyClose();
+      await assertFilesUnchanged();
     },
   );
 }
