@@ -298,10 +298,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libx11-dev \
-            webkit2gtk-driver xvfb xdotool at-spi2-core=2.52.0-1build1
+            webkit2gtk-driver xvfb xdotool at-spi2-core=2.52.0-1build1 \
+            gdb=15.1-1ubuntu1~24.04.1
           command -v dbus-run-session
           pkg-config --modversion atspi-2
-          dpkg-query -W at-spi2-core libatspi2.0-dev dbus-daemon libwebkit2gtk-4.1-0
+          dpkg-query -W at-spi2-core libatspi2.0-dev dbus-daemon libwebkit2gtk-4.1-0 gdb
+          /usr/bin/gdb --version
       - run: rustup show
       - run: pnpm install --frozen-lockfile
       - name: Build the unsigned macOS app bundle
@@ -357,6 +359,37 @@ jobs:
           cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
             apps/starbank-desktop/verification/linux-clipboard-read.c \
             -o "$RUNNER_TEMP/starbank-clipboard-read" -lX11
+          diagnostic_dir=$(mktemp -d "$RUNNER_TEMP/starbank-gtk-stack.XXXXXX")
+          cleanup_diagnostic() {
+            rm -f -- "$diagnostic_dir/inferior" "$diagnostic_dir/stack"
+            rmdir -- "$diagnostic_dir"
+          }
+          trap cleanup_diagnostic EXIT
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
+            apps/starbank-desktop/verification/linux-gdb-inferior.c \
+            -o "$diagnostic_dir/inferior"
+          export STARBANK_GDB_INFERIOR="$diagnostic_dir/inferior"
+          cat > "$diagnostic_dir/stack" <<'SH'
+          #!/bin/sh
+          set -eu
+          STARBANK_GDB_DRIVER_GROUP=$(/usr/bin/python3 -I -c 'import os; print(os.getpgrp())')
+          export STARBANK_GDB_DRIVER_GROUP
+          export SHELL=/bin/sh
+          exec /usr/bin/gdb --nx --quiet --batch --return-child-result \
+            -iex 'set auto-load off' \
+            -iex 'set debuginfod enabled off' \
+            -ex 'set pagination off' \
+            -ex 'set confirm off' \
+            -ex 'set disable-randomization off' \
+            -ex 'set print frame-arguments none' \
+            -ex 'set startup-with-shell on' \
+            -ex 'set exec-wrapper "$STARBANK_GDB_INFERIOR"' \
+            -ex 'handle SIGPIPE SIGUSR1 nostop noprint pass' \
+            -ex run \
+            -ex 'python gdb.execute("bt 40") if gdb.selected_inferior().pid else gdb.write("Diagnostic process exited; no stopped stack captured.\n")' \
+            --args /usr/bin/starbank-desktop "$@" >&2
+          SH
+          chmod 0700 "$diagnostic_dir/stack"
           accessibility_cflags_text=$(pkg-config --cflags atspi-2 gio-2.0)
           accessibility_libraries_text=$(pkg-config --libs gio-2.0)
           read -r -a accessibility_cflags <<< "$accessibility_cflags_text"
@@ -374,7 +407,8 @@ jobs:
             ' starbank-native-accessibility \
             apps/starbank-desktop/verification/linux-native-webview.mjs \
             /usr/bin/starbank-desktop "$RUNNER_TEMP/starbank-close-window" \
-            "$RUNNER_TEMP/starbank-clipboard-read" "$RUNNER_TEMP/starbank-accessibility"
+            "$RUNNER_TEMP/starbank-clipboard-read" "$RUNNER_TEMP/starbank-accessibility" \
+            "$diagnostic_dir/stack"
       - name: Build the unsigned NSIS installer
         if: runner.os == 'Windows'
         run: pnpm --filter starbank-desktop exec tauri build --bundles nsis --no-sign --debug -- --locked
